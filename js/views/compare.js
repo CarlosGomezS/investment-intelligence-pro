@@ -1,10 +1,10 @@
 // Comparador de empresas (hasta 5, métricas actuales e históricas) y comparador sectorial (medianas del sector).
-import { data, gather } from '../providers/index.js';
-import { fundamentals } from '../ui/charts.js';
-import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js';
-import { logoHTML } from '../app.js';
-import { isNum, buildAnnual, deriveYear, median, cagrN } from '../calc/finance.js';
-import { exportCSV } from '../export.js';
+import { data, gather } from '../providers/index.js?v=27218ae7';
+import { fundamentals } from '../ui/charts.js?v=27218ae7';
+import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=27218ae7';
+import { logoHTML } from '../app.js?v=27218ae7';
+import { isNum, buildAnnual, deriveYear, median, cagrN } from '../calc/finance.js?v=27218ae7';
+import { exportCSV } from '../export.js?v=27218ae7';
 
 const METRICS = [['revenue', 'Ingresos', 'big'], ['netIncome', 'Beneficio neto', 'big'], ['fcf', 'FCF', 'big'], ['ebitda', 'EBITDA', 'big'], ['eps', 'BPA', 'n'], ['grossMargin', 'Margen bruto', 'pct'], ['operatingMargin', 'Margen operativo', 'pct'], ['netMargin', 'Margen neto', 'pct'], ['roic', 'ROIC', 'pct'], ['roe', 'ROE', 'pct'], ['debt', 'Deuda total', 'big'], ['cash', 'Caja', 'big'], ['equity', 'Patrimonio', 'big'], ['shares', 'Acciones', 'big']];
 let metric = 'revenue', mode = 'empresas';

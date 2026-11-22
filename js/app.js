@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js';
-import { data, setHint } from './providers/index.js';
-import { usage } from './providers/http.js';
-import { config } from './config.js';
-import { store } from './store.js';
-import { destroyAll } from './ui/charts.js';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=27218ae7';
+import { data, setHint } from './providers/index.js?v=27218ae7';
+import { usage } from './providers/http.js?v=27218ae7';
+import { config } from './config.js?v=27218ae7';
+import { store } from './store.js?v=27218ae7';
+import { destroyAll } from './ui/charts.js?v=27218ae7';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js'),
-  c: () => import('./views/company.js'),
-  watchlist: () => import('./views/watchlist.js'),
-  screener: () => import('./views/screener.js'),
-  comparar: () => import('./views/compare.js'),
-  calendario: () => import('./views/calendar.js'),
-  metodologia: () => import('./views/methodology.js'),
-  ajustes: () => import('./views/settings.js'),
+  dashboard: () => import('./views/dashboard.js?v=27218ae7'),
+  c: () => import('./views/company.js?v=27218ae7'),
+  watchlist: () => import('./views/watchlist.js?v=27218ae7'),
+  screener: () => import('./views/screener.js?v=27218ae7'),
+  comparar: () => import('./views/compare.js?v=27218ae7'),
+  calendario: () => import('./views/calendar.js?v=27218ae7'),
+  metodologia: () => import('./views/methodology.js?v=27218ae7'),
+  ajustes: () => import('./views/settings.js?v=27218ae7'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -107,6 +107,7 @@ const SHORT = { fmp: 'FMP', av: 'AV', td: 'TD', finnhub: 'FH', roic: 'ROIC', sec
 function showUsage() { const u = usage(), c = config.get(); $('#usage').textContent = Object.keys(SHORT).filter((p) => config.canUse(p) && (u[p] || c.limits[p])).map((p) => `${SHORT[p]} ${u[p] || 0}${c.limits[p] ? '/' + c.limits[p] : ''}`).join(' · '); }
 window.addEventListener('iip:usage', showUsage); showUsage();
 
+window.__iipBooted = true;
 window.addEventListener('hashchange', route);
 window.addEventListener('iip:toast', (e) => toast(e.detail));
 route();

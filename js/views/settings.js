@@ -1,13 +1,13 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS } from '../config.js';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js';
-import { fmp } from '../providers/fmp.js';
-import { alphavantage } from '../providers/alphavantage.js';
-import { finnhub } from '../providers/finnhub.js';
-import { twelvedata } from '../providers/twelvedata.js';
-import { roic } from '../providers/roic.js';
-import { store } from '../store.js';
-import { esc, card, toast } from '../ui/dom.js';
+import { config, KEYS } from '../config.js?v=27218ae7';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=27218ae7';
+import { fmp } from '../providers/fmp.js?v=27218ae7';
+import { alphavantage } from '../providers/alphavantage.js?v=27218ae7';
+import { finnhub } from '../providers/finnhub.js?v=27218ae7';
+import { twelvedata } from '../providers/twelvedata.js?v=27218ae7';
+import { roic } from '../providers/roic.js?v=27218ae7';
+import { store } from '../store.js?v=27218ae7';
+import { esc, card, toast } from '../ui/dom.js?v=27218ae7';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -57,7 +57,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js');
+      const { sec } = await import('../providers/sec.js?v=27218ae7');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;

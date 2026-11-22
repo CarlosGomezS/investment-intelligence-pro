@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js';
-import { alphavantage } from './alphavantage.js';
-import { finnhub } from './finnhub.js';
-import { twelvedata } from './twelvedata.js';
-import { roic } from './roic.js';
-import { sec } from './sec.js';
-import { esef } from './esef.js';
-import { config } from '../config.js';
-import { ApiError, usage, queueDelay } from './http.js';
-import { setHint } from './hints.js';
+import { fmp } from './fmp.js?v=27218ae7';
+import { alphavantage } from './alphavantage.js?v=27218ae7';
+import { finnhub } from './finnhub.js?v=27218ae7';
+import { twelvedata } from './twelvedata.js?v=27218ae7';
+import { roic } from './roic.js?v=27218ae7';
+import { sec } from './sec.js?v=27218ae7';
+import { esef } from './esef.js?v=27218ae7';
+import { config } from '../config.js?v=27218ae7';
+import { ApiError, usage, queueDelay } from './http.js?v=27218ae7';
+import { setHint } from './hints.js?v=27218ae7';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -33,7 +33,7 @@ const QUARTERLY = ['fmp', 'av']; // solo estos dan trimestres reales
 
 // Si un proveedor responde «plan de pago» para un símbolo, no se le vuelve a preguntar por ese símbolo
 // durante 3 días: así no se gasta cuota en peticiones que van a fallar (p. ej. FMP gratis con acciones europeas).
-const BLK = 'iip.blocked.v1';
+const BLK = 'iip.blocked.v2'; // v2: se descartan los bloqueos erróneos de la versión anterior
 let blocked = (() => { try { const b = JSON.parse(localStorage.getItem(BLK) || '{}'); const now = Date.now(); return Object.fromEntries(Object.entries(b).filter(([, t]) => now - t < 3 * 864e5)); } catch { return {}; } })();
 const isSym = (x) => typeof x === 'string' && /^[A-Z0-9.^\-]{1,15}$/i.test(x);
 function block(id, sym) { blocked[`${id}:${sym}`] = Date.now(); try { localStorage.setItem(BLK, JSON.stringify(blocked)); } catch {} }
@@ -57,7 +57,9 @@ async function run(method, args) {
   const list = chain(method, args);
   if (!list.length) {
     const anyBlocked = (ORDER[method] || ['fmp']).some((id) => isBlocked(id, args));
-    throw anyBlocked ? new ApiError('premium', 'Tus fuentes gratuitas no ofrecen este dato para esta empresa') : new ApiError('no_key', 'Ningún proveedor configurado ofrece este dato. Revisa Ajustes.');
+    const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
+    const who = (ORDER[method] || ['fmp']).map((id) => names[id]).join(', ');
+    throw anyBlocked ? new ApiError('premium', `Solo lo ofrece ${who} y su plan gratuito no cubre esta empresa`) : new ApiError('no_key', `Solo lo ofrece ${who}: añade su clave en Ajustes`);
   }
   let best = null;
   for (const [i, id] of list.entries()) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="dark" data-version="27218ae7">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/app.css?v=27218ae7">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
@@ -40,6 +40,15 @@
 </nav>
 <main id="view" tabindex="-1"></main>
 <footer class="foot">Herramienta de análisis. No constituye asesoramiento financiero ni recomendación de compra o venta. Los datos proceden de terceros y pueden contener errores.</footer>
-<script type="module" src="js/app.js"></script>
+<div id="bootfail" hidden style="position:fixed;inset:auto 12px 90px 12px;z-index:200;background:#161c28;color:#e6e9ef;border:1px solid #2a3546;border-radius:12px;padding:14px 16px;font:14px Inter,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.4)">
+  <b>La app no ha terminado de cargar.</b><div id="bootmsg" style="color:#8a94a6;margin:4px 0 10px;font-size:13px">Suele deberse a archivos antiguos en caché tras una actualización.</div>
+  <button onclick="location.replace(location.pathname+'?r='+Date.now()+location.hash)" style="background:#3d7bff;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600">Recargar la app</button>
+</div>
+<script>
+  // Vigilante de arranque: si el módulo principal no arranca en 10 s o falla, ofrece recargar sin caché.
+  window.addEventListener('error', function (e) { var t = e.target; if (t && t.tagName && t.tagName !== 'SCRIPT') return; if (!window.__iipBooted) { document.getElementById('bootmsg').textContent = 'Error: ' + (e.message || 'no se pudo cargar un archivo'); document.getElementById('bootfail').hidden = false; } }, true);
+  setTimeout(function () { if (!window.__iipBooted) document.getElementById('bootfail').hidden = false; }, 10000);
+</script>
+<script type="module" src="js/app.js?v=27218ae7"></script>
 </body>
 </html>

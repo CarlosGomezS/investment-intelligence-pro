@@ -1,8 +1,8 @@
 // ROIC.AI API v2 (gratis: 5 peticiones/minuto, cobertura mundial, 2 años de estados anuales).
 // Respaldo para empresas fuera de EE. UU. Acepta ticker o ISIN como identificador.
-import { getJSON } from './http.js';
-import { config } from '../config.js';
-import { hint } from './hints.js';
+import { getJSON } from './http.js?v=27218ae7';
+import { config } from '../config.js?v=27218ae7';
+import { hint } from './hints.js?v=27218ae7';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v == null || v === '' ? null : Number(v));

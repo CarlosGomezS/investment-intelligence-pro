@@ -1,15 +1,15 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js';
-import { buildModel } from '../calc/model.js';
-import { evaluateRatios } from '../calc/ratios.js';
-import { detectAlerts } from '../calc/alerts.js';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js';
-import { buildReport } from '../calc/report.js';
-import { store } from '../store.js';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js';
-import { logoHTML, countryOf } from '../app.js';
-import { isNum } from '../calc/finance.js';
+import { data, gather } from '../providers/index.js?v=27218ae7';
+import { buildModel } from '../calc/model.js?v=27218ae7';
+import { evaluateRatios } from '../calc/ratios.js?v=27218ae7';
+import { detectAlerts } from '../calc/alerts.js?v=27218ae7';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=27218ae7';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=27218ae7';
+import { buildReport } from '../calc/report.js?v=27218ae7';
+import { store } from '../store.js?v=27218ae7';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=27218ae7';
+import { logoHTML, countryOf } from '../app.js?v=27218ae7';
+import { isNum } from '../calc/finance.js?v=27218ae7';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +17,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js'), grafico: () => import('./tabs/chart.js'), estados: () => import('./tabs/statements.js'), ratios: () => import('./tabs/ratios.js'),
-  crecimiento: () => import('./tabs/growth.js'), deuda: () => import('./tabs/debt.js'), valoracion: () => import('./tabs/valuation.js'), dividendos: () => import('./tabs/dividends.js'),
-  competidores: () => import('./tabs/peers.js'), moat: () => import('./tabs/moat.js'), noticias: () => import('./tabs/news.js'), analistas: () => import('./tabs/analysts.js'),
-  riesgos: () => import('./tabs/risks.js'), scoring: () => import('./tabs/scoring.js'), informe: () => import('./tabs/report.js'), simulador: () => import('./tabs/simulator.js'),
+  resumen: () => import('./tabs/overview.js?v=27218ae7'), grafico: () => import('./tabs/chart.js?v=27218ae7'), estados: () => import('./tabs/statements.js?v=27218ae7'), ratios: () => import('./tabs/ratios.js?v=27218ae7'),
+  crecimiento: () => import('./tabs/growth.js?v=27218ae7'), deuda: () => import('./tabs/debt.js?v=27218ae7'), valoracion: () => import('./tabs/valuation.js?v=27218ae7'), dividendos: () => import('./tabs/dividends.js?v=27218ae7'),
+  competidores: () => import('./tabs/peers.js?v=27218ae7'), moat: () => import('./tabs/moat.js?v=27218ae7'), noticias: () => import('./tabs/news.js?v=27218ae7'), analistas: () => import('./tabs/analysts.js?v=27218ae7'),
+  riesgos: () => import('./tabs/risks.js?v=27218ae7'), scoring: () => import('./tabs/scoring.js?v=27218ae7'), informe: () => import('./tabs/report.js?v=27218ae7'), simulador: () => import('./tabs/simulator.js?v=27218ae7'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -184,7 +184,7 @@ function bindHeader(view, S) {
     toast('Análisis guardado en el historial');
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js');
+    const { clearCache } = await import('../providers/http.js?v=27218ae7');
     await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);

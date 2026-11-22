@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js';
+import { config, KEYS } from '../config.js?v=27218ae7';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }
@@ -132,7 +132,9 @@ export function classify(provider, status, body) {
   if (provider === 'finnhub' && /don't have access|You don.t have access/i.test(msg)) return new ApiError('premium', 'Este dato requiere un plan de pago de Finnhub', { provider });
   if (/Falta el secreto/.test(msg)) return new ApiError('no_key', `El Worker no tiene configurada la clave de ${providerName(provider)}`, { provider });
   if (status === 401 || /invalid api key|apikey is invalid|Invalid API KEY/i.test(msg)) return new ApiError('bad_key', 'La clave de API no es válida', { provider });
-  if (status === 402 || status === 403 || /premium|subscription|restricted|upgrade|not available under your current/i.test(msg)) return new ApiError('premium', 'Este dato requiere un plan de pago del proveedor', { provider, detail: msg });
+  // El aviso de límite diario de Alpha Vantage menciona «premium»: se comprueba antes para no confundirlo con un dato de pago
+  if (status === 429 || /rate limit|requests per day|call frequency|limit reach|standard API rate/i.test(msg)) return new ApiError('rate_limit', `Límite de ${providerName(provider)} alcanzado por hoy`, { provider });
+  if (status === 402 || status === 403 || /premium endpoint|premium query|subscription|restricted|upgrade|not available under your current|premium plan/i.test(msg)) return new ApiError('premium', 'Este dato requiere un plan de pago del proveedor', { provider, detail: msg });
   if (status === 429 || /limit reach|rate limit|call frequency|requests per day|Thank you for using Alpha Vantage/i.test(msg)) return new ApiError('rate_limit', 'Límite de peticiones del proveedor alcanzado', { provider });
   if (status === 404) return new ApiError('not_found', 'Sin datos', { provider });
   if (status >= 500) return new ApiError('network', 'El proveedor no responde', { provider });
