@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman } from './finance.js?v=a0623ec2';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=a0623ec2';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=35db0a08';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=35db0a08';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -16,6 +16,7 @@ export function buildModel(raw, fxRate = 1) {
   const fx = repCur === tradeCur ? 1 : fxRate; // unidades de moneda de cotización por 1 unidad de moneda de reporte
 
   const years = buildAnnual(inc, bal, cf).map((y) => deriveYear(y));
+  const splitsAdj = adjustSplits(years); // acciones y BPA comparables entre años
   const last = years[years.length - 1] || {};
   const prices = asc(val(raw.prices) || []);
   let ratiosHist = asc(val(raw.ratios) || []);
@@ -102,7 +103,7 @@ export function buildModel(raw, fxRate = 1) {
     symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, shares, marketCap, ev, netDebt: netDebtT,
     years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
-    change, growth, derived, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
+    change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
     market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
     pe: peRatio, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
     stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },

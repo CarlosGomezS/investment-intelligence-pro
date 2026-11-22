@@ -101,3 +101,13 @@ test('cálculos propios: variaciones, beta, Piotroski y Altman', () => {
   const z = altman({ assets: 100, currentAssets: 50, currentLiabilities: 30, retainedEarnings: 20, ebit: 15, liabilities: 50, revenue: 120 }, 200);
   assert.ok(Math.abs(z - (1.2 * 0.2 + 1.4 * 0.2 + 3.3 * 0.15 + 0.6 * 4 + 1.2)) < 1e-9);
 });
+
+import { adjustSplits } from '../js/calc/finance.js';
+test('ajuste por split 10×1', () => {
+  const Y = [{ year: '2023', shares: 2.5e9, eps: 12, netIncome: 30e9 }, { year: '2024', shares: 24.8e9, eps: 1.3, netIncome: 32e9 }];
+  const s = adjustSplits(Y);
+  assert.equal(s.length, 1); assert.equal(s[0].factor, 10);
+  assert.equal(Y[0].shares, 25e9); assert.ok(Math.abs(Y[0].eps - 1.2) < 1e-9);
+  const Z = [{ year: '2023', shares: 100, eps: 1, netIncome: 100 }, { year: '2024', shares: 200, eps: 1, netIncome: 200 }]; // fusión que duplica beneficio: no es split
+  assert.equal(adjustSplits(Z).length, 0);
+});

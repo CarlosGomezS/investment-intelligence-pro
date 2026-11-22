@@ -153,3 +153,32 @@ export function altman(y, marketCap) {
   if (![wc, y.retainedEarnings, y.ebit, marketCap, y.liabilities, y.revenue].every(isNum) || y.liabilities <= 0) return null;
   return 1.2 * wc / ta + 1.4 * y.retainedEarnings / ta + 3.3 * y.ebit / ta + 0.6 * marketCap / y.liabilities + 1.0 * y.revenue / ta;
 }
+
+/**
+ * Ajuste por splits: si el número de acciones salta de un año a otro por un factor típico de split
+ * (2, 3, 4, 5, 8, 10, 15, 20… o el inverso) sin que el negocio lo justifique, se reexpresan los años
+ * anteriores (acciones × factor, BPA ÷ factor). Devuelve la lista de splits detectados.
+ */
+export function adjustSplits(years, knownSplits = []) {
+  const COMMON = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
+  const found = [];
+  for (let i = years.length - 1; i > 0; i--) {
+    const a = years[i], b = years[i - 1];
+    if (!isNum(a.shares) || !isNum(b.shares) || b.shares <= 0) continue;
+    const r = a.shares / b.shares;
+    let f = null;
+    for (const c of COMMON) { if (Math.abs(r / c - 1) < 0.12) f = c; else if (Math.abs(r * c - 1) < 0.12) f = 1 / c; }
+    if (!f) continue;
+    // Confirmación: el beneficio neto no cambia en esa proporción (si cambiara, sería otra cosa)
+    const ni = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
+    if (Math.abs(ni / f - 1) < 0.25 && f !== 1) continue;
+    found.push({ year: a.year, factor: f });
+    for (let j = 0; j < i; j++) {
+      const y = years[j];
+      if (isNum(y.shares)) y.shares *= f;
+      if (isNum(y.eps)) y.eps /= f;
+      if (isNum(y.fcfPerShare)) y.fcfPerShare /= f;
+    }
+  }
+  return found;
+}

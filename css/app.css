@@ -132,7 +132,9 @@ td .yo{display:block;font-size:11px}
 .gauge{display:grid;place-items:center;text-align:center}
 .gauge svg{width:180px;height:auto}
 .verdict{font-size:18px;font-weight:600;line-height:1.25}
-.alert-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.alert-row{display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px;align-items:start;padding:11px 0;border-bottom:1px solid var(--line)}
+.alert-row>.pill{justify-self:start;align-self:start;margin-top:2px;min-width:52px;text-align:center;padding:2px 8px;line-height:1.5;font-size:11px;text-transform:capitalize}
+.pill.alta{background:color-mix(in srgb,var(--neg) 14%,transparent)}.pill.media{background:color-mix(in srgb,var(--warn) 14%,transparent)}
 .alert-row:last-child{border:0}
 .alert-row b{display:block;font-size:13.5px}.alert-row p{margin:2px 0 0;color:var(--ink2);font-size:13px}
 .qa{border-bottom:1px solid var(--line);padding:12px 0}.qa:last-child{border:0}
