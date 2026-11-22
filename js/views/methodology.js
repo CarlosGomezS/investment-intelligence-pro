@@ -1,6 +1,6 @@
 // Metodología: fuentes, arquitectura, fórmulas, reglas de alerta y limitaciones conocidas.
-import { card } from '../ui/dom.js?v=35db0a08';
-import { RATIOS } from '../calc/ratios.js?v=35db0a08';
+import { card } from '../ui/dom.js?v=b26089cc';
+import { RATIOS } from '../calc/ratios.js?v=b26089cc';
 
 const APIS = [
   ['Financial Modeling Prep', 'Principal', 'Estados (anual/trimestral/TTM), ratios históricos, estimaciones, DCF, dividendos, insiders, screener, índices', '250 peticiones/día; sobre todo EE. UU.', 'Sí', 'https://site.financialmodelingprep.com/developer/docs'],

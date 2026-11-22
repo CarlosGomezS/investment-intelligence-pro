@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=35db0a08';
-import { data, setHint } from './providers/index.js?v=35db0a08';
-import { usage } from './providers/http.js?v=35db0a08';
-import { config } from './config.js?v=35db0a08';
-import { store } from './store.js?v=35db0a08';
-import { destroyAll } from './ui/charts.js?v=35db0a08';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=b26089cc';
+import { data, setHint } from './providers/index.js?v=b26089cc';
+import { usage } from './providers/http.js?v=b26089cc';
+import { config } from './config.js?v=b26089cc';
+import { store } from './store.js?v=b26089cc';
+import { destroyAll } from './ui/charts.js?v=b26089cc';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=35db0a08'),
-  c: () => import('./views/company.js?v=35db0a08'),
-  watchlist: () => import('./views/watchlist.js?v=35db0a08'),
-  screener: () => import('./views/screener.js?v=35db0a08'),
-  comparar: () => import('./views/compare.js?v=35db0a08'),
-  calendario: () => import('./views/calendar.js?v=35db0a08'),
-  metodologia: () => import('./views/methodology.js?v=35db0a08'),
-  ajustes: () => import('./views/settings.js?v=35db0a08'),
+  dashboard: () => import('./views/dashboard.js?v=b26089cc'),
+  c: () => import('./views/company.js?v=b26089cc'),
+  watchlist: () => import('./views/watchlist.js?v=b26089cc'),
+  screener: () => import('./views/screener.js?v=b26089cc'),
+  comparar: () => import('./views/compare.js?v=b26089cc'),
+  calendario: () => import('./views/calendar.js?v=b26089cc'),
+  metodologia: () => import('./views/methodology.js?v=b26089cc'),
+  ajustes: () => import('./views/settings.js?v=b26089cc'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -108,6 +108,7 @@ function showUsage() { const u = usage(), c = config.get(); $('#usage').textCont
 window.addEventListener('iip:usage', showUsage); showUsage();
 
 window.__iipBooted = true;
+{ const bf = document.getElementById('bootfail'); if (bf) bf.hidden = true; }
 window.addEventListener('hashchange', route);
 window.addEventListener('iip:toast', (e) => toast(e.detail));
 route();
