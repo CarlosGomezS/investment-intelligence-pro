@@ -13,7 +13,7 @@ import { roic } from './roic.js';
 import { sec } from './sec.js';
 import { esef } from './esef.js';
 import { config } from '../config.js';
-import { ApiError, usage } from './http.js';
+import { ApiError, usage, queueDelay } from './http.js';
 import { setHint } from './hints.js';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
@@ -59,7 +59,9 @@ async function run(method, args) {
     throw anyBlocked ? new ApiError('premium', 'Tus fuentes gratuitas no ofrecen este dato para esta empresa') : new ApiError('no_key', 'Ningún proveedor configurado ofrece este dato. Revisa Ajustes.');
   }
   let best = null;
-  for (const id of list) {
+  for (const [i, id] of list.entries()) {
+    // Una fuente con cola por límite de minuto se salta si hay alternativas detrás (no hacer esperar)
+    if (i < list.length - 1 && queueDelay(id) > 8000) continue;
     try {
       const r = await P[id][method](...args);
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);

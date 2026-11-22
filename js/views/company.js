@@ -25,12 +25,22 @@ const TAB_MOD = {
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
 
-async function load(sym, onProgress) {
+// Carga progresiva: la ficha aparece en cuanto llegan los datos básicos. Lo que tarda más de unos segundos
+// sigue descargándose en segundo plano y la vista se actualiza sola al llegar (late).
+const ESSENTIAL = ['quote', 'income', 'balance', 'cashflow', 'prices'];
+function timed(fn, ms, key, late) {
+  const p = fn().then((v) => ({ ok: true, ...v }), (e) => ({ ok: false, error: e }));
+  let done = false;
+  p.then((r) => { if (done && late) late(key, r); });
+  return Promise.race([p, new Promise((res) => setTimeout(() => { done = true; res({ ok: false, pending: true, error: { code: 'timeout', message: 'Aún descargando…' } }); }, ms))]);
+}
+
+async function load(sym, onProgress, late) {
   const from = '1980-01-01';
   // El perfil va primero: aporta nombre, ISIN y país, que necesitan SEC, ESEF y ROIC.AI para localizar la empresa.
-  const first = await gather({ profile: () => data.profile(sym) });
-  const raw = await gather({
-    profile: async () => { if (first.profile.ok) return first.profile; throw first.profile.error; }, quote: () => data.quote(sym), priceChange: () => data.priceChange(sym),
+  const first = await timed(() => data.profile(sym), 15000, 'profile');
+  const jobs = {
+    quote: () => data.quote(sym), priceChange: () => data.priceChange(sym),
     income: () => data.income(sym, 'annual', 15), balance: () => data.balance(sym, 'annual', 15), cashflow: () => data.cashflow(sym, 'annual', 15),
     incomeTTM: () => data.incomeTTM(sym), balanceTTM: () => data.balanceTTM(sym), cashflowTTM: () => data.cashflowTTM(sym),
     ratios: () => data.ratios(sym, 'annual', 15), keyMetrics: () => data.keyMetrics(sym, 'annual', 15), ratiosTTM: () => data.ratiosTTM(sym), keyMetricsTTM: () => data.keyMetricsTTM(sym),
@@ -38,14 +48,13 @@ async function load(sym, onProgress) {
     dcf: () => data.dcf(sym), dividends: () => data.dividends(sym), splits: () => data.splits(sym), earnings: () => data.earnings(sym),
     treasury: () => data.treasury(new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)), riskPremium: () => data.riskPremium(),
     prices: () => data.pricesDaily(sym, from),
-  });
-  // Sin cotización directa: se usa el último cierre del histórico (indicado como tal)
-  if (!raw.quote.ok && raw.prices.ok && raw.prices.data.length) {
-    const L = raw.prices.data[raw.prices.data.length - 1], P2 = raw.prices.data[raw.prices.data.length - 2];
-    raw.quote = { ok: true, data: { symbol: sym, price: L.close, changePercentage: P2 ? (L.close / P2.close - 1) * 100 : null, timestamp: L.date }, source: raw.prices.source + ' (último cierre)', endpoint: 'histórico', fetchedAt: raw.prices.fetchedAt };
-  }
-  onProgress && onProgress();
-  if (!raw.profile.ok && !raw.income.ok) { const e = raw.profile.error || raw.income.error; e.what = 'perfil'; throw e; }
+  };
+  const keys = Object.keys(jobs); let n = 0;
+  const res = await Promise.all(keys.map((k) => timed(jobs[k], ESSENTIAL.includes(k) ? 20000 : 7000, k, late).then((r) => { n++; onProgress && onProgress(n, keys.length); return r; })));
+  const raw = Object.fromEntries(keys.map((k, i) => [k, res[i]]));
+  raw.profile = first;
+  fixQuote(raw, sym);
+  if (!raw.profile.ok && !raw.income.ok) { const e = raw.profile.error || raw.income.error; throw e; }
   // Conversión de divisa si los estados están en otra moneda que la cotización (p. ej. ADR)
   let fx = 1;
   const rep = raw.income.ok && raw.income.data[0] ? raw.income.data[0].reportedCurrency : null;
@@ -55,6 +64,14 @@ async function load(sym, onProgress) {
     catch (e) { raw.fx = { ok: false, error: e }; }
   }
   return { raw, fx };
+}
+
+// Sin cotización directa: se usa el último cierre del histórico (indicado como tal)
+function fixQuote(raw, sym) {
+  if (!raw.quote.ok && raw.prices && raw.prices.ok && raw.prices.data.length) {
+    const L = raw.prices.data[raw.prices.data.length - 1], P2 = raw.prices.data[raw.prices.data.length - 2];
+    raw.quote = { ok: true, data: { symbol: sym, price: L.close, changePercentage: P2 ? (L.close / P2.close - 1) * 100 : null, timestamp: L.date }, source: raw.prices.source + ' (último cierre)', endpoint: 'histórico', fetchedAt: raw.prices.fetchedAt };
+  }
 }
 
 export function compute(S) {
@@ -124,7 +141,15 @@ export async function render(view, [symRaw, tab = 'resumen']) {
     if (!S) {
       view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1><div class="meta">Descargando estados financieros, cotizaciones, ratios, estimaciones y dividendos…</div></div></div>${skeleton(4)}`;
       try {
-        const { raw, fx } = await load(sym);
+        const meta = view.querySelector('.chead .meta');
+        let lateTimer = null;
+        const late = (k, r) => {
+          const St = cache.get(sym); if (!St || !r.ok) return;
+          St.raw[k] = r; if (k === 'prices') fixQuote(St.raw, sym);
+          clearTimeout(lateTimer);
+          lateTimer = setTimeout(() => { compute(St); if (view.dataset.loaded === sym) { const t = location.hash.split('/')[3] || 'resumen'; view.dataset.loaded = ''; render(view, [sym, t]); toast('Datos completados'); } }, 800);
+        };
+        const { raw, fx } = await load(sym, (i, t) => { if (meta) meta.textContent = `Descargando datos… ${i} de ${t}`; }, late);
         S = { sym, raw, fx, extra: {} };
         compute(S);
         cache.set(sym, S);

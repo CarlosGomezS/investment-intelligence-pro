@@ -107,12 +107,13 @@ export async function getJSON(provider, path, params, ttlHours, validate) {
     try {
       await throttle(provider);
       bump(provider);
-      res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), provider === 'esef' || provider === 'sec' ? 45000 : 15000);
+      try { res = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctl.signal }); } finally { clearTimeout(to); }
       const text = await res.text();
       try { body = JSON.parse(text); } catch { body = text; }
     } catch (e) {
       if (hit) return { ...hit, cached: true, stale: true };
-      throw new ApiError('network', `No hay conexión con ${providerName(provider)}`, { provider });
+      throw new ApiError('network', `${providerName(provider)} no responde`, { provider });
     }
     const err = classify(provider, res.status, body);
     if (err) { if (hit && err.code !== 'premium') return { ...hit, cached: true, stale: true }; throw err; }
