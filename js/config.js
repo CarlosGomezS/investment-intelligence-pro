@@ -3,19 +3,25 @@
 const KEY = 'iip.config.v1';
 
 const DEFAULTS = {
-  fmpKey: '',
-  avKey: '',
-  proxyUrl: '',          // URL del Cloudflare Worker (modo seguro: las claves viven en el backend)
+  fmpKey: '', avKey: '', finnhubKey: '', tdKey: '', roicKey: '',
+  proxyUrl: '',          // Cloudflare Worker: guarda las claves en el servidor y da acceso a SEC EDGAR y ESEF
   theme: 'dark',
-  fmpDailyLimit: 250,    // plan gratuito de FMP
-  avDailyLimit: 25,      // plan gratuito de Alpha Vantage
+  limits: { fmp: 250, av: 25, td: 800, finnhub: 0, roic: 0, sec: 0, esef: 0 },   // diarios (0 = sin tope diario)
   cacheHours: { quote: 0.1, prices: 6, fundamentals: 24, static: 168 },
 };
 
 function read() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; }
-  catch { return { ...DEFAULTS }; }
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || '{}');
+    // compatibilidad con la versión anterior
+    const limits = { ...DEFAULTS.limits, ...(s.limits || {}) };
+    if (s.fmpDailyLimit) limits.fmp = s.fmpDailyLimit;
+    if (s.avDailyLimit) limits.av = s.avDailyLimit;
+    return { ...DEFAULTS, ...s, limits, cacheHours: { ...DEFAULTS.cacheHours, ...(s.cacheHours || {}) } };
+  } catch { return structuredClone(DEFAULTS); }
 }
+
+export const KEYS = { fmp: 'fmpKey', av: 'avKey', finnhub: 'finnhubKey', td: 'tdKey', roic: 'roicKey' };
 
 export const config = {
   get() { return read(); },
@@ -24,5 +30,12 @@ export const config = {
     try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* almacenamiento lleno o bloqueado */ }
     return next;
   },
-  hasData() { const c = read(); return !!(c.fmpKey || c.avKey || c.proxyUrl); },
+  /** ¿Puede usarse este proveedor ahora? (clave propia o proxy; SEC/ESEF requieren proxy) */
+  canUse(p) {
+    const c = read();
+    if (p === 'sec') return !!c.proxyUrl;
+    if (p === 'esef') return true;
+    return !!(c.proxyUrl || c[KEYS[p]]);
+  },
+  hasData() { const c = read(); return !!(c.proxyUrl || Object.values(KEYS).some((k) => c[k])); },
 };

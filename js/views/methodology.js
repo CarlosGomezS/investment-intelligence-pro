@@ -3,14 +3,15 @@ import { card } from '../ui/dom.js';
 import { RATIOS } from '../calc/ratios.js';
 
 const APIS = [
-  ['Financial Modeling Prep', 'Principal', 'Estados (anual/trimestral/TTM), ratios, estimaciones, DCF, dividendos, insiders, noticias, screener, calendario, SEC', '250 peticiones/día; cobertura gratuita centrada en EE. UU.', 'Sí', 'https://site.financialmodelingprep.com/developer/docs'],
-  ['Alpha Vantage', 'Respaldo', 'Perfil, estados anual/trimestral, cotización, dividendos, resultados, noticias con sentimiento', '25 peticiones/día', 'Sí', 'https://www.alphavantage.co/documentation/'],
-  ['SEC EDGAR', 'Enlaces oficiales', 'Documentos 10-K, 10-Q, 8-K, formularios 4 (fuente primaria de EE. UU.)', 'Gratis; exige cabecera User-Agent y no admite llamadas desde el navegador (CORS)', 'No (vía Worker)', 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces'],
-  ['Finnhub', 'Evaluado', 'Cotizaciones, fundamentales básicos, noticias', 'Plan gratuito por minuto; fundamentales profundos de pago', 'Sí', 'https://finnhub.io/docs/api'],
-  ['EODHD', 'Evaluado', 'Fundamentales globales, cotizaciones EOD de muchas bolsas', 'Plan gratuito muy limitado; fundamentales de pago', 'Sí', 'https://eodhd.com/financial-apis/'],
-  ['Polygon / Massive', 'Evaluado', 'Cotizaciones de EE. UU., fundamentales a partir de XBRL', 'Plan gratuito con pocas peticiones por minuto', 'Sí', 'https://polygon.io/docs'],
-  ['Nasdaq Data Link', 'Evaluado', 'Bases de datos macro y alternativas; fundamentales en conjuntos de pago', 'Mayoría de conjuntos de pago', 'Sí', 'https://docs.data.nasdaq.com/'],
-  ['CNMV / ESMA', 'Enlaces oficiales', 'Información regulada de emisores españoles y europeos', 'Consulta web; sin API pública de estados financieros normalizados', '—', 'https://www.cnmv.es'],
+  ['Financial Modeling Prep', 'Principal', 'Estados (anual/trimestral/TTM), ratios históricos, estimaciones, DCF, dividendos, insiders, screener, índices', '250 peticiones/día; sobre todo EE. UU.', 'Sí', 'https://site.financialmodelingprep.com/developer/docs'],
+  ['Finnhub', 'Activo', 'Cotización, perfil, ratios actuales, competidores, recomendaciones, resultados, noticias, calendario', '60/minuto sin tope diario; EE. UU.', 'Sí', 'https://finnhub.io/docs/api'],
+  ['Twelve Data', 'Activo', 'Histórico de precios (hasta 5.000 sesiones), cotización, tipos de cambio', '800/día y 8/minuto; EE. UU. y divisas', 'Sí', 'https://twelvedata.com/docs'],
+  ['ROIC.AI', 'Activo (mundial)', 'Perfil, precios y estados anuales de empresas de todo el mundo', '5/minuto; 2 años de estados', 'Sí / Worker', 'https://www.roic.ai/api/v2/docs/getting-started'],
+  ['SEC EDGAR', 'Activo (oficial)', 'Estados anuales XBRL de todas las empresas registradas en la SEC (también extranjeras con 20-F) y lista de documentos', 'Gratis, sin clave; exige User-Agent; sin CORS', 'Vía Worker', 'https://www.sec.gov/search-filings/edgar-application-programming-interfaces'],
+  ['filings.xbrl.org (ESEF)', 'Activo (oficial)', 'Cuentas anuales IFRS de cotizadas europeas (informes ESEF)', 'Gratis, sin clave; repositorio no exhaustivo', 'Directo o Worker', 'https://filings.xbrl.org/docs/api'],
+  ['Alpha Vantage', 'Respaldo', 'Perfil, estados, cotización, dividendos, resultados, noticias', '25 peticiones/día', 'Sí', 'https://www.alphavantage.co/documentation/'],
+  ['EODHD', 'Evaluado, no integrado', 'Fundamentales globales', 'Gratis: 20 peticiones/día y cada consulta de fundamentales cuesta 10', 'Sí', 'https://eodhd.com/financial-apis/'],
+  ['Polygon / Massive, Nasdaq Data Link', 'Evaluados, no integrados', 'Cotizaciones de EE. UU. y conjuntos de datos', 'Fundamentales en planes de pago', 'Sí', 'https://polygon.io/docs'],
 ];
 
 export function render(view) {
@@ -22,7 +23,7 @@ export function render(view) {
     <li><b>Cálculos propios y auditables.</b> Márgenes, ROIC, deuda neta, coberturas, CAGR, DCF, múltiplos y scoring se calculan en <code>js/calc/</code> a partir de los estados, con pruebas automáticas en <code>tests/</code>.</li>
     <li><b>Divisas.</b> Si los estados se presentan en una moneda distinta de la de cotización (p. ej. ADR), se convierten al tipo de cambio actual para ratios y valoración, y se avisa.</li></ul>`)}
   ${card('Arquitectura', `<p style="margin-top:0">Aplicación web estática (GitHub Pages) con módulos ES nativos, sin paso de compilación:</p>
-    <ul style="margin:0;padding-left:18px;line-height:1.7"><li><code>providers/</code>: proveedores intercambiables con una interfaz común; el servicio de datos prueba cada proveedor por orden y devuelve el primero que responde.</li>
+    <ul style="margin:0;padding-left:18px;line-height:1.7"><li><code>providers/</code>: siete proveedores intercambiables con una interfaz común. Para cada dato hay un orden de preferencia; las fuentes sin tope diario se usan primero para cotizaciones, precios y búsqueda, y las que han gastado el 70 % de su cuota pasan al final. Si una fuente responde «plan de pago» para una empresa, no se le vuelve a preguntar por ella en 3 días.</li>
     <li><code>providers/http.js</code>: caché en IndexedDB con caducidad por tipo de dato, deduplicación de peticiones simultáneas, contador diario por proveedor y errores normalizados.</li>
     <li><code>calc/</code>: modelo normalizado de empresa, ratios, valoración, alertas, scoring, informe y simulaciones (funciones puras).</li>
     <li><code>views/</code>: interfaz por módulos. <code>store.js</code>: base de datos local (favoritos, listas, historial, análisis, supuestos).</li>

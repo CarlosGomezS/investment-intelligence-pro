@@ -15,7 +15,7 @@ export function dcfDefaults(m) {
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
     rf: { value: m.market.rf10, origin: m.market.rf10 != null ? `real · bono EE. UU. 10a (${m.market.rfDate})` : 'falta' },
-    beta: { value: m.market.beta, origin: m.market.beta != null ? 'real · beta 5a del proveedor' : 'falta' },
+    beta: { value: m.market.beta, origin: m.market.betaAssumed ? 'supuesto · beta 1 (el proveedor no la da)' : 'real · beta 5a del proveedor' },
     erp: { value: m.market.erp, origin: m.market.erp != null ? `real · prima de riesgo ${m.market.erpCountry} (Damodaran vía FMP)` : 'falta' },
     costDebt: { value: m.market.costDebt, origin: m.market.costDebt != null ? 'real · intereses / deuda, media 3a' : 'falta' },
     wacc: { value: w ? w.wacc : null, origin: w ? 'calculado · CAPM' : 'falta: introduce el WACC a mano' },
@@ -34,7 +34,8 @@ export function runDcf(m, inp) {
   return { ...r, base, sens: { ws, gs, grid: sensitivity(base, ws, gs) }, scen: scenarios(base), mos: marginOfSafety(r.perShare, m.price), up: upside(r.perShare, m.price) };
 }
 
-export function multiples(m, peers) {
+export function multiples(m, peersAll) {
+  const peers = peersAll ? peersAll.filter((p) => !p.self) : null;
   const pe5 = ratioAvg(m.ratiosHist, 'priceToEarningsRatio', 5), pe10 = ratioAvg(m.ratiosHist, 'priceToEarningsRatio', 10);
   const eve5 = ratioAvg(m.kmHist, 'evToEBITDA', 5), evf5 = ratioAvg(m.kmHist, 'evToFreeCashFlow', 5);
   const epsT = m.X(m.T.eps), ebitdaT = m.X(m.T.ebitda), fcfT = m.X(m.T.fcf);

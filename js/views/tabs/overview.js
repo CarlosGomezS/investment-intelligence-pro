@@ -10,7 +10,8 @@ export function gauge(s, size = 180) {
 
 export function render(el, S) {
   const { m, sc, val, rep, alerts } = S, p = m.profile, c = m.change, cur = m.tradeCur;
-  const rng = String(p.range || '').split('-').map(Number);
+  let rng = String(p.range || '').split('-').map(Number);
+  if (!(rng.length === 2 && rng[1] > 0)) { const c = (m.priceData || []).slice(-252).map((x) => x.close).filter(isNum); rng = c.length ? [Math.min(...c), Math.max(...c)] : [null, null]; }
   const next = m.earnings.find((e) => e.date >= new Date().toISOString().slice(0, 10) && e.epsActual == null);
   const comp = val.composite;
   const chg = (k) => (isNum(c[k]) ? `<span class="${cls(c[k])}">${sgnPct(c[k] / 100)}</span>` : '—');

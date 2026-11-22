@@ -6,7 +6,7 @@ import { exportCSV } from '../../export.js';
 
 export function render(el, S) {
   const m = S.m, cur = m.tradeCur, d = m.dpsSeries, all = m.divs;
-  if (!all.length) { el.innerHTML = card('Dividendos', `<div class="empty">${esc(m.profile.companyName || m.symbol)} no tiene historial de dividendos en el proveedor${S.raw.dividends.ok ? '' : ` (${esc(S.raw.dividends.error && S.raw.dividends.error.message)})`}. Su retribución al accionista, si la hay, se hace vía recompras (ver Estados financieros → Flujos).</div>`); return; }
+  if (!all.length) { el.innerHTML = card('Dividendos', `<div class="empty">${S.raw.dividends.ok ? `${esc(m.profile.companyName || m.symbol)} no tiene historial de dividendos en el proveedor` : `Tus fuentes gratuitas no ofrecen el historial de dividendos de esta empresa (${esc(S.raw.dividends.error && S.raw.dividends.error.message)}); no significa que no pague`}. Su retribución al accionista, si la hay, se hace vía recompras (ver Estados financieros → Flujos).</div>`); return; }
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = all.filter((x) => x.date >= today || (x.paymentDate && x.paymentDate >= today));
   const vals = d.map((x) => x.dps);

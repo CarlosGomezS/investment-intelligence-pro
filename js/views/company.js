@@ -27,8 +27,10 @@ const cache = new Map(); // símbolo → estado ya calculado durante la sesión
 
 async function load(sym, onProgress) {
   const from = '1980-01-01';
+  // El perfil va primero: aporta nombre, ISIN y país, que necesitan SEC, ESEF y ROIC.AI para localizar la empresa.
+  const first = await gather({ profile: () => data.profile(sym) });
   const raw = await gather({
-    profile: () => data.profile(sym), quote: () => data.quote(sym), priceChange: () => data.priceChange(sym),
+    profile: async () => { if (first.profile.ok) return first.profile; throw first.profile.error; }, quote: () => data.quote(sym), priceChange: () => data.priceChange(sym),
     income: () => data.income(sym, 'annual', 15), balance: () => data.balance(sym, 'annual', 15), cashflow: () => data.cashflow(sym, 'annual', 15),
     incomeTTM: () => data.incomeTTM(sym), balanceTTM: () => data.balanceTTM(sym), cashflowTTM: () => data.cashflowTTM(sym),
     ratios: () => data.ratios(sym, 'annual', 15), keyMetrics: () => data.keyMetrics(sym, 'annual', 15), ratiosTTM: () => data.ratiosTTM(sym), keyMetricsTTM: () => data.keyMetricsTTM(sym),
@@ -37,6 +39,11 @@ async function load(sym, onProgress) {
     treasury: () => data.treasury(new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)), riskPremium: () => data.riskPremium(),
     prices: () => data.pricesDaily(sym, from),
   });
+  // Sin cotización directa: se usa el último cierre del histórico (indicado como tal)
+  if (!raw.quote.ok && raw.prices.ok && raw.prices.data.length) {
+    const L = raw.prices.data[raw.prices.data.length - 1], P2 = raw.prices.data[raw.prices.data.length - 2];
+    raw.quote = { ok: true, data: { symbol: sym, price: L.close, changePercentage: P2 ? (L.close / P2.close - 1) * 100 : null, timestamp: L.date }, source: raw.prices.source + ' (último cierre)', endpoint: 'histórico', fetchedAt: raw.prices.fetchedAt };
+  }
   onProgress && onProgress();
   if (!raw.profile.ok && !raw.income.ok) { const e = raw.profile.error || raw.income.error; e.what = 'perfil'; throw e; }
   // Conversión de divisa si los estados están en otra moneda que la cotización (p. ej. ADR)
@@ -123,7 +130,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
       } catch (e) {
-        view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1></div></div>${unavailable('No se pudo cargar la empresa', e)}<p class="note">Comprueba el ticker (las bolsas europeas llevan sufijo: SAN.MC, SAP.DE, MC.PA, ASML.AS) o busca por nombre arriba. El plan gratuito de FMP solo cubre empresas de EE. UU.: para el resto añade una clave de Alpha Vantage o un plan de pago.</p>`;
+        view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1></div></div>${unavailable('No se pudo cargar la empresa', e)}<p class="note">Comprueba el ticker (las bolsas europeas llevan sufijo: SAN.MC, SAP.DE, MC.PA, ASML.AS) o busca por nombre arriba. Para empresas de fuera de EE. UU. añade en Ajustes la clave gratuita de ROIC.AI y el Worker (SEC EDGAR y cuentas europeas ESEF).</p>`;
         return;
       }
     }

@@ -64,7 +64,7 @@ export function metricsFor(m, ctx) {
     M('valoracion', 'EV/EBITDA frente a su media 5a', isNum(eve) && isNum(eveAvg5) ? eve / eveAvg5 - 1 : null, isNum(eve) && isNum(eveAvg5) ? `${X(eve)}× vs ${X(eveAvg5)}×` : '—', [[-0.3, 100], [0, 60], [0.5, 0]], 'Descuento frente a su propia historia'),
     M('valoracion', 'Rentabilidad FCF', fcfy, P(fcfy), [[0, 0], [0.04, 55], [0.08, 100]], 'FCF / capitalización'),
 
-    M('riesgo', 'Beta', m.market.beta, X(m.market.beta, 2), [[0.6, 100], [1, 70], [1.8, 0]], 'Sensibilidad al mercado'),
+    M('riesgo', 'Beta', m.market.betaAssumed ? null : m.market.beta, m.market.betaAssumed ? '—' : X(m.market.beta, 2), [[0.6, 100], [1, 70], [1.8, 0]], 'Sensibilidad al mercado'),
     M('riesgo', 'Máxima caída 5 años', closes.length > 200 ? maxDrawdown(closes) : null, closes.length > 200 ? P(maxDrawdown(closes)) : '—', [[-0.7, 0], [-0.35, 60], [-0.15, 100]], 'Peor caída desde máximos'),
     M('riesgo', 'Dilución anual 5a', m.growth.shares5, P(m.growth.shares5), [[-0.02, 100], [0, 80], [0.04, 0]], 'CAGR del nº de acciones'),
     M('riesgo', 'Alertas graves', ctx.alerts ? highAlerts : null, ctx.alerts ? String(highAlerts) : '—', [[0, 100], [2, 50], [4, 0]], 'Nº de alertas de severidad alta'),

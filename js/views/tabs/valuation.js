@@ -23,7 +23,8 @@ export async function render(el, S, ctx) {
 
   const inp = (id, label, value, o, step = '0.1', suf = '%') => `<label class="f"><span>${label} ${origin(o)}</span><span class="row" style="flex-wrap:nowrap"><input class="in" id="${id}" type="number" step="${step}" value="${value}" inputmode="decimal"><span class="mute">${suf}</span></span></label>`;
   const w = I.wacc, ke = I.ke, E = m.marketCap || 0, D = m.X(m.T.debt) || 0;
-  el.innerHTML = `
+  const fin = /financ|bank|banco|insur|asegur|reit|real estate/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`);
+  el.innerHTML = `${fin ? '<div class="empty" style="margin-bottom:14px"><b>Ojo: empresa financiera o inmobiliaria.</b> En bancos, aseguradoras y REIT el DCF de flujo de caja libre y el EV/EBITDA no son apropiados (la deuda es su materia prima). Para ellas pesan más el PER, el precio/valor contable frente al ROE y el dividendo.</div>' : ''}
   <div class="grid g3">
     ${card('Resumen de valoración', `<div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><span>Precio actual</span><b>${num(m.price)} ${esc(cur)}</b></div><div class="kpi"><span>Valor intrínseco central</span><b>${num(comp.value)} ${esc(cur)}</b></div>
@@ -66,7 +67,7 @@ export async function render(el, S, ctx) {
 
   <div class="grid g2" style="margin-top:14px">
     ${card('Valoración por múltiplos', `<div class="tablewrap"><table><thead><tr><th class="l">Método</th><th>Múltiplo</th><th>Precio implícito</th><th>vs precio</th><th class="l">Origen</th></tr></thead><tbody>${val.mult.map((r) => `<tr><td class="l">${esc(r.method)}</td><td>${isNum(r.multiple) ? num(r.multiple, 1) + '×' : '—'}</td><td><b>${num(r.value)}</b></td><td class="${cls(r.up)}">${sgnPct(r.up, 0)}</td><td class="l">${origin(r.origin)}</td></tr>`).join('')}</tbody></table></div><p class="note">Múltiplo medio × métrica TTM. Para EV se resta la deuda neta y se divide entre las acciones. Se excluyen múltiplos negativos o superiores a 500.</p>`)}
-    ${card('Descuento de dividendos (DDM, Gordon)', !val.ddm.reason || val.ddm.applicable ? `<div class="kpis" style="grid-template-columns:1fr 1fr">
+    ${card('Descuento de dividendos (DDM, Gordon)', !S.raw.dividends.ok ? '<div class="empty">Tus fuentes no ofrecen el historial de dividendos de esta empresa, así que el DDM no se puede calcular.</div>' : !val.ddm.reason || val.ddm.applicable ? `<div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><span>Dividendo últimos 12 meses</span><b>${num(m.dpsTTM)} ${esc(cur)}</b></div><div class="kpi"><span>CAGR dividendo 5a</span><b>${pct(val.ddm.g5)}</b></div>
       <div class="kpi"><span>Crecimiento aplicado</span><b>${pct(val.ddm.growth)}</b><small>min(CAGR 5a; ke − 1 p.p.; 8 %)</small></div><div class="kpi"><span>Coste del capital (ke)</span><b>${pct(val.ddm.ke, 2)}</b></div>
       <div class="kpi"><span>Valor DDM</span><b>${num(val.ddm.value)} ${esc(cur)}</b></div><div class="kpi"><span>vs precio</span><b class="${cls(val.ddm.up)}">${sgnPct(val.ddm.up, 0)}</b></div></div>${val.ddm.error ? `<p class="note">${esc(val.ddm.error)}</p>` : ''}` : `<div class="empty">${esc(val.ddm.reason)}</div>`)}

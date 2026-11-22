@@ -1,6 +1,6 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
 import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js';
-import { data } from './providers/index.js';
+import { data, setHint } from './providers/index.js';
 import { usage } from './providers/http.js';
 import { config } from './config.js';
 import { store } from './store.js';
@@ -20,6 +20,7 @@ const routes = {
 export function go(path) { location.hash = '#/' + path; }
 
 async function route() {
+  closeSugg();
   const h = location.hash.replace(/^#\/?/, '');
   const [path, query] = h.split('?');
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
@@ -66,7 +67,7 @@ function renderSugg(list, title) {
   sugg.hidden = false; q.parentElement.setAttribute('aria-expanded', 'true');
 }
 function closeSugg() { sugg.hidden = true; q.parentElement.setAttribute('aria-expanded', 'false'); }
-function choose(r) { closeSugg(); q.value = ''; q.blur(); store.pushHistory(r); go(`c/${encodeURIComponent(r.symbol)}/resumen`); }
+function choose(r) { if (r.name) setHint(r.symbol, { name: r.name, country: r.country }); closeSugg(); q.value = ''; q.blur(); store.pushHistory(r); go(`c/${encodeURIComponent(r.symbol)}/resumen`); }
 
 async function doSearch(term) {
   const my = ++seq;
@@ -102,7 +103,8 @@ function showHistory() { const h = store.get().history.slice(0, 8); if (h.length
 function applyTheme(t) { document.documentElement.dataset.theme = t; document.querySelector('meta[name=theme-color]').content = t === 'dark' ? '#0a0d13' : '#f4f6f9'; }
 applyTheme(config.get().theme);
 $('#theme').addEventListener('click', () => { const t = config.get().theme === 'dark' ? 'light' : 'dark'; config.set({ theme: t }); applyTheme(t); route(); });
-function showUsage() { const u = usage(), c = config.get(); $('#usage').textContent = `FMP ${u.fmp || 0}/${c.fmpDailyLimit} · AV ${u.av || 0}/${c.avDailyLimit}`; }
+const SHORT = { fmp: 'FMP', av: 'AV', td: 'TD', finnhub: 'FH', roic: 'ROIC', sec: 'SEC', esef: 'ESEF' };
+function showUsage() { const u = usage(), c = config.get(); $('#usage').textContent = Object.keys(SHORT).filter((p) => config.canUse(p) && (u[p] || c.limits[p])).map((p) => `${SHORT[p]} ${u[p] || 0}${c.limits[p] ? '/' + c.limits[p] : ''}`).join(' · '); }
 window.addEventListener('iip:usage', showUsage); showUsage();
 
 window.addEventListener('hashchange', route);

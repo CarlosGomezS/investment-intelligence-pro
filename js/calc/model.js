@@ -67,7 +67,9 @@ export function buildModel(raw, fxRate = 1) {
   const rpRow = Array.isArray(rp) ? rp.find((r) => r.country === countryName(country)) || rp.find((r) => r.country === 'United States') : null;
   const erp = rpRow ? rpRow.totalEquityRiskPremium / 100 : null;
   const costDebt = lastAvg(series('costOfDebt').filter((v) => isNum(v) && v > 0 && v < 0.25), 3);
-  const w = waccCalc({ rf: rf10, beta: profile.beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
+  const betaAssumed = !isNum(profile.beta);
+  const beta = isNum(profile.beta) ? profile.beta : 1;
+  const w = waccCalc({ rf: rf10, beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
 
   const peRatio = isNum(rTTM.priceToEarningsRatioTTM) && fx === 1 ? rTTM.priceToEarningsRatioTTM : div(price, X(T.eps));
 
@@ -76,7 +78,7 @@ export function buildModel(raw, fxRate = 1) {
     years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores: val(raw.scores) || {}, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change: val(raw.priceChange) || {}, growth, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
-    market: { rf10, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpCountry: rpRow ? rpRow.country : null, beta: profile.beta, costDebt, wacc: w },
+    market: { rf10, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpCountry: rpRow ? rpRow.country : null, beta, betaAssumed, costDebt, wacc: w },
     pe: peRatio, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
     stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,

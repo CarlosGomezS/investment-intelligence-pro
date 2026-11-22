@@ -31,33 +31,55 @@ Plataforma web de análisis fundamental, financiero y de valoración intrínseca
 
 ## Puesta en marcha
 
-1. Consigue una clave gratuita de **[Financial Modeling Prep](https://site.financialmodelingprep.com/developer/docs/pricing)** (principal) y, opcionalmente, de **[Alpha Vantage](https://www.alphavantage.co/support/#api-key)** (respaldo).
-2. Abre la app → **Ajustes** → pega las claves → **Probar conexión**.
+La app combina **siete fuentes gratuitas** y reparte las consultas entre ellas para que no te quedes sin poder buscar. Con una sola clave ya funciona; cuantas más añadas, más empresas cubres.
 
-Las claves se guardan solo en tu navegador (`localStorage`). Nunca se suben al repositorio.
+| Fuente | Clave gratis | Límite | Cobertura | Para qué la usa la app |
+|---|---|---|---|---|
+| [Financial Modeling Prep](https://site.financialmodelingprep.com/developer/docs/pricing) | Sí | 250/día | EE. UU. | Estados, ratios históricos, estimaciones, DCF, insiders, screener |
+| [Finnhub](https://finnhub.io/register) | Sí | 60/min, sin tope diario | EE. UU. | Cotización, perfil, ratios actuales, competidores, recomendaciones, noticias, calendario |
+| [Twelve Data](https://twelvedata.com/register) | Sí | 800/día | EE. UU. y divisas | Histórico de precios, cotización, tipos de cambio |
+| [ROIC.AI](https://www.roic.ai/api) | Sí | 5/min | Mundial (2 años) | Perfil, precios y estados de empresas de fuera de EE. UU. |
+| SEC EDGAR | No hace falta | Sin tope diario | Registradas en la SEC (incl. ASML, TSMC, Santander…) | Estados anuales oficiales completos, documentos |
+| filings.xbrl.org (ESEF) | No hace falta | Sin tope diario | Cotizadas europeas | Cuentas anuales oficiales IFRS |
+| [Alpha Vantage](https://www.alphavantage.co/support/#api-key) | Sí | 25/día | Varias | Último respaldo |
 
-### Qué cubre cada plan
+1. Consigue las claves que quieras (todas gratis, sin tarjeta).
+2. Abre la app → **Ajustes** → pégalas → **Probar todas**.
 
-| Proveedor | Gratis | Requiere plan de pago |
-|---|---|---|
-| FMP | 250 peticiones/día; empresas de EE. UU.; estados anuales, ratios, perfil, cotización, estimaciones, dividendos | Trimestrales, TTM, intradía, noticias, institucionales y cobertura internacional completa (según plan) |
-| Alpha Vantage | 25 peticiones/día; perfil, estados, cotización diaria, dividendos, resultados, noticias | Más peticiones e históricos completos |
+Las claves se guardan solo en tu navegador. Nunca se suben al repositorio.
 
-Cuando un dato no está en tu plan, la app lo dice y no lo estima. Un análisis completo consume unas 25 peticiones (se guardan en caché 24 h).
+### Cómo evita quedarse sin cuota
 
-## Modo seguro (backend)
+- Cotizaciones, precios y búsqueda van primero a las fuentes sin tope diario (Finnhub, Twelve Data, SEC).
+- FMP se reserva para lo que solo da FMP.
+- Una fuente que ha gastado el 70 % de su cuota diaria pasa al final de la cola.
+- Si una fuente responde «plan de pago» para una empresa, no se le vuelve a preguntar por ella durante 3 días.
+- Todo se guarda en caché (24 h fundamentales, 6 h precios, minutos las cotizaciones). Al agotar una cuota se sirve la caché.
+- Las fuentes con límite por minuto (ROIC.AI, Twelve Data) se espacian solas para no recibir errores.
 
-Una web estática no puede esconder claves. Para guardarlas en un servidor, despliega el proxy incluido:
+## Backend gratuito (Cloudflare Worker) — recomendado
+
+Activa SEC EDGAR y ESEF (que no admiten llamadas directas desde el navegador), guarda las claves en el servidor y cachea las respuestas para todos tus dispositivos.
+
+1. Crea una cuenta gratuita en [Cloudflare](https://dash.cloudflare.com/sign-up).
+2. En un ordenador con Node instalado:
 
 ```bash
-cd worker
+git clone https://github.com/CarlosGomezS/investment-intelligence-pro
+cd investment-intelligence-pro/worker
+# edita wrangler.toml: pon tu email en SEC_USER_AGENT
 npx wrangler login
-npx wrangler secret put FMP_KEY
-npx wrangler secret put AV_KEY     # opcional
+npx wrangler secret put FMP_KEY        # pega cada clave que tengas
+npx wrangler secret put FINNHUB_KEY
+npx wrangler secret put TD_KEY
+npx wrangler secret put ROIC_KEY
+npx wrangler secret put AV_KEY
 npx wrangler deploy
 ```
 
-Pon la URL resultante en **Ajustes → URL del backend proxy**. El Worker solo acepta peticiones de tu dominio de GitHub Pages, cachea las respuestas, limita peticiones por IP y da acceso a SEC EDGAR.
+3. Copia la URL que te da (`https://iip-proxy.<tu-usuario>.workers.dev`) en **Ajustes → Backend proxy**.
+
+El plan gratuito de Workers da 100.000 peticiones al día, de sobra para uso personal.
 
 ## Desarrollo
 

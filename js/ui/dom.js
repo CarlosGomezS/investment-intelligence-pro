@@ -28,6 +28,7 @@ const ERR = {
   rate_limit: 'Límite diario de peticiones alcanzado',
   network: 'El proveedor no responde',
   not_found: 'El proveedor no tiene este dato',
+  needs_proxy: 'Esta fuente necesita el backend (Worker)',
   missing: 'Sin datos',
 };
 export const errMsg = (e) => (e ? ERR[e.code || e.error] || e.message || 'Error' : 'Sin datos');
@@ -35,7 +36,7 @@ export const errMsg = (e) => (e ? ERR[e.code || e.error] || e.message || 'Error'
 /** Recuadro de "dato no disponible" con la razón real. */
 export function unavailable(what, e) {
   const code = e && (e.code || e.error);
-  const extra = code === 'premium' ? ' Puedes activarlo con un plan de pago de FMP o probar Alpha Vantage como respaldo en Ajustes.' : code === 'no_key' || code === 'bad_key' ? ' <a href="#/ajustes">Ir a Ajustes</a>.' : '';
+  const extra = code === 'premium' ? ' Ninguna de tus fuentes gratuitas lo ofrece para esta empresa; añade más fuentes en <a href="#/ajustes">Ajustes</a>.' : code === 'no_key' || code === 'bad_key' || code === 'needs_proxy' ? ' <a href="#/ajustes">Ir a Ajustes</a>.' : '';
   return `<div class="empty"><b>${esc(what)}:</b> ${esc(errMsg(e))}.${extra}</div>`;
 }
 
