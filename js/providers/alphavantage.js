@@ -30,7 +30,7 @@ function balanceRow(r, sym) {
     goodwill: n(r.goodwill), intangibleAssets: n(r.intangibleAssets), totalAssets: n(r.totalAssets), totalCurrentLiabilities: n(r.totalCurrentLiabilities),
     shortTermDebt: n(r.shortTermDebt) ?? n(r.currentDebt), longTermDebt: n(r.longTermDebt), totalLiabilities: n(r.totalLiabilities),
     totalStockholdersEquity: n(r.totalShareholderEquity), totalDebt: debt, netDebt: debt != null ? debt - (csti ?? cash ?? 0) : null,
-    commonStockSharesOutstanding: n(r.commonStockSharesOutstanding), _source: 'Alpha Vantage',
+    commonStockSharesOutstanding: n(r.commonStockSharesOutstanding), retainedEarnings: n(r.retainedEarnings), _source: 'Alpha Vantage',
   };
 }
 function cashRow(r, sym) {

@@ -18,7 +18,7 @@ import { setHint } from './hints.js';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
-const STATEMENTS = ['fmp', 'sec', 'esef', 'roic', 'av'];
+const STATEMENTS = ['fmp', 'finnhub', 'sec', 'esef', 'roic', 'av'];
 export const ORDER = {
   profile: ['fmp', 'finnhub', 'roic', 'av', 'sec'],
   quote: ['finnhub', 'td', 'fmp', 'av'],
@@ -37,7 +37,8 @@ const BLK = 'iip.blocked.v1';
 let blocked = (() => { try { const b = JSON.parse(localStorage.getItem(BLK) || '{}'); const now = Date.now(); return Object.fromEntries(Object.entries(b).filter(([, t]) => now - t < 3 * 864e5)); } catch { return {}; } })();
 const isSym = (x) => typeof x === 'string' && /^[A-Z0-9.^\-]{1,15}$/i.test(x);
 function block(id, sym) { blocked[`${id}:${sym}`] = Date.now(); try { localStorage.setItem(BLK, JSON.stringify(blocked)); } catch {} }
-const isBlocked = (id, args) => isSym(args[0]) && !!blocked[`${id}:${args[0]}`];
+const badKeys = new Set(); // claves rechazadas: no se vuelve a usar esa fuente en esta sesión
+const isBlocked = (id, args) => badKeys.has(id) || (isSym(args[0]) && !!blocked[`${id}:${args[0]}`]);
 
 function demoted(id) {
   const lim = (config.get().limits || {})[id];
@@ -70,6 +71,7 @@ async function run(method, args) {
       return { ...r, provider: id };
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(e.code || 'not_found', e.message || 'Sin datos', { provider: id });
+      if (err.code === 'bad_key') badKeys.add(id);
       if (err.code === 'premium' && isSym(args[0]) && ['profile', 'income', 'quote'].includes(method)) block(id, args[0]);
       if (!best || (PRIORITY[err.code] || 0) > (PRIORITY[best.code] || 0)) best = err;
     }
@@ -102,6 +104,22 @@ const METHODS = ['profile', 'quote', 'priceChange', 'pricesDaily', 'pricesAdjust
 
 export const data = Object.fromEntries(METHODS.map((m) => [m, (...a) => run(m, a)]));
 data.search = search;
+
+/** Perfil combinado: se toma el mejor y se completan los campos que falten con las demás fuentes. */
+const PROFILE_FIELDS = ['description', 'beta', 'range', 'sector', 'industry', 'ceo', 'website', 'currency', 'country', 'exchange', 'marketCap', 'sharesOutstanding', 'fullTimeEmployees', 'ipoDate', 'isin', 'cik'];
+data.profile = async (sym) => {
+  const base = await run('profile', [sym]);
+  const p = { ...base.data };
+  const missing = () => PROFILE_FIELDS.filter((k) => p[k] == null || p[k] === '');
+  const filled = [];
+  for (const id of ['finnhub', 'roic', 'av']) {
+    if (!missing().length || id === base.provider || !config.canUse(id) || isBlocked(id, [sym]) || !P[id].profile) continue;
+    if (id === 'av' && !missing().includes('description')) continue;
+    try { const r = await P[id].profile(sym); let used = false; for (const k of missing()) if (r.data[k] != null && r.data[k] !== '') { p[k] = r.data[k]; used = true; } if (used) filled.push(P[id].name); } catch {}
+  }
+  setHint(sym, { name: p.companyName, isin: p.isin, country: p.country });
+  return { ...base, data: p, source: [base.source, ...filled].join(' + ') };
+};
 data.logo = fmp.logo;
 export { setHint };
 

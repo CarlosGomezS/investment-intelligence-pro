@@ -19,11 +19,15 @@ export function render(el, S) {
     ['Capitalización', big(m.marketCap, cur)], ['Enterprise Value', big(m.ev, cur)], ['Acciones en circulación', big(m.shares)],
     ['Máx. 52 semanas', isNum(rng[1]) ? num(rng[1]) : '—'], ['Mín. 52 semanas', isNum(rng[0]) ? num(rng[0]) : '—'], ['Divisa', `${esc(cur)}${m.repCur !== cur ? ` <small>(estados en ${esc(m.repCur)})</small>` : ''}`],
     ['1 día', chg('1D')], ['1 semana', chg('5D')], ['1 mes', chg('1M')], ['6 meses', chg('6M')], ['En el año', chg('ytd')], ['1 año', chg('1Y')], ['5 años', chg('5Y')], ['10 años', chg('10Y')],
-    ['PER', isNum(m.pe) && m.pe > 0 ? num(m.pe, 1) + '×' : '—'], ['Rent. dividendo', m.dpsTTM ? pct(m.dpsTTM / m.price, 2) : '—'], ['Beta', num(p.beta, 2)],
+    ['PER', isNum(m.pe) && m.pe > 0 ? num(m.pe, 1) + '×' : '—'], ['Rent. dividendo', m.dpsTTM ? pct(m.dpsTTM / m.price, 2) : '—'], ['Beta', `${num(m.market.beta, 2)}${m.market.betaCalc ? ' <small>calculada</small>' : m.market.betaAssumed ? ' <small>supuesta</small>' : ''}`],
     ['Próximos resultados', next ? `${date(next.date)}${isNum(next.epsEstimated) ? ` <small>BPA est. ${num(next.epsEstimated)}</small>` : ''}` : '—'],
   ];
   const top = alerts.slice(0, 4);
-  const cik = p.cik ? String(p.cik).replace(/^0+/, '') : null;
+  const cik = p.cik ? String(p.cik).replace(/^0+/, '') : (!m.symbol.includes('.') ? m.symbol : null); // EDGAR acepta el ticker
+  const LABEL = { profile: 'Perfil', quote: 'Cotización', priceChange: 'Variaciones de precio', prices: 'Histórico de precios', income: 'Cuenta de resultados', balance: 'Balance', cashflow: 'Flujos de caja', incomeTTM: 'Resultados TTM', ratios: 'Ratios históricos', keyMetrics: 'Múltiplos históricos', ratiosTTM: 'Ratios actuales', keyMetricsTTM: 'Métricas actuales', scores: 'Piotroski / Altman', estimates: 'Estimaciones de analistas', priceTarget: 'Precio objetivo', gradesConsensus: 'Recomendaciones', dcf: 'DCF del proveedor', dividends: 'Dividendos', earnings: 'Resultados trimestrales', treasury: 'Bono a 10 años', riskPremium: 'Prima de riesgo', spy: 'S&P 500 (beta)' };
+  const rows = Object.keys(LABEL).filter((k) => S.raw[k]).map((k) => { const r = S.raw[k]; return `<tr><td class="l">${LABEL[k]}</td><td class="l">${r.ok ? `<span class="pos">✓</span> ${esc(r.source || '')}` : `<span class="${r.pending ? 'warn' : 'neg'}">${r.pending ? '…' : '✕'}</span> ${esc((r.error && r.error.message) || 'Sin datos')}`}</td></tr>`; }).join('');
+  const okN = Object.keys(LABEL).filter((k) => S.raw[k] && S.raw[k].ok).length, totN = Object.keys(LABEL).filter((k) => S.raw[k]).length;
+  const diag = `<details style="margin-top:14px" class="card"><summary style="padding:12px 16px;cursor:pointer;font-weight:600">Diagnóstico de datos: ${okN} de ${totN} bloques recibidos${m.derived && m.derived.length ? ` · calculados por la app: ${esc(m.derived.join(', '))}` : ''}</summary><div class="cb"><div class="tablewrap"><table class="dense"><tbody>${rows}</tbody></table></div><p class="note">Si una fuente aparece con ✕ en todo, revisa su clave en <a href="#/ajustes">Ajustes</a> (botón «Probar todas»). «…» = sigue descargando.</p></div></details>`;
   el.innerHTML = `
   <div class="grid g3" style="margin-bottom:14px">
     ${card('Puntuación de inversión', `<div class="gauge">${gauge(sc.total)}<div class="verdict">${esc(rep.conclusion)}</div><p class="note">Cobertura de datos: ${pct(sc.coverage, 0)} de las métricas. <a href="#/c/${encodeURIComponent(m.symbol)}/informe">Ver informe completo</a></p></div>`)}
@@ -50,5 +54,5 @@ export function render(el, S) {
         ${p.isin && p.country !== 'US' ? `<li><a href="https://registers.esma.europa.eu/publication/searchRegister?core=esma_registers_firds&searchText=${encodeURIComponent(p.isin)}" target="_blank" rel="noopener">ESMA · registro FIRDS por ISIN</a></li>` : ''}
         <li><a href="#/c/${encodeURIComponent(m.symbol)}/noticias">Últimos documentos presentados ante el regulador</a></li>
       </ul><p class="note">Los enlaces abren los registros oficiales; los datos de la aplicación proceden de proveedores que los extraen de esos documentos.</p>`)}
-  </div>`;
+  </div>${diag}`;
 }

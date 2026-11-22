@@ -48,6 +48,7 @@ async function load(sym, onProgress, late) {
     dcf: () => data.dcf(sym), dividends: () => data.dividends(sym), splits: () => data.splits(sym), earnings: () => data.earnings(sym),
     treasury: () => data.treasury(new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)), riskPremium: () => data.riskPremium(),
     prices: () => data.pricesDaily(sym, from),
+    spy: () => data.pricesDaily('SPY', new Date(Date.now() - 6 * 365 * 864e5).toISOString().slice(0, 10)),
   };
   const keys = Object.keys(jobs); let n = 0;
   const res = await Promise.all(keys.map((k) => timed(jobs[k], ESSENTIAL.includes(k) ? 20000 : 7000, k, late).then((r) => { n++; onProgress && onProgress(n, keys.length); return r; })));

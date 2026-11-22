@@ -84,3 +84,20 @@ test('simulación prospectiva con DRIP supera a sin DRIP', () => {
   const b = forward({ price: 100, eps: 5, epsGrowth: 0.08, exitPE: 20, payout: 0.4, years: 10, drip: false });
   assert.ok(a.final > b.final); assert.ok(a.cagr > 0);
 });
+
+import { priceChanges, betaFrom, piotroski, altman, closeAt } from '../js/calc/finance.js';
+test('cálculos propios: variaciones, beta, Piotroski y Altman', () => {
+  const px = []; const d = new Date('2020-01-01');
+  for (let i = 0; i < 1600; i++) { const t = new Date(d); t.setDate(d.getDate() + i); px.push({ date: t.toISOString().slice(0, 10), close: 100 * 1.0005 ** i }); }
+  const ch = priceChanges(px);
+  assert.ok(ch['1Y'] > 19 && ch['1Y'] < 21);
+  assert.equal(closeAt(px, '2020-01-05').date, '2020-01-05');
+  const idx = px.map((p, i) => ({ date: p.date, close: 100 * (1 + 0.05 * Math.sin(i / 20)) }));
+  const st = idx.map((p) => ({ date: p.date, close: p.close ** 2 }));
+  const b = betaFrom(st, idx); assert.ok(b > 1.5 && b < 2.5, String(b));
+  const a = { netIncome: 10, ocf: 15, roa: 0.1, longTermDebt: 10, assets: 100, currentRatio: 1.5, shares: 100, grossMargin: 0.5, revenue: 80 };
+  const p0 = { netIncome: 8, ocf: 9, roa: 0.08, longTermDebt: 20, assets: 100, currentRatio: 1.2, shares: 101, grossMargin: 0.45, revenue: 70 };
+  assert.equal(piotroski(a, p0), 9);
+  const z = altman({ assets: 100, currentAssets: 50, currentLiabilities: 30, retainedEarnings: 20, ebit: 15, liabilities: 50, revenue: 120 }, 200);
+  assert.ok(Math.abs(z - (1.2 * 0.2 + 1.4 * 0.2 + 3.3 * 0.15 + 0.6 * 4 + 1.2)) < 1e-9);
+});

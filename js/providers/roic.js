@@ -54,7 +54,7 @@ export const roic = {
         goodwill: n(x.bs_goodwill), intangibleAssets: n(x.bs_other_intangible_assets_detailed ?? x.bs_disclosed_intangibles), longTermInvestments: n(x.bs_lt_invest ?? x.bs_long_term_investments),
         totalNonCurrentAssets: n(x.bs_tot_non_cur_asset), totalAssets: n(x.bs_tot_asset), totalCurrentLiabilities: n(x.bs_cur_liab), shortTermDebt: std, longTermDebt: ltd,
         totalLiabilities: n(x.bs_tot_liab), totalStockholdersEquity: n(x.bs_eqty_bef_minority_int_detailed ?? x.bs_total_equity),
-        totalDebt: std == null && ltd == null ? null : (std || 0) + (ltd || 0), netDebt: n(x.net_debt), commonStockSharesOutstanding: n(x.bs_sh_out), _source: 'ROIC.AI' };
+        totalDebt: std == null && ltd == null ? null : (std || 0) + (ltd || 0), retainedEarnings: n(x.bs_pure_retained_earnings), netDebt: n(x.net_debt), commonStockSharesOutstanding: n(x.bs_sh_out), _source: 'ROIC.AI' };
     }) };
   },
   async cashflow(s) {

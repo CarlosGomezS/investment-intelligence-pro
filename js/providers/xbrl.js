@@ -40,6 +40,7 @@ export const MAP = {
     shortTermDebt: [...G('LongTermDebtCurrent', 'DebtCurrent', 'ShortTermBorrowings', 'CommercialPaper'), ...I('CurrentBorrowings', 'ShorttermBorrowings', 'CurrentPortionOfLongtermBorrowings')],
     longTermDebt: [...G('LongTermDebtNoncurrent', 'LongTermDebt'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
     totalLiabilities: [...G('Liabilities'), ...I('Liabilities')],
+    retainedEarnings: [...G('RetainedEarningsAccumulatedDeficit'), ...I('RetainedEarnings')],
     totalStockholdersEquity: [...G('StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'), ...I('EquityAttributableToOwnersOfParent', 'Equity')],
   },
   cashflow: {
