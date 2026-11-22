@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown } from './finance.js?v=27218ae7';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown } from './finance.js?v=a0623ec2';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
