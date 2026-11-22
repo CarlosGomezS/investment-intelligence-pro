@@ -1,0 +1,12 @@
+name = "iip-proxy"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Orígenes permitidos separados por comas (tu GitHub Pages)
+ALLOWED_ORIGIN = "https://carlosgomezs.github.io"
+SEC_USER_AGENT = "InvestmentIntelligencePro tu-email@ejemplo.com"
+
+# Secretos (no se escriben aquí):
+#   npx wrangler secret put FMP_KEY
+#   npx wrangler secret put AV_KEY

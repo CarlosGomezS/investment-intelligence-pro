@@ -1,0 +1,87 @@
+// Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
+// Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy } from './finance.js';
+import { wacc as waccCalc, analystGrowth } from './valuation.js';
+
+const val = (r) => (r && r.ok ? r.data : null);
+const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
+
+export function buildModel(raw, fxRate = 1) {
+  const profile = val(raw.profile) || {};
+  const quote = val(raw.quote) || {};
+  const price = quote.price ?? profile.price;
+  const tradeCur = profile.currency || quote.currency || 'USD';
+  const inc = asc(val(raw.income) || []), bal = asc(val(raw.balance) || []), cf = asc(val(raw.cashflow) || []);
+  const repCur = (inc[inc.length - 1] || {}).reportedCurrency || tradeCur;
+  const fx = repCur === tradeCur ? 1 : fxRate; // unidades de moneda de cotización por 1 unidad de moneda de reporte
+
+  const years = buildAnnual(inc, bal, cf).map((y) => deriveYear(y));
+  const last = years[years.length - 1] || {};
+  const ratiosHist = asc(val(raw.ratios) || []);
+  const kmHist = asc(val(raw.keyMetrics) || []);
+  const rTTM = val(raw.ratiosTTM) || {}, kTTM = val(raw.keyMetricsTTM) || {};
+
+  // TTM: estados TTM del proveedor si existen; si no, último ejercicio anual (se indica en la interfaz).
+  const iT = val(raw.incomeTTM), bT = val(raw.balanceTTM), cT = val(raw.cashflowTTM);
+  const ttmYear = iT ? deriveYear({ year: 'TTM', i: iT, b: bT || (bal[bal.length - 1] || {}), c: cT || {} }) : null;
+  const T = ttmYear && isNum(ttmYear.revenue) ? ttmYear : last;
+  const ttmIsReal = !!(ttmYear && isNum(ttmYear.revenue));
+
+  const shares = quote.sharesOutstanding ?? profile.sharesOutstanding ?? (isNum(profile.marketCap) && isNum(price) && price > 0 ? profile.marketCap / price : null) ?? last.shares;
+  const marketCap = quote.marketCap ?? profile.marketCap ?? (isNum(shares) && isNum(price) ? shares * price : null);
+  const netDebtT = isNum(T.netDebt) ? T.netDebt * fx : isNum(last.netDebt) ? last.netDebt * fx : null;
+  const ev = isNum(marketCap) ? marketCap + (netDebtT || 0) : null;
+  const X = (v) => (isNum(v) ? v * fx : null); // a moneda de cotización
+
+  const estimates = asc(val(raw.estimates) || []);
+  const lastFY = last.year;
+  const nextEst = estimates.find((e) => String(e.date).slice(0, 4) > String(lastFY) && isNum(e.epsAvg));
+  const forwardEps = nextEst ? X(nextEst.epsAvg) : null;
+
+  const series = (f) => years.map((y) => y[f]);
+  const rev = series('revenue'), ni = series('netIncome'), eps = series('eps'), fcf = series('fcf'), sh = series('shares');
+  const growth = {
+    rev1: cagrN(rev, 1), rev3: cagrN(rev, 3), rev5: cagrN(rev, 5), rev10: cagrN(rev, 10),
+    ni3: cagrN(ni, 3), ni5: cagrN(ni, 5), ni10: cagrN(ni, 10),
+    eps3: cagrN(eps, 3), eps5: cagrN(eps, 5), eps10: cagrN(eps, 10),
+    fcf3: cagrN(fcf, 3), fcf5: cagrN(fcf, 5), fcf10: cagrN(fcf, 10),
+    shares5: cagrN(sh, 5), shares1: cagrN(sh, 1),
+    analystRev: analystGrowth(estimates, last.revenue, lastFY),
+    analystEps: (() => { const f = estimates.filter((e) => String(e.date).slice(0, 4) > String(lastFY) && isNum(e.epsAvg)); if (!f.length || !isNum(last.eps) || last.eps <= 0) return null; const far = f[Math.min(f.length - 1, 2)]; const n = Number(String(far.date).slice(0, 4)) - Number(lastFY); return far.epsAvg > 0 && n > 0 ? (far.epsAvg / last.eps) ** (1 / n) - 1 : null; })(),
+  };
+
+  // Dividendos
+  const divs = asc(val(raw.dividends) || []).filter((d) => isNum(d.adjDividend ?? d.dividend));
+  const byYear = {};
+  for (const d of divs) { const y = String(d.date).slice(0, 4); byYear[y] = (byYear[y] || 0) + (d.adjDividend ?? d.dividend); }
+  const curYear = String(new Date().getFullYear());
+  const dpsYears = Object.keys(byYear).filter((y) => y < curYear).sort();
+  const dpsSeries = dpsYears.map((y) => ({ year: y, dps: byYear[y] }));
+  const last12 = divs.filter((d) => new Date(d.date) > new Date(Date.now() - 365 * 864e5)).reduce((a, d) => a + (d.adjDividend ?? d.dividend), 0);
+  const dpsTTM = last12 || (isNum(profile.lastDividend) ? profile.lastDividend : 0);
+
+  // Datos de mercado para el WACC (todos con su origen)
+  const tr = asc(val(raw.treasury) || []); const rf10 = tr.length ? tr[tr.length - 1].year10 / 100 : null;
+  const rp = val(raw.riskPremium) || [];
+  const country = profile.country || 'US';
+  const rpRow = Array.isArray(rp) ? rp.find((r) => r.country === countryName(country)) || rp.find((r) => r.country === 'United States') : null;
+  const erp = rpRow ? rpRow.totalEquityRiskPremium / 100 : null;
+  const costDebt = lastAvg(series('costOfDebt').filter((v) => isNum(v) && v > 0 && v < 0.25), 3);
+  const w = waccCalc({ rf: rf10, beta: profile.beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
+
+  const peRatio = isNum(rTTM.priceToEarningsRatioTTM) && fx === 1 ? rTTM.priceToEarningsRatioTTM : div(price, X(T.eps));
+
+  return {
+    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, shares, marketCap, ev, netDebt: netDebtT,
+    years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores: val(raw.scores) || {}, estimates, forwardEps,
+    priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
+    change: val(raw.priceChange) || {}, growth, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
+    market: { rf10, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpCountry: rpRow ? rpRow.country : null, beta: profile.beta, costDebt, wacc: w },
+    pe: peRatio, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
+    stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
+    median, mean,
+  };
+}
+
+const COUNTRIES = { US: 'United States', ES: 'Spain', DE: 'Germany', FR: 'France', GB: 'United Kingdom', NL: 'Netherlands', IT: 'Italy', CH: 'Switzerland', JP: 'Japan', CN: 'China', TW: 'Taiwan', KR: 'South Korea', CA: 'Canada', IE: 'Ireland', SE: 'Sweden', DK: 'Denmark', NO: 'Norway', FI: 'Finland', BE: 'Belgium', PT: 'Portugal', AU: 'Australia', BR: 'Brazil', IN: 'India', HK: 'Hong Kong', MX: 'Mexico', IL: 'Israel', LU: 'Luxembourg', AT: 'Austria' };
+export const countryName = (c) => COUNTRIES[c] || c;
