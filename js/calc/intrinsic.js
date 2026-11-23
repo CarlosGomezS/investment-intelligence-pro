@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=6408f476';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=6408f476';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=ed7bffe0';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=ed7bffe0';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -15,7 +15,7 @@ export function dcfDefaults(m) {
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
     rf: { value: m.market.rf10, origin: m.market.rfAssumed ? 'supuesto · 4,5 % (sin dato del bono a 10 años)' : `real · bono EE. UU. 10a (${m.market.rfDate})` },
-    beta: { value: m.market.beta, origin: m.market.betaAssumed ? 'supuesto · beta 1 (sin dato)' : m.market.betaCalc ? 'calculado · 5 años de rentabilidades mensuales frente al S&P 500 (SPY)' : 'real · beta 5a del proveedor' },
+    beta: { value: m.market.beta, origin: m.market.betaAssumed ? 'supuesto · beta 1 (sin dato)' : `calculado · beta ajustada de Blume (0,67 × ${(m.market.betaRaw || 0).toFixed(2).replace('.', ',')} ${m.market.betaCalc ? 'calculada frente al S&P 500' : 'del proveedor'} + 0,33)` },
     erp: { value: m.market.erp, origin: m.market.erpAssumed ? 'supuesto · 4,5 % (prima típica de mercado desarrollado)' : `real · prima de riesgo ${m.market.erpCountry} (Damodaran vía FMP)` },
     costDebt: { value: m.market.costDebt, origin: m.market.costDebt != null ? 'real · intereses / deuda, media 3a' : 'falta' },
     wacc: { value: w ? w.wacc : null, origin: w ? 'calculado · CAPM' : 'falta: introduce el WACC a mano' },
@@ -54,12 +54,20 @@ export function multiples(m, peersAll) {
   const gN = gNow.length ? median(gNow) : null;
   const slowed = isNum(gThen) && isNum(gN) && gThen > 0.05 && gN < gThen * 0.6;
   const why = slowed ? `excluido del valor central: cuando cotizaba a ese múltiplo crecía un ${(gThen * 100).toFixed(1).replace('.', ',')} % anual y ahora un ${(gN * 100).toFixed(1).replace('.', ',')} %` : '';
-  const H = (method, multiple, value) => ({ method, multiple, value, origin: 'real · histórico propio', exclude: slowed, note: why });
+  // Tope: un múltiplo histórico no puede superar 1,5 veces la mediana actual de competidores ni un máximo absoluto
+  // (PER 35×, EV/EBITDA 25×, EV/FCF 35×). Evita valorar a una empresa ya gigante con múltiplos de su etapa temprana.
+  const CAP = { pe: 35, eve: 25, evf: 35 };
+  const capOf = (kind) => Math.min(CAP[kind], kind === 'pe' && isNum(peerPE) ? peerPE * 1.5 : kind === 'eve' && isNum(peerEVE) ? peerEVE * 1.5 : Infinity);
+  const H = (method, kind, multiple, calc) => {
+    const cap = capOf(kind), capped = isNum(multiple) && multiple > cap;
+    const mu = capped ? cap : multiple;
+    return { method, multiple: mu, rawMultiple: multiple, value: calc(mu), origin: 'real · histórico propio', exclude: slowed, note: why || (capped ? `múltiplo histórico ${multiple.toFixed(1).replace('.', ',')}× topado a ${cap.toFixed(1).replace('.', ',')}×` : '') };
+  };
   const rows = [
-    H('PER medio 5 años', pe5, impliedByPE(epsT, pe5)),
-    H('PER medio 10 años', pe10, impliedByPE(epsT, pe10)),
-    H('EV/EBITDA medio 5 años', eve5, impliedByEV(ebitdaT, eve5, m.netDebt, m.shares)),
-    H('EV/FCF medio 5 años', evf5, impliedByEV(fcfT, evf5, m.netDebt, m.shares)),
+    H('PER medio 5 años', 'pe', pe5, (x) => impliedByPE(epsT, x)),
+    H('PER medio 10 años', 'pe', pe10, (x) => impliedByPE(epsT, x)),
+    H('EV/EBITDA medio 5 años', 'eve', eve5, (x) => impliedByEV(ebitdaT, x, m.netDebt, m.shares)),
+    H('EV/FCF medio 5 años', 'evf', evf5, (x) => impliedByEV(fcfT, x, m.netDebt, m.shares)),
     { method: 'PER mediano de competidores', multiple: peerPE, value: impliedByPE(epsT, peerPE), origin: 'real · competidores (TTM)', note: peers ? '' : 'competidores aún no cargados' },
     { method: 'EV/EBITDA mediano de competidores', multiple: peerEVE, value: impliedByEV(ebitdaT, peerEVE, m.netDebt, m.shares), origin: 'real · competidores (TTM)', note: peers ? '' : 'competidores aún no cargados' },
   ];

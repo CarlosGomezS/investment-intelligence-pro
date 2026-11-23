@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cagr, cagrN, yoy, ttm, lin, maxDrawdown, deriveYear, buildAnnual, median } from '../js/calc/finance.js';
+import { cagr, cagrN, yoy, ttm, lin, maxDrawdown, deriveYear, buildAnnual, median, splitAdjustRows, splitFactor } from '../js/calc/finance.js';
 import { dcf, wacc, ddm, impliedByEV, marginOfSafety, sensitivity, suggestGrowth } from '../js/calc/valuation.js';
 import { forward } from '../js/calc/simulate.js';
 
@@ -65,7 +65,7 @@ test('múltiplos EV y margen de seguridad', () => {
 
 test('crecimiento sugerido acotado y con origen', () => {
   const s = suggestGrowth({ fcfCagr5: 0.4, revCagr5: 0.3, analystRevGrowth: 0.25 });
-  assert.equal(s.value, 0.2); assert.equal(s.parts.length, 3);
+  assert.equal(s.value, 0.3); assert.equal(s.parts.length, 3);
   assert.equal(suggestGrowth({}).value, null);
 });
 
@@ -110,4 +110,12 @@ test('ajuste por split 10×1', () => {
   assert.equal(Y[0].shares, 25e9); assert.ok(Math.abs(Y[0].eps - 1.2) < 1e-9);
   const Z = [{ year: '2023', shares: 100, eps: 1, netIncome: 100 }, { year: '2024', shares: 200, eps: 1, netIncome: 200 }]; // fusión que duplica beneficio: no es split
   assert.equal(adjustSplits(Z).length, 0);
+});
+
+test('estados ajustados a splits: acciones y BPA comparables, importes intactos', () => {
+  const adj = [{ year: '2024', factor: 10 }, { year: '2021', factor: 4 }];
+  assert.equal(splitFactor(adj, 2020), 40); assert.equal(splitFactor(adj, 2022), 10); assert.equal(splitFactor(adj, 2024), 1);
+  const rows = splitAdjustRows([{ fiscalYear: '2020', weightedAverageShsOut: 600, eps: 4, revenue: 100 }, { fiscalYear: '2025', weightedAverageShsOut: 24000, eps: 3, revenue: 900 }], adj);
+  assert.equal(rows[0].weightedAverageShsOut, 24000); assert.equal(rows[0].eps, 0.1); assert.equal(rows[0].revenue, 100);
+  assert.equal(rows[1].eps, 3);
 });

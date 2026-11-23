@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=6408f476';
+import { isNum, div, mean } from './finance.js?v=ed7bffe0';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -81,7 +81,7 @@ export const RATIOS = [
     cur: (m) => (isNum(m.pe) && m.pe > 0 ? 1 / m.pe : null), hist: (m) => histFrom(m.kmHist, 'earningsYield'),
     interp: (v, _a, m) => v == null ? '—' : `${fx(v * 100, 1)} %${m.market.rf10 ? ` frente al ${fx(m.market.rf10 * 100, 2)} % del bono a 10 años: ${v > m.market.rf10 ? 'prima positiva' : 'el bono rinde más que el beneficio'}` : ''}.`, alert: () => false },
   { id: 'dy', label: 'Rentabilidad por dividendo', group: 'Rendimientos', fmt: 'pct', better: 'high', formula: 'Dividendos por acción últimos 12 meses / precio',
-    cur: (m) => (isNum(m.dpsTTM) && m.price ? m.dpsTTM / m.price : null), hist: (m) => histFrom(m.ratiosHist, 'dividendYield'),
+    cur: (m) => (isNum(m.dpsTTM) && m.price ? m.dpsTTM / m.price : null), hist: (m) => histFrom(m.ratiosHist, 'dividendYield').filter((h) => h.v < 0.25), // >25 % = dato sin ajustar a splits
     interp: (v) => !v ? 'No reparte dividendo.' : `${fx(v * 100, 2)} % anual.`, alert: (v) => v > 0.09 && 'Dividendo superior al 9 %: el mercado puede estar descontando un recorte.' },
   { id: 'payout', label: 'Payout', group: 'Rendimientos', fmt: 'pct', better: 'band', formula: 'Dividendos pagados / beneficio neto',
     cur: (m) => div(m.T.dividendsPaid ?? m.last.dividendsPaid, m.T.netIncome ?? m.last.netIncome), hist: (m) => m.years.map((y) => ({ year: y.year, v: div(y.dividendsPaid, y.netIncome) })).filter((p) => isNum(p.v) && p.v >= 0),

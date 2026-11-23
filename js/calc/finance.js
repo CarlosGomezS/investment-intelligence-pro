@@ -159,6 +159,25 @@ export function altman(y, marketCap) {
  * (2, 3, 4, 5, 8, 10, 15, 20… o el inverso) sin que el negocio lo justifique, se reexpresan los años
  * anteriores (acciones × factor, BPA ÷ factor). Devuelve la lista de splits detectados.
  */
+/** Factor acumulado de splits posteriores a un año fiscal (para ajustar acciones y BPA de años anteriores). */
+export function splitFactor(splitsAdj, year) {
+  let f = 1; for (const s of splitsAdj || []) if (Number(year) < Number(s.year)) f *= s.factor; return f;
+}
+const SHARE_F = ['weightedAverageShsOut', 'weightedAverageShsOutDil', 'commonStockSharesOutstanding'];
+const PERSHARE_F = ['eps', 'epsDiluted', 'epsdiluted'];
+/** Copia de las filas de un estado con acciones y BPA ajustados a los splits detectados (no toca los importes). */
+export function splitAdjustRows(rows, splitsAdj) {
+  if (!splitsAdj || !splitsAdj.length) return rows;
+  return rows.map((r) => {
+    const f = r._ttm ? 1 : splitFactor(splitsAdj, r.fiscalYear || String(r.date).slice(0, 4));
+    if (f === 1) return r;
+    const o = { ...r, _splitAdj: f };
+    for (const k of SHARE_F) if (isNum(o[k])) o[k] *= f;
+    for (const k of PERSHARE_F) if (isNum(o[k])) o[k] /= f;
+    return o;
+  });
+}
+
 export function adjustSplits(years, knownSplits = []) {
   const COMMON = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
   const found = [];

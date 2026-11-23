@@ -1,9 +1,9 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=6408f476';
-import { isNum } from '../../calc/finance.js?v=6408f476';
-import { store } from '../../store.js?v=6408f476';
-import { loadPeers } from './peers.js?v=6408f476';
-import { exportXLSX } from '../../export.js?v=6408f476';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=ed7bffe0';
+import { isNum } from '../../calc/finance.js?v=ed7bffe0';
+import { store } from '../../store.js?v=ed7bffe0';
+import { loadPeers } from './peers.js?v=ed7bffe0';
+import { exportXLSX } from '../../export.js?v=ed7bffe0';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -46,7 +46,7 @@ export async function render(el, S, ctx) {
       ${inp('wo', 'WACC manual (vacío = calculado)', isNum(I.waccOverride) ? P(I.waccOverride) : '', 'supuesto', '0.01')}
       <div class="f" style="align-self:end"><div class="row"><button class="btn pri" type="submit">Recalcular</button><button class="btn" type="button" id="reset">Restaurar</button></div></div>
     </form>
-    ${d.growth.parts && d.growth.parts.length ? `<p class="note">Crecimiento sugerido = mediana de: ${d.growth.parts.map(([k, v]) => `${esc(k)} ${pct(v)}`).join(' · ')}, acotada a 0-20 %.</p>` : ''}
+    ${d.growth.parts && d.growth.parts.length ? `<p class="note">Crecimiento sugerido = mediana de: ${d.growth.parts.map(([k, v]) => `${esc(k)} ${pct(v)}`).join(' · ')}, acotada a 0-30 %.</p>` : ''}
     <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
       <div class="kpi"><span>Coste del capital propio (CAPM)</span><b>${pct(ke, 2)}</b><small>rf + β × prima</small></div>
       <div class="kpi"><span>Peso capital / deuda</span><b>${pct(E / (E + D || 1), 0)} / ${pct(D / (E + D || 1), 0)}</b><small>a valor de mercado</small></div>

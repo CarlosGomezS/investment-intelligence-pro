@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=6408f476';
-import { data, setHint } from './providers/index.js?v=6408f476';
-import { usage } from './providers/http.js?v=6408f476';
-import { config, restoreConfig } from './config.js?v=6408f476';
-import { store } from './store.js?v=6408f476';
-import { destroyAll } from './ui/charts.js?v=6408f476';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=ed7bffe0';
+import { data, setHint } from './providers/index.js?v=ed7bffe0';
+import { usage } from './providers/http.js?v=ed7bffe0';
+import { config, restoreConfig } from './config.js?v=ed7bffe0';
+import { store } from './store.js?v=ed7bffe0';
+import { destroyAll } from './ui/charts.js?v=ed7bffe0';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=6408f476'),
-  c: () => import('./views/company.js?v=6408f476'),
-  watchlist: () => import('./views/watchlist.js?v=6408f476'),
-  screener: () => import('./views/screener.js?v=6408f476'),
-  comparar: () => import('./views/compare.js?v=6408f476'),
-  calendario: () => import('./views/calendar.js?v=6408f476'),
-  metodologia: () => import('./views/methodology.js?v=6408f476'),
-  ajustes: () => import('./views/settings.js?v=6408f476'),
+  dashboard: () => import('./views/dashboard.js?v=ed7bffe0'),
+  c: () => import('./views/company.js?v=ed7bffe0'),
+  watchlist: () => import('./views/watchlist.js?v=ed7bffe0'),
+  screener: () => import('./views/screener.js?v=ed7bffe0'),
+  comparar: () => import('./views/compare.js?v=ed7bffe0'),
+  calendario: () => import('./views/calendar.js?v=ed7bffe0'),
+  metodologia: () => import('./views/methodology.js?v=ed7bffe0'),
+  ajustes: () => import('./views/settings.js?v=ed7bffe0'),
 };
 
 export function go(path) { location.hash = '#/' + path; }

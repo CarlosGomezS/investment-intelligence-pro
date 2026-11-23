@@ -1,5 +1,5 @@
 // Simulaciones de rentabilidad: histórica (con y sin reinversión de dividendos) y prospectiva por supuestos.
-import { isNum } from './finance.js?v=6408f476';
+import { isNum } from './finance.js?v=ed7bffe0';
 
 /** Rentabilidad histórica: precios ajustados por dividendo (= reinversión) frente a precios sin ajustar. */
 export function historical(adjAsc, rawAsc, indexAsc, years, amount = 10000) {

@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=6408f476';
-import { alphavantage } from './alphavantage.js?v=6408f476';
-import { finnhub } from './finnhub.js?v=6408f476';
-import { twelvedata } from './twelvedata.js?v=6408f476';
-import { roic } from './roic.js?v=6408f476';
-import { sec } from './sec.js?v=6408f476';
-import { esef } from './esef.js?v=6408f476';
-import { config } from '../config.js?v=6408f476';
-import { ApiError, usage, queueDelay } from './http.js?v=6408f476';
-import { setHint } from './hints.js?v=6408f476';
+import { fmp } from './fmp.js?v=ed7bffe0';
+import { alphavantage } from './alphavantage.js?v=ed7bffe0';
+import { finnhub } from './finnhub.js?v=ed7bffe0';
+import { twelvedata } from './twelvedata.js?v=ed7bffe0';
+import { roic } from './roic.js?v=ed7bffe0';
+import { sec } from './sec.js?v=ed7bffe0';
+import { esef } from './esef.js?v=ed7bffe0';
+import { config } from '../config.js?v=ed7bffe0';
+import { ApiError, usage, queueDelay } from './http.js?v=ed7bffe0';
+import { setHint } from './hints.js?v=ed7bffe0';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -53,6 +53,43 @@ function chain(method, args) {
 
 const PRIORITY = { premium: 5, rate_limit: 4, bad_key: 6, needs_proxy: 1, network: 3, not_found: 2, no_key: 1, bad_response: 2 };
 
+// Campos clave por estado: si faltan años o estos campos, se completa con la siguiente fuente que los tenga.
+const KEYF = {
+  income: ['revenue', 'netIncome', 'eps', 'operatingIncome'],
+  balance: ['totalAssets', 'totalStockholdersEquity', 'cashAndCashEquivalents'],
+  cashflow: ['operatingCashFlow', 'freeCashFlow', 'capitalExpenditure'],
+};
+const fyOf = (r) => String(r.fiscalYear || String(r.date || '').slice(0, 4));
+function gaps(method, rows) {
+  if (!Array.isArray(rows)) return false;
+  if (rows.length < 8) return true;
+  return KEYF[method].some((f) => rows.filter((r) => r[f] == null).length > rows.length * 0.2);
+}
+async function complete(method, args, base, rest) {
+  const rows = base.data.map((r) => ({ ...r }));
+  const cur = rows[0] && rows[0].reportedCurrency;
+  const used = [base.provider];
+  for (const id of rest) {
+    if (!gaps(method, rows)) break;
+    if (queueDelay(id) > 8000) continue;
+    try {
+      const r = await P[id][method](...args);
+      if (!Array.isArray(r.data) || !r.data.length) continue;
+      if (cur && r.data[0].reportedCurrency && r.data[0].reportedCurrency !== cur) continue;
+      let added = false;
+      for (const o of r.data) {
+        const fy = fyOf(o); const mine = rows.find((x) => fyOf(x) === fy);
+        if (!mine) { rows.push({ ...o, _from: id }); added = true; continue; }
+        for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null) { mine[k] = v; added = true; }
+      }
+      if (added) used.push(id);
+    } catch (e) { /* la fuente secundaria no aporta: se sigue con lo que hay */ }
+  }
+  rows.sort((a, b) => (fyOf(a) < fyOf(b) ? 1 : -1));
+  const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
+  return used.length > 1 ? { ...base, data: rows.slice(0, Math.max(args[2] || 15, base.data.length)), source: used.map((u) => names[u] || u).join(' + '), merged: used } : base;
+}
+
 async function run(method, args) {
   const list = chain(method, args);
   if (!list.length) {
@@ -70,6 +107,7 @@ async function run(method, args) {
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);
       if (empty) { best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
       if (method === 'profile' && r.data) setHint(args[0], { name: r.data.companyName, isin: r.data.isin, country: r.data.country });
+      if (KEYF[method] && args[1] !== 'quarter' && gaps(method, r.data)) return await complete(method, args, { ...r, provider: id }, list.slice(i + 1));
       return { ...r, provider: id };
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(e.code || 'not_found', e.message || 'Sin datos', { provider: id });

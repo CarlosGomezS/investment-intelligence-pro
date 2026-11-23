@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=6408f476';
+import { isNum, div, mean, median, cagr } from './finance.js?v=ed7bffe0';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -74,13 +74,13 @@ export function scenarios(base) {
 /**
  * Crecimiento base sugerido para el DCF. Regla documentada:
  * mediana de (CAGR 5a del FCF, CAGR 5a de ventas, crecimiento anual de ventas previsto por analistas),
- * acotada entre 0 % y 20 %. Devuelve también de dónde sale cada componente.
+ * acotada entre 0 % y 30 %. Devuelve también de dónde sale cada componente.
  */
 export function suggestGrowth({ fcfCagr5, revCagr5, analystRevGrowth }) {
   const parts = [['FCF histórico (CAGR 5a)', fcfCagr5], ['Ventas históricas (CAGR 5a)', revCagr5], ['Ventas previstas por analistas', analystRevGrowth]].filter(([, v]) => isNum(v));
   if (!parts.length) return { value: null, parts };
   const m = median(parts.map(([, v]) => v));
-  return { value: Math.min(0.2, Math.max(0, m)), parts };
+  return { value: Math.min(0.3, Math.max(0, m)), parts };
 }
 
 /** Crecimiento anual medio de ventas previsto por analistas desde el último año real. */

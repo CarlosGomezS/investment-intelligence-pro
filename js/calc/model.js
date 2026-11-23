@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=6408f476';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=6408f476';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=ed7bffe0';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=ed7bffe0';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -54,7 +54,13 @@ export function buildModel(raw, fxRate = 1) {
   };
 
   // Dividendos
-  const divs = asc(val(raw.dividends) || []).filter((d) => isNum(d.adjDividend ?? d.dividend));
+  // Si el proveedor no da el dividendo ajustado, se ajusta con los splits conocidos (los de antes del split se dividen).
+  const splitList = (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.denominator > 0 && s.numerator / s.denominator > 1);
+  const divs = asc(val(raw.dividends) || []).filter((d) => isNum(d.adjDividend ?? d.dividend)).map((d) => {
+    if (isNum(d.adjDividend) && d.adjDividend !== d.dividend) return d;
+    const f = splitList.filter((s) => String(s.date) > String(d.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
+    return f > 1 ? { ...d, adjDividend: d.dividend / f } : d;
+  });
   const byYear = {};
   for (const d of divs) { const y = String(d.date).slice(0, 4); byYear[y] = (byYear[y] || 0) + (d.adjDividend ?? d.dividend); }
   const curYear = String(new Date().getFullYear());
@@ -74,7 +80,9 @@ export function buildModel(raw, fxRate = 1) {
   const spy = asc(val(raw.spy) || []);
   const betaCalc = !isNum(profile.beta) && prices.length > 500 && spy.length > 500 ? betaFrom(prices, spy) : null;
   const betaAssumed = !isNum(profile.beta) && !isNum(betaCalc);
-  const beta = isNum(profile.beta) ? profile.beta : isNum(betaCalc) ? betaCalc : 1;
+  const betaRaw = isNum(profile.beta) ? profile.beta : isNum(betaCalc) ? betaCalc : 1;
+  // Beta ajustada de Blume (0,67·beta + 0,33): la beta histórica tiende a volver a 1; evita costes de capital extremos.
+  const beta = betaAssumed ? 1 : 0.67 * betaRaw + 0.33;
   if (isNum(betaCalc)) derived.push('beta');
   const w = waccCalc({ rf: rf10, beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
 
@@ -85,7 +93,7 @@ export function buildModel(raw, fxRate = 1) {
       const p = closeAt(prices, String(y.date || '').slice(0, 10)); if (!p || !isNum(y.shares)) continue;
       const mc = p.close * y.shares, Xv = (v) => (isNum(v) ? v * fx : null);
       const evv = mc + (Xv(y.netDebt) || 0), dps = (dpsSeries.find((d) => d.year === y.year) || {}).dps;
-      R.push({ fiscalYear: y.year, date: y.date, priceToEarningsRatio: div(p.close, Xv(y.eps)), priceToSalesRatio: div(mc, Xv(y.revenue)), priceToBookRatio: div(mc, Xv(y.equity)), dividendYield: isNum(dps) ? dps / p.close : null, _derived: true });
+      R.push({ fiscalYear: y.year, date: y.date, priceToEarningsRatio: div(p.close, Xv(y.eps)), priceToSalesRatio: div(mc, Xv(y.revenue)), priceToBookRatio: div(mc, Xv(y.equity)), dividendYield: isNum(dps) && dps / p.close < 0.25 ? dps / p.close : null, _derived: true });
       K.push({ fiscalYear: y.year, date: y.date, enterpriseValue: evv, evToEBITDA: div(evv, Xv(y.ebitda)), evToFreeCashFlow: div(evv, Xv(y.fcf)), freeCashFlowYield: div(Xv(y.fcf), mc), earningsYield: div(Xv(y.netIncome), mc), _derived: true });
     }
     if (!ratiosHist.length && R.length) { ratiosHist = R; derived.push('ratios históricos'); }
@@ -107,7 +115,7 @@ export function buildModel(raw, fxRate = 1) {
     years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
-    market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
+    market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaRaw, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
     pe: peRatio, peProvider, periodLabel, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
     stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,

@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=6408f476';
-import { fundamentals } from '../../ui/charts.js?v=6408f476';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=6408f476';
-import { isNum, div, asc } from '../../calc/finance.js?v=6408f476';
-import { extra } from '../company.js?v=6408f476';
-import { exportCSV, exportXLSX } from '../../export.js?v=6408f476';
+import { data } from '../../providers/index.js?v=ed7bffe0';
+import { fundamentals } from '../../ui/charts.js?v=ed7bffe0';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=ed7bffe0';
+import { isNum, div, asc, splitAdjustRows } from '../../calc/finance.js?v=ed7bffe0';
+import { extra } from '../company.js?v=ed7bffe0';
+import { exportCSV, exportXLSX } from '../../export.js?v=ed7bffe0';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -54,10 +54,11 @@ async function rowsFor(S, stmt, period) {
   if (period === 'annual') {
     const r = S.raw[stmt];
     if (!r.ok) return { error: r.error };
-    const rows = asc(r.data);
+    const rows = splitAdjustRows(asc(r.data), S.m.splitsAdj);
     const ttm = S.raw[stmt + 'TTM'];
     if (ttm && ttm.ok && ttm.data) rows.push({ ...ttm.data, fiscalYear: 'TTM', _ttm: true });
-    return { rows, prov: [r, ttm && ttm.ok ? ttm : null] };
+    const adj = rows.some((x) => x._splitAdj);
+    return { rows, prov: [r, ttm && ttm.ok ? ttm : null], note: adj ? 'Acciones y BPA de los años anteriores a cada split detectado están ajustados al número de acciones actual (comparables entre años). Los importes no cambian.' : '' };
   }
   try {
     const q = await extra(S, 'q' + stmt, () => data[stmt](S.sym, 'quarter', 44));

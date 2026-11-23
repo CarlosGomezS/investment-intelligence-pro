@@ -1,9 +1,9 @@
 // «Descargar todo»: todo el análisis de una empresa en Excel (una hoja por bloque), CSV (un ZIP con un archivo
 // por bloque), TXT (informe legible) o JSON (datos en bruto). En apps empaquetadas (WebView) donde las
 // descargas no funcionan, se intenta compartir el archivo y, si tampoco, se ofrece copiarlo.
-import { DEFS } from './views/tabs/statements.js?v=6408f476';
-import { toCSV } from './export.js?v=6408f476';
-import { asc, isNum } from './calc/finance.js?v=6408f476';
+import { DEFS } from './views/tabs/statements.js?v=ed7bffe0';
+import { toCSV } from './export.js?v=ed7bffe0';
+import { asc, isNum, splitAdjustRows } from './calc/finance.js?v=ed7bffe0';
 
 const g = (r, f) => (r ? (typeof f === 'function' ? f(r) : r[f]) : null);
 const clean = (v) => (v == null || (typeof v === 'number' && !Number.isFinite(v)) ? '' : v);
@@ -17,7 +17,7 @@ export function sheets(S) {
     ['Puntuación total', sc.total], ['Conclusión', rep.conclusion], ['Valor intrínseco central', val.composite.value], ['Margen de seguridad', val.composite.mos], ['Potencial', val.composite.up],
     ['Descripción', p.description], ['Generado', new Date().toISOString()]];
   for (const [k, D] of Object.entries(DEFS)) {
-    const r = S.raw[k]; const rows = r && r.ok ? asc(r.data) : [];
+    const r = S.raw[k]; const rows = r && r.ok ? splitAdjustRows(asc(r.data), m.splitsAdj) : [];
     out[D.title.slice(0, 31)] = [['Partida (' + m.repCur + ')', ...rows.map((x) => x.fiscalYear || String(x.date).slice(0, 4))], ...D.rows.map(([l, f]) => [l, ...rows.map((x) => clean(g(x, f)))])];
   }
   out['Datos anuales derivados'] = m.years.length ? [Object.keys(m.years[0]), ...m.years.map((y) => Object.values(y).map(clean))] : [['Sin datos']];
