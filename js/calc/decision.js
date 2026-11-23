@@ -1,7 +1,7 @@
 // Decisión en cuatro ejes independientes: calidad del negocio, valoración, potencial de rentabilidad y riesgo de
 // pérdida permanente. No se mezclan en una sola nota: una empresa excelente puede estar cara y una barata puede
 // estar deteriorándose. Todas las reglas y umbrales están aquí, a la vista, y la interfaz los explica.
-import { isNum, maxDrawdown } from './finance.js?v=c8fdab36';
+import { isNum, maxDrawdown } from './finance.js?v=984486c8';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const cat = (sc, k) => (sc.cats.find((c) => c.key === k) || {}).score;
@@ -17,7 +17,7 @@ export function decide(m, sc, val, alerts) {
   const quality = { score: isNum(qs) ? Math.round(qs) : null, label: !isNum(qs) ? 'sin datos' : qs >= 75 ? 'Excelente' : qs >= 60 ? 'Buena' : qs >= 45 ? 'Mediocre' : 'Débil' };
 
   // 2. Valoración y precio máximo de compra
-  const valuable = isNum(c.value) && rel.level !== 'no valorable';
+  const valuable = isNum(c.value) && isNum(price) && price > 0 && rel.level !== 'no valorable';
   let req = REQUIRED_MOS[rel.level] ?? null; const reqWhy = [];
   if (isNum(req)) { reqWhy.push(`${Math.round(req * 100)} % por fiabilidad ${rel.level}`); if (isNum(qs) && qs < 60) { req += 0.1; reqWhy.push('+10 puntos por negocio de calidad no probada'); } if (c.contrasted === false) { req += 0.1; reqWhy.push('+10 puntos porque solo hay múltiplos, sin DCF ni dividendos'); } }
   const maxBuy = valuable && isNum(req) && c.value > 0 ? c.value * (1 - req) : null;
@@ -29,7 +29,8 @@ export function decide(m, sc, val, alerts) {
   };
 
   // 3. Potencial de rentabilidad anual: si el precio converge al valor de cada escenario en 5 años, más dividendo
-  const dy = isNum(m.dpsTTM) && price > 0 ? m.dpsTTM / price : 0;
+  const dyRaw = isNum(m.dpsTTM) && price > 0 ? m.dpsTTM / price : 0;
+  const dy = dyRaw > 0 && dyRaw < 0.25 ? dyRaw : 0; // un dividendo > 25 % del precio es un pago extraordinario o un error: no se suma
   const scen = val.dcf && val.dcf.scen ? val.dcf.scen : [];
   const sv = (id) => { const s = scen.find((x) => x.id === id); return s && s.result && !s.result.error && isNum(s.result.perShare) ? Math.max(0, s.result.perShare) : null; };
   // Base = el mismo valor central de la valoración. Pesimista/optimista: ese valor movido lo que se mueve el DCF entre
@@ -54,15 +55,17 @@ export function decide(m, sc, val, alerts) {
   const closes = (m.priceData || m.prices || []).slice(-1260).map((p) => p.close).filter(isNum);
   const dd = closes.length > 200 ? maxDrawdown(closes) : null;
   if (isNum(dd) && dd < -0.6) { r += 1; R.push(`ha llegado a caer un ${Math.round(-dd * 100)} % en 5 años`); }
-  if (fin) R.push('sector financiero o regulado: Altman y el DCF no se aplican; el riesgo se lee peor con estos datos');
-  const risk = { points: r, label: r <= 1 ? 'Bajo' : r <= 3 ? 'Moderado' : r <= 5 ? 'Alto' : 'Muy alto', reasons: R, pessimisticDown: down, maxDrawdown5: dd };
+  if (fin) R.push('sector financiero, inmobiliario o eléctrico: Altman, el FCF y el DCF no se aplican, así que el riesgo no se puede medir bien con estos datos');
+  const risk = { points: r, label: fin ? (r >= 4 ? 'Alto' : 'No medible') : r <= 1 ? 'Bajo' : r <= 3 ? 'Moderado' : r <= 5 ? 'Alto' : 'Muy alto', reasons: R, pessimisticDown: down, maxDrawdown5: dd };
 
   // Conclusión: combinación de los cuatro ejes (no es una recomendación)
   const name = m.profile.companyName || m.symbol;
   const goodQ = isNum(qs) && qs >= 60;
   let verdict, action;
   const n2 = (v) => v.toLocaleString('es-ES', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
-  if (!valuable) { verdict = goodQ ? 'Negocio de calidad sin valoración fiable' : 'Sin valoración fiable'; action = 'No se puede fijar un precio máximo de compra con estos datos. Solo seguimiento, o valora tú los supuestos en la pestaña Valoración.'; }
+  if (fin) { verdict = 'Sector que esta evaluación no sabe medir'; action = 'Banco, aseguradora, inmobiliaria o eléctrica: calidad, valor y riesgo de esta tarjeta se basan en caja libre y DCF, que no sirven aquí. Analízala con ROE, solvencia regulatoria, valor contable y dividendo.'; }
+  else if (!valuable) { verdict = goodQ ? 'Negocio de calidad sin valoración fiable' : 'Sin valoración fiable'; action = 'No se puede fijar un precio máximo de compra con estos datos. Solo seguimiento, o valora tú los supuestos en la pestaña Valoración.'; }
+  else if (c.value === 0) { verdict = 'La deuda supera al valor estimado del negocio'; action = 'El valor estimado del capital es 0: descartar mientras la deuda pese más que lo que vale la empresa, aunque el negocio sea bueno.'; }
   else if (risk.label === 'Muy alto') { verdict = 'Riesgo de pérdida permanente muy alto'; action = 'Descartar salvo que un análisis propio profundo desmonte los riesgos detectados.'; }
   else if (goodQ && isNum(maxBuy) && price <= maxBuy) { verdict = quality.label === 'Excelente' ? 'Empresa excelente con margen de seguridad suficiente' : 'Buena empresa con margen de seguridad suficiente'; action = `El precio está por debajo del máximo de compra (${n2(maxBuy)} ${m.tradeCur}). Candidata a estudio de compra: revisa antes los riesgos cualitativos y las noticias.`; }
   else if (goodQ) { verdict = `Empresa ${quality.label.toLowerCase()}, ${valuation.label.toLowerCase()}`; action = isNum(maxBuy) ? `Para seguimiento. No ofrece el margen exigido al precio actual: esperar a ${n2(maxBuy)} ${m.tradeCur} o menos (un ${Math.round((1 - maxBuy / price) * 100)} % por debajo), o revisar los supuestos.` : 'Para seguimiento.'; }

@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=c8fdab36';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=c8fdab36';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=984486c8';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=984486c8';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -43,7 +43,7 @@ export function buildModel(raw, fxRate = 1) {
   let ttmYear = iT ? deriveYear({ year: 'TTM', i: iT, b: bT || (bal[bal.length - 1] || {}), c: cT || {} }) : null;
   // TTM sin flujos de caja: no se mezclan ventas de 12 meses con caja del último ejercicio (márgenes, conversión,
   // rentabilidad FCF saldrían de dos periodos distintos). Se usa entero el último ejercicio cerrado y se avisa.
-  const ttmPartial = !!(ttmYear && isNum(ttmYear.revenue) && !isNum(ttmYear.ocf));
+  const ttmPartial = !!(ttmYear && isNum(ttmYear.revenue) && (!isNum(ttmYear.ocf) || !isNum(ttmYear.fcf)));
   if (ttmPartial) ttmYear = null;
   // Partidas sueltas que la fuente no da en 12 meses: se toman del último anual y quedan listadas (ttmFilled)
   const ttmFilled = [];

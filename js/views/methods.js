@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica Alligator de Bill Williams para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=c8fdab36';
-import { compute, fxFor } from './company.js?v=c8fdab36';
-import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=c8fdab36';
-import { fxRate } from '../providers/fxrate.js?v=c8fdab36';
-import { alligator } from '../calc/alligator.js?v=c8fdab36';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=c8fdab36';
-import { logoHTML } from '../app.js?v=c8fdab36';
-import { isNum } from '../calc/finance.js?v=c8fdab36';
-import { store } from '../store.js?v=c8fdab36';
-import { exportCSV } from '../export.js?v=c8fdab36';
+import { data } from '../providers/index.js?v=984486c8';
+import { compute, fxFor } from './company.js?v=984486c8';
+import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=984486c8';
+import { fxRate } from '../providers/fxrate.js?v=984486c8';
+import { alligator } from '../calc/alligator.js?v=984486c8';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=984486c8';
+import { logoHTML } from '../app.js?v=984486c8';
+import { isNum } from '../calc/finance.js?v=984486c8';
+import { store } from '../store.js?v=984486c8';
+import { exportCSV } from '../export.js?v=984486c8';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -176,9 +176,10 @@ function draw(view) {
 function detail(box, item) {
   if (!item) return;
   const { r, res } = item, m = r.S.m, t = state.techs.get(r.sym), cur = m.tradeCur || '';
+  const mkey = m.symbol || r.sym; // la misma clave que usa el método al evaluar
   const icon = (ok) => (ok === true ? '<span class="pos">✓</span>' : ok === false ? '<span class="neg">✕</span>' : '<span class="mute">?</span>');
   box.querySelector('#det').innerHTML = `<div class="card" style="margin-top:12px"><header><h3>${esc(r.sym)} · ${esc(m.profile.companyName || '')}</h3><a class="btn sm" href="#/c/${encodeURIComponent(r.sym)}/resumen">Ficha completa</a></header><div class="cb">
-    ${(METHODS[state.method].manual || []).length ? `<div class="empty" style="margin-bottom:10px"><b>Lo que solo puedes juzgar tú</b> (se guarda en este móvil):${METHODS[state.method].manual.map((q) => { const v = manualStore.get(r.sym)[q.key]; return `<div style="margin-top:8px">${esc(q.label)}<div class="row" style="gap:6px;margin-top:4px">${[['sí', true], ['no', false], ['sin decidir', null]].map(([t, val]) => `<button class="btn sm${v === val || (val === null && v == null) ? ' pri' : ''}" data-mk="${esc(q.key)}" data-mv="${val}">${t}</button>`).join('')}</div></div>`; }).join('')}</div>` : ''}
+    ${(METHODS[state.method].manual || []).length ? `<div class="empty" style="margin-bottom:10px"><b>Lo que solo puedes juzgar tú</b> (se guarda en este móvil):${METHODS[state.method].manual.filter((q) => !res.manualKeys || res.manualKeys.includes(q.key)).map((q) => { const v = manualStore.get(mkey)[q.key]; return `<div style="margin-top:8px">${esc(q.label)}<div class="row" style="gap:6px;margin-top:4px">${[['sí', true], ['no', false], ['sin decidir', null]].map(([t, val]) => `<button class="btn sm${v === val || (val === null && v == null) ? ' pri' : ''}" data-mk="${esc(q.key)}" data-mv="${val}">${t}</button>`).join('')}</div></div>`; }).join('')}</div>` : ''}
     ${res.checks.map((c) => `<div style="display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">${icon(c.ok)}<div><b>${esc(c.t)}</b> — ${esc(c.v)}<br><small class="mute">${esc(c.rule)}</small></div></div>`).join('')}
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:12px">
       <div class="kpi"><span>Entrada (método)</span><b>${isNum(res.entry) ? num(res.entry) + ' ' + esc(cur) : '—'}</b><small>${esc(res.entryNote)}</small></div>
@@ -188,12 +189,14 @@ function detail(box, item) {
     </div>
     ${t && isNum(t.stop) && isNum(res.target) && isNum(m.price) && m.price > t.stop && res.target > m.price ? `<p class="note">Con entrada al precio actual: riesgo hasta el stop ${pct((m.price - t.stop) / m.price)} · recorrido hasta el objetivo ${pct(res.target / m.price - 1)} · relación ${num((res.target - m.price) / (m.price - t.stop), 1)} a 1.</p>` : ''}
   </div></div>`;
-  box.querySelectorAll('#det [data-mk]').forEach((b) => (b.onclick = () => { manualStore.set(r.sym, b.dataset.mk, b.dataset.mv === 'null' ? null : b.dataset.mv === 'true'); draw(box.parentElement); const again = rankMethod(state.method, [...results.values()]).find((x) => x.r.sym === r.sym); detail(box, again); }));
+  box.querySelectorAll('#det [data-mk]').forEach((b) => (b.onclick = () => { manualStore.set(mkey, b.dataset.mk, b.dataset.mv === 'null' ? null : b.dataset.mv === 'true'); draw(box.parentElement); const again = rankMethod(state.method, [...results.values()]).find((x) => x.r.sym === r.sym); detail(box, again); }));
   box.querySelector('#det').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function csv() {
   const ranked = rankMethod(state.method, [...results.values()]);
-  exportCSV('metodo_' + state.method, [['Puesto', 'Símbolo', 'Empresa', 'Nota', 'Veredicto', 'Precio', 'Entrada (método)', 'Objetivo (método)', 'Salida', 'Alligator (técnico)', 'Stop técnico', ...METHODS[state.method].rules.map((_, i) => 'Criterio ' + (i + 1))],
-    ...ranked.map(({ r, res }, i) => { const t = state.techs.get(r.sym) || {}; return [i + 1, r.sym, r.S.m.profile.companyName || '', res.score, VERD[res.verdict][0], r.S.m.price, res.entry ?? '', res.target ?? '', res.stopNote, t.state || '', t.stop ?? '', ...res.checks.map((c) => `${c.ok === true ? 'Sí' : c.ok === false ? 'No' : 'Sin dato'}: ${c.v}`)]; })]);
+  // Columnas por nombre de criterio: cada empresa puede tener criterios distintos (pánico, aviso de sector…)
+  const titles = []; for (const { res } of ranked) for (const c of res.checks) if (!titles.includes(c.t)) titles.push(c.t);
+  exportCSV('metodo_' + state.method, [['Puesto', 'Símbolo', 'Empresa', 'Nota', 'Veredicto', 'Precio', 'Entrada (método)', 'Objetivo (método)', 'Salida', 'Alligator (técnico)', 'Stop técnico', ...titles],
+    ...ranked.map(({ r, res }, i) => { const t = state.techs.get(r.sym) || {}; const by = Object.fromEntries(res.checks.map((c) => [c.t, `${c.ok === true ? 'Sí' : c.ok === false ? 'No' : 'Sin dato'}: ${c.v}`])); return [i + 1, r.sym, r.S.m.profile.companyName || '', res.score, VERD[res.verdict][0], r.S.m.price, res.entry ?? '', res.target ?? '', res.stopNote, t.state || '', t.stop ?? '', ...titles.map((k) => by[k] ?? '')]; })]);
 }

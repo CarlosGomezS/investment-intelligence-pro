@@ -1,5 +1,5 @@
 // Utilidades de interfaz: escape, formato numérico en español, tablas, estados de carga/error.
-import { isNum } from '../calc/finance.js?v=c8fdab36';
+import { isNum } from '../calc/finance.js?v=984486c8';
 
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];

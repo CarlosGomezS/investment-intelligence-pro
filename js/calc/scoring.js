@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=c8fdab36';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=984486c8';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -29,7 +29,9 @@ export function metricsFor(m, ctx) {
   const roicStd = enough(s('rc').slice(-10)) ? stdev(s('rc').slice(-10).filter(isNum)) : null;
   const roicAvg5 = enough(s('rc').slice(-5), 3) ? mean(s('rc').slice(-5).filter(isNum)) : null;
   const ratioY = (arr) => (arr.length >= MINY ? arr.filter(Boolean).length / arr.length : null);
-  const showY = (arr) => (arr.length ? `${arr.filter(Boolean).length}/${arr.length}${arr.length < MINY ? ` (solo ${arr.length} años: mínimo ${MINY} para puntuar)` : ''}` : '—');
+  // Variaciones año a año: 5 ejercicios dan 4 variaciones
+  const ratioV = (arr) => (arr.length >= MINY - 1 ? arr.filter(Boolean).length / arr.length : null);
+  const showY = (arr, min = MINY) => (arr.length ? `${arr.filter(Boolean).length}/${arr.length}${arr.length < min ? ` (solo ${arr.length} ${min === MINY ? 'años' : 'variaciones'}: mínimo ${min} para puntuar)` : ''}` : '—');
   const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
   // Mismo dato para la nota y para lo que se muestra; solo con ventas positivas
@@ -85,9 +87,9 @@ export function metricsFor(m, ctx) {
     M('riesgo', 'Dilución anual 5a', m.growth.shares5, P(m.growth.shares5), [[-0.02, 100], [0, 80], [0.04, 0]], 'CAGR del nº de acciones'),
     M('riesgo', 'Alertas graves', ctx.alerts ? highAlerts : null, ctx.alerts ? String(highAlerts) : '—', [[0, 100], [2, 50], [4, 0]], 'Nº de alertas de severidad alta'),
 
-    M('estabilidad', 'Años con caída de ventas (10a)', ratioY(revDown), showY(revDown), [[0, 100], [0.2, 60], [0.5, 0]], 'Menos es mejor'),
+    M('estabilidad', 'Años con caída de ventas (10a)', ratioV(revDown), showY(revDown, MINY - 1), [[0, 100], [0.2, 60], [0.5, 0]], 'Menos es mejor'),
     M('estabilidad', 'Años con pérdidas (10a)', ratioY(niNeg), showY(niNeg), [[0, 100], [0.1, 55], [0.3, 0]], 'Menos es mejor'),
-    M('estabilidad', 'Volatilidad del crecimiento de ventas', revDown.length >= MINY ? m.stats.revVol : null, revDown.length >= MINY ? P(m.stats.revVol) : '—', [[0.03, 100], [0.1, 60], [0.3, 0]], 'Desviación típica del crecimiento anual'),
+    M('estabilidad', 'Volatilidad del crecimiento de ventas', revDown.length >= MINY - 1 ? m.stats.revVol : null, revDown.length >= MINY - 1 ? P(m.stats.revVol) : '—', [[0.03, 100], [0.1, 60], [0.3, 0]], 'Desviación típica del crecimiento anual'),
   ];
 }
 

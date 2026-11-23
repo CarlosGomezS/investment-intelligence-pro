@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=c8fdab36';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=c8fdab36';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=984486c8';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=984486c8';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -100,19 +100,24 @@ export function dividendModel(m, ke) {
 export const FAMILY_LABEL = { dcf: 'DCF', ddm: 'dividendos (DDM)', hist: 'múltiplos históricos propios', peers: 'múltiplos de competidores' };
 const famOf = (method) => (/competidores/.test(method) ? 'peers' : 'hist');
 export function composite(m, dcfRes, mult, ddmRes) {
-  const vals = []; const fams = new Set(); let methods = 0;
+  // Cada familia se reduce primero a su mediana: cuatro múltiplos propios no pueden anular al DCF (4 contra 2).
+  // El DCF pesa doble frente a cada familia de múltiplos; el rango (bajo/alto) usa todas las estimaciones sueltas.
+  const byFam = {}; const all = []; let methods = 0;
+  const add = (f, v) => { (byFam[f] = byFam[f] || []).push(v); all.push(v); methods++; };
   // DCF: si la deuda supera al valor de la empresa, el capital vale 0 (no se descarta: cuenta como 0)
-  if (dcfRes && isNum(dcfRes.perShare)) { const v = Math.max(0, dcfRes.perShare); vals.push(v, v); methods++; fams.add('dcf'); }
+  if (dcfRes && isNum(dcfRes.perShare)) add('dcf', Math.max(0, dcfRes.perShare));
   for (const r of mult) {
     if (r.exclude || !isNum(r.value)) continue;
-    if (r.value > 0) { vals.push(r.value); methods++; fams.add(famOf(r.method)); } else if (/EV\//.test(r.method)) { vals.push(0); methods++; fams.add(famOf(r.method)); } // EV menos deuda neta negativo = 0
+    if (r.value > 0) add(famOf(r.method), r.value); else if (/EV\//.test(r.method)) add(famOf(r.method), 0); // EV menos deuda neta negativo = 0
   }
-  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) { vals.push(ddmRes.value); methods++; fams.add('ddm'); }
-  const families = [...fams];
+  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) add('ddm', ddmRes.value);
+  const families = Object.keys(byFam);
   if (families.length < 2) return { value: null, n: methods, families, reason: methods ? `valoración insuficientemente contrastada: solo hay ${methods === 1 ? 'un método' : `${methods} variantes`} de una misma familia (${families.map((f) => FAMILY_LABEL[f]).join(', ')}); hacen falta al menos dos familias distintas` : 'Hace falta al menos dos familias de valoración distintas (DCF, dividendos, múltiplos propios o de competidores)' };
+  const vals = [];
+  for (const f of families) { const md = median(byFam[f]); vals.push(md); if (f === 'dcf') vals.push(md); }
   const v = median(vals);
-  const sorted = vals.slice().sort((a, b) => a - b);
-  const contrasted = (fams.has('dcf') || fams.has('ddm')) && (fams.has('hist') || fams.has('peers'));
-  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: methods, families, contrasted, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
+  const sorted = all.slice().sort((a, b) => a - b);
+  const contrasted = (byFam.dcf || byFam.ddm) && (byFam.hist || byFam.peers) ? true : false;
+  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: methods, families, byFamily: Object.fromEntries(families.map((f) => [f, median(byFam[f])])), contrasted, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
 }
 export { mean };

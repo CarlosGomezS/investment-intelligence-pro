@@ -1,13 +1,13 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=c8fdab36';
-import { fmtB } from './alerts.js?v=c8fdab36';
+import { isNum } from './finance.js?v=984486c8';
+import { fmtB } from './alerts.js?v=984486c8';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
 const cat = (sc, k) => (sc.cats.find((c) => c.key === k) || {}).score;
 const level = (s) => (s == null ? 'sin datos suficientes' : s >= 75 ? 'sí, claramente' : s >= 60 ? 'sí, con matices' : s >= 45 ? 'a medias' : 'no');
 
-export function buildReport(m, sc, val, alerts) {
+export function buildReport(m, sc, val, alerts, dec) {
   const T = m.T, cur = m.tradeCur;
   const q = [];
   const A = (question, verdict, text, s) => q.push({ question, verdict, text, score: s });
@@ -30,21 +30,14 @@ export function buildReport(m, sc, val, alerts) {
   const fit = longTermFit(sc);
   A('¿Es adecuada para una inversión a 5-10 años?', fit.v, fit.t, null);
 
-  const total = sc.total, qual = mean3(cat(sc, 'calidad'), cat(sc, 'rentabilidad'), cat(sc, 'caja'), cat(sc, 'solidez'));
-  let conclusion;
+  // Misma calidad y misma conclusión que la tarjeta de decisión (cuatro ejes): nunca dos veredictos distintos
+  const total = sc.total, qual = dec && dec.quality ? dec.quality.score : mean3(cat(sc, 'calidad'), cat(sc, 'rentabilidad'), cat(sc, 'moat'), cat(sc, 'caja'));
   const rel = val.reliability || {};
-  if (sc.coverage < 0.45 || total == null) conclusion = 'Empresa difícil de valorar por falta de información';
-  else if (qual >= 60 && (!isNum(c.mos) || rel.level === 'no valorable')) conclusion = 'Empresa de calidad, sin valoración fiable';
-  else if (rel.level === 'no valorable') conclusion = 'Empresa difícil de valorar por falta de información';
-  else if (qual >= 70 && c.mos >= 0.2 && !alerts.some((a) => a.sev === 'alta') && total >= 60) conclusion = 'Empresa de gran calidad a precio atractivo';
-  else if (qual >= 60 && c.mos >= -0.1 && !alerts.some((a) => a.sev === 'alta')) conclusion = 'Empresa de calidad a precio razonable';
-  else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad, con riesgos graves que vigilar';
-  else if (qual >= 60) conclusion = 'Empresa de calidad, pero sobrevalorada';
-  else conclusion = 'Empresa mediocre o con riesgos elevados';
+  let conclusion = sc.coverage < 0.45 || total == null ? 'Empresa difícil de valorar por falta de información' : dec ? dec.verdict : 'Sin conclusión';
   // Valoración poco fiable: se dice en la conclusión, no solo en letra pequeña
   if (rel.level === 'baja' || rel.level === 'muy baja') conclusion += ` (valoración de fiabilidad ${rel.level}: ${(rel.reasons || []).slice(0, 2).join('; ')})`;
   // Bancos, aseguradoras, REIT y eléctricas: el DCF de caja libre y la puntuación estándar no les aplican bien
-  if (!/es financiera/.test(conclusion) && /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`)) conclusion += ' (aviso: es financiera, inmobiliaria o eléctrica; el DCF y la puntuación estándar no se aplican bien a este sector)';
+  if (!(dec && /Sector que esta evaluación/.test(dec.verdict)) && !/es financiera/.test(conclusion) && /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`)) conclusion += ' (aviso: es financiera, inmobiliaria o eléctrica; el DCF y la puntuación estándar no se aplican bien a este sector)';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);
   const cons = sc.cats.filter((x) => x.score != null && x.score < 60).map((x) => `${x.label} solo ${x.score}/100`).concat(alerts.filter((a) => a.sev !== 'baja').map((a) => a.title));
   if (!m.ttmIsReal) cons.push(`Análisis con datos del ${m.periodLabel}, sin los últimos trimestres`);
