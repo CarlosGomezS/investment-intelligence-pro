@@ -48,6 +48,7 @@ jobs:
           [ "$A" != "$CF_ACCOUNT" ] && echo "::warning::El Account ID tenía espacios o saltos de línea al pegarlo."
           echo "Longitud del Account ID: ${#A} caracteres (debe ser 32)"
           V="$(curl -s -H "Authorization: Bearer $T" https://api.cloudflare.com/client/v4/user/tokens/verify)"
+          echo "$V" | jq -e '.success' >/dev/null || V="$(curl -s -H "Authorization: Bearer $T" "https://api.cloudflare.com/client/v4/accounts/$A/tokens/verify")" # token de cuenta
           echo "Token: $(echo "$V" | jq -r 'if .success then "válido, estado " + .result.status else "NO válido: " + ([.errors[]?.message] | join("; ")) end')"
           L="$(curl -s -H "Authorization: Bearer $T" 'https://api.cloudflare.com/client/v4/accounts?per_page=50')"
           N="$(echo "$L" | jq -r '.result | length // 0')"
@@ -58,6 +59,7 @@ jobs:
           echo "Subdominio workers.dev: $(echo "$S" | jq -r 'if .success then (.result.subdomain // "sin crear") else "no accesible: " + ([.errors[]?.message] | join("; ")) end')"
           P="$(curl -s -H "Authorization: Bearer $T" "https://api.cloudflare.com/client/v4/accounts/$A/workers/scripts")"
           echo "Permiso para listar Workers: $(echo "$P" | jq -r 'if .success then "sí" else "NO: " + ([.errors[]?.message] | join("; ")) end')"
+          echo "Si el despliegue responde «No access to the specified resource» con todo lo anterior bien, al token le falta el permiso de ESCRITURA: Account → Workers Scripts → Edit (plantilla «Edit Cloudflare Workers»)."
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
