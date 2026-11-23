@@ -1,10 +1,10 @@
 // Simulador: rentabilidad histórica con/sin reinversión de dividendos frente al S&P 500 y proyección a 5-10 años.
-import { data } from '../../providers/index.js?v=30cb3a13';
-import { fundamentals } from '../../ui/charts.js?v=30cb3a13';
-import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=30cb3a13';
-import { isNum, mean } from '../../calc/finance.js?v=30cb3a13';
-import { historical, forward } from '../../calc/simulate.js?v=30cb3a13';
-import { extra } from '../company.js?v=30cb3a13';
+import { data } from '../../providers/index.js?v=171d25de';
+import { fundamentals } from '../../ui/charts.js?v=171d25de';
+import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=171d25de';
+import { isNum, mean } from '../../calc/finance.js?v=171d25de';
+import { historical, forward } from '../../calc/simulate.js?v=171d25de';
+import { extra } from '../company.js?v=171d25de';
 
 export async function render(el, S) {
   const m = S.m, cur = m.tradeCur;
@@ -19,7 +19,7 @@ export async function render(el, S) {
   const payout = isNum(m.T.dividendsPaid) && isNum(m.T.netIncome) && m.T.netIncome > 0 ? Math.min(1, m.T.dividendsPaid / m.T.netIncome) : 0;
   const st = { amount: 10000, years: 10, g: g0, pe: pe5 ?? (m.pe > 0 ? m.pe : 15), payout: Math.max(0, Math.min(1, payout)), drip: true };
   el.innerHTML = `${card('Rentabilidad histórica de 10.000 invertidos', `<div class="tablewrap"><table><thead><tr><th class="l">Horizonte</th><th>Con dividendos reinvertidos</th><th>Anual</th><th>Solo precio</th><th>Anual</th><th>S&P 500 (precio)</th><th>Anual</th></tr></thead><tbody>
-      ${hs.map((h) => `<tr><td class="l">${h.y} años${h.drip ? ` <span class="note">desde ${esc(h.drip.from)}${h.partial ? ` · solo hay ${num(h.actualYears, 1)} años de historia: rentabilidad anual sobre ese periodo y S&P 500 desde la misma fecha` : ''}</span>` : ''}</td><td><b>${h.drip ? big(h.drip.final) : '—'}</b></td><td class="${cls(h.drip && h.drip.cagr)}">${h.drip ? sgnPct(h.drip.cagr) : '—'}</td><td>${h.noDrip ? big(h.noDrip.final) : '—'}</td><td>${h.noDrip ? sgnPct(h.noDrip.cagr) : '—'}</td><td>${h.index ? big(h.index.final) : '—'}</td><td>${h.index ? sgnPct(h.index.cagr) : '—'}</td></tr>`).join('')}
+      ${hs.map((h) => `<tr><td class="l">${h.y} años${h.from ? ` <span class="note">desde ${esc(h.from)}${h.partial ? ` · solo hay ${num(h.actualYears, 1)} años de historia: rentabilidad anual sobre ese periodo` : ''}${h.dropped && h.dropped.length ? ` · sin historia suficiente: ${esc(h.dropped.join(', '))}` : ''}</span>` : ''}</td><td><b>${h.drip ? big(h.drip.final) : '—'}</b></td><td class="${cls(h.drip && h.drip.cagr)}">${h.drip ? sgnPct(h.drip.cagr) : '—'}</td><td>${h.noDrip ? big(h.noDrip.final) : '—'}</td><td>${h.noDrip ? sgnPct(h.noDrip.cagr) : '—'}</td><td>${h.index ? big(h.index.final) : '—'}</td><td>${h.index ? sgnPct(h.index.cagr) : '—'}</td></tr>`).join('')}
       </tbody></table></div><p class="note">«Con dividendos reinvertidos» usa precios ajustados por dividendos (equivale a reinvertir cada dividendo en la fecha ex-dividendo). Sin comisiones ni impuestos. «—»: no hay histórico suficiente con tu plan de datos.</p>
       ${adj.status === 'rejected' ? unavailable('Precios ajustados por dividendo', adj.reason) : ''}${idx.status === 'rejected' ? unavailable('S&P 500', idx.reason) : ''}${source(adj.value, idx.value)}`)}
     <div class="grid g2" style="margin-top:14px">

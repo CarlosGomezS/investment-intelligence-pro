@@ -36,29 +36,36 @@ jobs:
       AV_KEY: ${{ secrets.AV_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: Publicar el Worker con las claves como secretos
-        id: deploy
+      - uses: actions/setup-node@v4
         if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
-        uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          secrets: |
-            FMP_KEY
-            FINNHUB_KEY
-            TD_KEY
-            ROIC_KEY
-            AV_KEY
-      - name: Dirección del Worker
+          node-version: 22
+      - name: Publicar el Worker y guardar en él solo las claves que existan
         id: url
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: worker
         run: |
-          U="${{ steps.deploy.outputs.deployment-url }}"
+          npx --yes wrangler@3 deploy | tee deploy.log
+          for K in FMP_KEY FINNHUB_KEY TD_KEY ROIC_KEY AV_KEY; do
+            V="${!K}"
+            if [ -n "$V" ]; then printf '%s' "$V" | npx --yes wrangler@3 secret put "$K" >/dev/null && echo "Secreto $K guardado en el Worker"; fi
+          done
+          U=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
           echo "url=${U}" >> "$GITHUB_OUTPUT"
-          if [ -n "$U" ]; then echo "Worker publicado en $U"; else echo "Sin Cloudflare configurado: se usa el modo sencillo"; fi
+          if [ -n "$U" ]; then echo "Worker publicado en $U"; else echo "No se obtuvo la dirección del Worker: se usa el modo sencillo"; fi
+      - name: Modo
+        env:
+          U: ${{ steps.url.outputs.url }}
+        run: |
+          if [ -n "$U" ]; then echo "Modo seguro"; else echo "Sin Cloudflare configurado (o falló), modo sencillo"; fi
 
   deploy:
     needs: worker
+    if: ${{ always() }} # si Cloudflare falla, la web se publica igual (modo sencillo)
     runs-on: ubuntu-latest
     environment:
       name: github-pages

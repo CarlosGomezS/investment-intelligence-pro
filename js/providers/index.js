@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=30cb3a13';
-import { alphavantage } from './alphavantage.js?v=30cb3a13';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=30cb3a13';
-import { twelvedata } from './twelvedata.js?v=30cb3a13';
-import { roic } from './roic.js?v=30cb3a13';
-import { sec, forgetSec } from './sec.js?v=30cb3a13';
-import { esef, forgetEsef } from './esef.js?v=30cb3a13';
-import { config } from '../config.js?v=30cb3a13';
-import { ApiError, usage, queueDelay } from './http.js?v=30cb3a13';
-import { setHint } from './hints.js?v=30cb3a13';
+import { fmp } from './fmp.js?v=171d25de';
+import { alphavantage } from './alphavantage.js?v=171d25de';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=171d25de';
+import { twelvedata } from './twelvedata.js?v=171d25de';
+import { roic } from './roic.js?v=171d25de';
+import { sec, forgetSec } from './sec.js?v=171d25de';
+import { esef, forgetEsef } from './esef.js?v=171d25de';
+import { config } from '../config.js?v=171d25de';
+import { ApiError, usage, queueDelay } from './http.js?v=171d25de';
+import { setHint } from './hints.js?v=171d25de';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -108,14 +108,17 @@ async function run(method, args, order) {
     const who = (ORDER[method] || ['fmp']).map((id) => names[id]).join(', ');
     throw anyBlocked ? new ApiError('premium', `Solo lo ofrece ${who} y su plan gratuito no cubre esta empresa`) : new ApiError('no_key', `Solo lo ofrece ${who}: añade su clave en Ajustes`);
   }
-  let best = null; const tried = [];
+  let best = null, emptyHit = null; const tried = [];
   for (const [i, id] of list.entries()) {
+    // Alpha Vantage (25/día) no se gasta si otra fuente ya respondió «vacío» para una empresa de EE. UU.
+    if (emptyHit && id === 'av' && isSym(args[0]) && !String(args[0]).includes('.')) continue;
     // Una fuente con cola por límite de minuto se salta si hay alternativas detrás (no hacer esperar)
     if (i < list.length - 1 && queueDelay(id) > 8000) { tried.push([id, 'en cola por límite por minuto']); continue; }
     try {
       const r = await P[id][method](...args);
       // Una lista vacía es una respuesta válida en estos datos («no tiene splits», «no paga dividendo»…): no es un fallo
-      if (Array.isArray(r.data) && r.data.length === 0 && EMPTY_OK.has(method)) return { ...r, provider: id };
+      // …pero se sigue probando con las demás fuentes por si alguna sí tiene datos (FMP puede no cubrir la empresa)
+      if (Array.isArray(r.data) && r.data.length === 0 && EMPTY_OK.has(method)) { emptyHit = emptyHit || { ...r, provider: id }; continue; }
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);
       if (empty) { tried.push([id, 'sin datos']); best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
       if (method === 'profile' && r.data) setHint(args[0], { name: r.data.companyName, isin: r.data.isin, country: r.data.country });
@@ -131,6 +134,7 @@ async function run(method, args, order) {
   }
   const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
   const skipped = (ORDER[method] || ['fmp']).filter((id) => !list.includes(id)).map((id) => [id, isBlocked(id, args) ? 'plan de pago (bloqueado 3 días)' : !config.canUse(id) ? (id === 'sec' ? 'necesita el Worker' : 'sin clave') : 'cuota del día gastada']);
+  if (emptyHit) return emptyHit; // nadie tenía datos: la respuesta válida es «lista vacía»
   if (best) best.tried = [...tried, ...skipped].map(([id, why]) => `${names[id] || id}: ${why}`).join(' · ');
   throw best;
 }

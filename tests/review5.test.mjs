@@ -12,7 +12,7 @@ const one = (r, k) => (Array.isArray(r[k].data) ? r[k].data[0] : r[k].data);
 test('una caída del 30 % en el día no inventa acciones si el perfil no trae precio (Finnhub)', () => {
   const base = buildModel(raw());
   const r = raw(); const p = one(r, 'profile'), q = one(r, 'quote');
-  p.sharesOutstanding = base.shares; delete p.price; delete q.sharesOutstanding;
+  p.sharesOutstanding = base.shares; p.marketCap = q.marketCap; delete p.price; delete q.sharesOutstanding; delete q.marketCap; // como Finnhub: la cotización no trae capitalización
   q.price = q.price * 0.7; // hoy cae un 30 %; la capitalización del perfil es de ayer
   const m = buildModel(r);
   assert.ok(Math.abs(m.shares / base.shares - 1) < 1e-9);
@@ -39,4 +39,13 @@ test('XBRL: arrendamiento financiero no se cuenta dos veces', () => {
   const F = (concept, val, unit, start) => ({ concept: 'us-gaap:' + concept, start, end: '2025-12-31', val, unit, filed: '2026-02-01' });
   const st = toStatements([F('Revenues', 1000, 'USD', '2025-01-01'), F('NetIncomeLoss', 100, 'USD', '2025-01-01'), F('Assets', 5000, 'USD'), F('LongTermDebtAndCapitalLeaseObligations', 400, 'USD'), F('FinanceLeaseLiability', 50, 'USD')], 'X');
   assert.equal(st.balance[0].longTermDebt, 400);
+});
+
+test('FMP: capitalización y precio de la cotización van juntos (caída del día sin acciones inventadas)', () => {
+  const base = buildModel(raw());
+  const r = raw(); const p = one(r, 'profile'), q = one(r, 'quote');
+  p.sharesOutstanding = base.shares; delete q.sharesOutstanding;
+  q.price *= 0.7; q.marketCap *= 0.7; // la cotización de hoy ya refleja la caída; el perfil sigue con el precio de ayer
+  const m = buildModel(r);
+  assert.ok(Math.abs(m.shares / base.shares - 1) < 1e-9);
 });

@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=30cb3a13';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=30cb3a13';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=171d25de';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=171d25de';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -49,6 +49,7 @@ export function buildModel(raw, fxRate = 1) {
 
   // Capitalización del proveedor: en bolsas que cotizan en subunidades (peniques…) puede venir en la unidad principal
   let mcProv = quote.marketCap ?? profile.marketCap;
+  const mcFromQuote = isNum(quote.marketCap); // de qué dato sale: su precio de referencia tiene que ser el del mismo momento
   if (isNum(mcProv) && isNum(price) && price > 0 && /^(GBp|GBX|ILA|ZAc|ZAC)$/.test(tradeCur) && isNum(last.shares) && last.shares > 0) {
     const r = mcProv / price / last.shares; if (r > 0.005 && r < 0.02) mcProv *= 100; // salía 100 veces menor: estaba en libras
   }
@@ -60,7 +61,8 @@ export function buildModel(raw, fxRate = 1) {
   // La capitalización del proveedor es de un momento anterior: se compara con el precio DE ESE MOMENTO (el del perfil,
   // o el cierre del día en que se descargó), nunca con el de hoy; si no se sabe ese precio, no se toca nada
   // (así una subida o caída fuerte del día no se confunde con un problema de clases de acciones).
-  const pRef = isNum(profile.price) && profile.price > 0 ? profile.price
+  const pRef = mcFromQuote ? (isNum(quote.price) && quote.price > 0 ? quote.price : null)
+    : isNum(profile.price) && profile.price > 0 ? profile.price
     : raw.profile && raw.profile.fetchedAt && prices.length ? (closeAt(prices, new Date(raw.profile.fetchedAt - 864e5).toISOString().slice(0, 10)) || {}).close : null;
   if (isNum(shares) && isNum(pRef) && pRef > 0 && isNum(mcProv) && mcProv > 0) {
     const ratio = (shares * pRef) / mcProv;
@@ -196,7 +198,7 @@ export function buildModel(raw, fxRate = 1) {
   const periodLabel = ttmIsReal ? 'últimos 12 meses (TTM)' : `último ejercicio cerrado (${last.year || '—'}${last.date ? ', cierre ' + String(last.date).slice(0, 10) : ''})`;
 
   return {
-    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, netDebtFrom, balanceFrom, sharesNote, shares, marketCap, ev, netDebt: netDebtT,
+    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, netDebtFrom, balanceFrom, sharesNote, mcProv, shares, marketCap, ev, netDebt: netDebtT,
     years, last, T, ttmIsReal, prices, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),

@@ -45,7 +45,10 @@ test('simulador: todas las columnas desde la misma fecha', () => {
   const A = mk('2021-01-01', 260), R = mk('2006-01-01', 1040), I = mk('2006-01-01', 1040);
   const h = historical(A, R, I, 20);
   const d = (x, y) => Math.abs(Date.parse(x) - Date.parse(y)) / 864e5;
-  assert.ok(d(h.drip.from, h.noDrip.from) <= 7); assert.ok(d(h.index.from, h.drip.from) <= 7);
+  // la serie corta (5 años con dividendos) no recorta las otras a 5 años: se descarta y se avisa
+  assert.equal(h.drip, null); assert.ok(h.dropped.includes('con dividendos'));
+  assert.ok(d(h.index.from, h.noDrip.from) <= 7); assert.ok(h.noDrip.years > 15);
+  const h5 = historical(A, R, I, 5); assert.ok(d(h5.drip.from, h5.noDrip.from) <= 7); // a 5 años las tres coinciden
 });
 
 test('dos cierres de enero con la misma etiqueta no se pisan', () => {

@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=30cb3a13';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=171d25de';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';

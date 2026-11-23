@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=30cb3a13';
-import { fmtB } from './alerts.js?v=30cb3a13';
+import { isNum } from './finance.js?v=171d25de';
+import { fmtB } from './alerts.js?v=171d25de';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -33,8 +33,9 @@ export function buildReport(m, sc, val, alerts) {
   const total = sc.total, qual = mean3(cat(sc, 'calidad'), cat(sc, 'rentabilidad'), cat(sc, 'caja'), cat(sc, 'solidez'));
   let conclusion;
   const rel = val.reliability || {};
-  if (sc.coverage < 0.45 || total == null || rel.level === 'no valorable') conclusion = 'Empresa difícil de valorar por falta de información';
-  else if (qual >= 60 && !isNum(c.mos)) conclusion = 'Empresa de calidad, sin valoración fiable';
+  if (sc.coverage < 0.45 || total == null) conclusion = 'Empresa difícil de valorar por falta de información';
+  else if (qual >= 60 && (!isNum(c.mos) || rel.level === 'no valorable')) conclusion = 'Empresa de calidad, sin valoración fiable';
+  else if (rel.level === 'no valorable') conclusion = 'Empresa difícil de valorar por falta de información';
   else if (qual >= 70 && c.mos >= 0.2 && !alerts.some((a) => a.sev === 'alta') && total >= 60) conclusion = 'Empresa de gran calidad a precio atractivo';
   else if (qual >= 60 && c.mos >= -0.1 && !alerts.some((a) => a.sev === 'alta')) conclusion = 'Empresa de calidad a precio razonable';
   else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad, con riesgos graves que vigilar';
@@ -43,7 +44,7 @@ export function buildReport(m, sc, val, alerts) {
   // Valoración poco fiable: se dice en la conclusión, no solo en letra pequeña
   if (rel.level === 'baja' || rel.level === 'muy baja') conclusion += ` (valoración de fiabilidad ${rel.level}: ${(rel.reasons || []).slice(0, 2).join('; ')})`;
   // Bancos, aseguradoras, REIT y eléctricas: el DCF de caja libre y la puntuación estándar no les aplican bien
-  if (/financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`)) conclusion += ' (aviso: es financiera, inmobiliaria o eléctrica; el DCF y la puntuación estándar no se aplican bien a este sector)';
+  if (!/es financiera/.test(conclusion) && /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`)) conclusion += ' (aviso: es financiera, inmobiliaria o eléctrica; el DCF y la puntuación estándar no se aplican bien a este sector)';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);
   const cons = sc.cats.filter((x) => x.score != null && x.score < 60).map((x) => `${x.label} solo ${x.score}/100`).concat(alerts.filter((a) => a.sev !== 'baja').map((a) => a.title));
   if (!m.ttmIsReal) cons.push(`Análisis con datos del ${m.periodLabel}, sin los últimos trimestres`);

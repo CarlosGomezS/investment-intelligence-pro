@@ -17,3 +17,11 @@ test('banco con pocos años y métodos dispares: baja', () => {
 test('niveles de cobertura', () => {
   assert.equal(coverageTier(0.95).label, 'evaluación completa'); assert.equal(coverageTier(0.5).label, 'fiabilidad limitada'); assert.equal(coverageTier(0.3).ok, false);
 });
+
+test('método a 0 frente a otro positivo resta; supuestos editados no restan', () => {
+  const r = reliability(base(), val({ low: 0, high: 200 }), { coverage: 0.95 });
+  assert.ok(r.reasons.some((x) => /valor 0/.test(x)));
+  const eur = base({ repCur: 'EUR' });
+  const v = val(); v.defaults.rf = { value: 0.045 }; v.inputs = { rf: 0.028 }; // el usuario puso el bono alemán
+  assert.ok(!reliability(eur, v, { coverage: 0.95 }).reasons.some((x) => /bono de EE/.test(x)));
+});

@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=30cb3a13';
+import { isNum, mean, stdev, median } from './finance.js?v=171d25de';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -69,7 +69,7 @@ export const METHODS = {
       if (fin) checks.unshift(C('Sector analizable con estos criterios', false, `${base(S).sector.trim() || 'financiero'}: FCF, deuda neta/EBITDA y DCF no tienen sentido en bancos, aseguradoras, inmobiliarias o eléctricas`, 'Analízala en su ficha con ROE, solvencia regulatoria y valor contable.'));
       const W = [25, 15, 15, 15, 15, 15];
       const quality = [c1, c2, c3, c4, c5, c6].reduce((a, c, i) => a + (c ? W[i] : 0), 0);
-      const priceSc = isNum(mos) ? lin(mos, -0.5, 0.35) * 100 : 0;
+      const priceSc = isNum(mos) && c7 !== null ? lin(mos, -0.5, 0.35) * 100 : 0; // con valoración poco fiable el precio no suma
       const score = Math.round(0.7 * quality + 0.3 * priceSc);
       const qOk = c1 && [c2, c3, c4, c5, c6].filter(Boolean).length >= 4;
       const verdict = fin ? 'no' : qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
@@ -112,7 +112,9 @@ export const METHODS = {
       let run = 0; for (let y = lastClosed; dYears.has(y); y--) run++;
       const dpAll = last(Y.map((y) => y.dividendsPaid), 20); const dp = dpAll.filter((v) => v != null);
       const hasHist = dYears.size > 0;
-      const g4 = hasHist ? (run >= 20 ? true : Math.min(...dYears) <= lastClosed - 19 ? false : run === dYears.size ? null : false)
+      // Confirmado que no paga: el proveedor respondió con una lista vacía de dividendos y no hay pagos en los flujos
+      const noDiv = !hasHist && S.raw && S.raw.dividends && S.raw.dividends.ok && Array.isArray(S.raw.dividends.data) && !S.raw.dividends.data.length && !dp.some((v) => v > 0);
+      const g4 = noDiv ? false : hasHist ? (run >= 20 ? true : Math.min(...dYears) <= lastClosed - 19 ? false : run === dYears.size ? null : false)
         : dp.some((v) => !(v > 0)) ? false : dpAll.length >= 20 && dpAll.every((v) => v != null && v > 0) ? true : null;
       const eps = s('eps').filter(isNum); const w = last(eps, 10);
       const e3 = mean(last(eps, 3)), e0 = w.length >= 7 ? mean(w.slice(0, 3)) : null;
@@ -128,7 +130,7 @@ export const METHODS = {
         C('Tamaño adecuado', g1, `ventas ${isNum(rev) ? (rev / 1e9).toFixed(1).replace('.', ',') + ' mil M ' + m.tradeCur : 'sin dato'}${!usd ? ' (sin tipo de cambio a USD: no se puede comparar)' : m.tradeCur !== 'USD' ? ` ≈ ${(rev * usdR / 1e9).toFixed(1).replace('.', ',')} mil M USD` : ''}`, this.rules[0]),
         C('Situación financiera fuerte', g2, `liquidez ${nS(cr, 2)} · deuda LP ${isNum(ltd) && isNum(wc) ? (ltd <= wc ? '≤' : '>') + ' capital circulante' : 'sin dato'}`, this.rules[1]),
         C('Beneficios estables 10 años', g3, `${ni.filter((v) => v > 0).length} de ${ni.length} años con beneficio${ni.length < 10 ? ' (tus fuentes no dan 10 años)' : ''}`, this.rules[2]),
-        C('Historial de dividendos', g4, hasHist ? `${run} años seguidos pagando hasta ${lastClosed}${g4 === null ? ` (el historial disponible solo llega a ${Math.min(...dYears)}: no verificable)` : ''} · Graham pide 20` : `${dp.filter((v) => v > 0).length} de ${dpAll.length} años con dividendo en los flujos de caja${g4 === null ? ' (menos de 20: no verificable)' : ''} · Graham pide 20`, this.rules[3]),
+        C('Historial de dividendos', g4, hasHist ? `${run} años seguidos pagando hasta ${lastClosed}${g4 === null ? ` (el historial disponible solo llega a ${Math.min(...dYears)}: no verificable)` : ''} · Graham pide 20` : noDiv ? 'no paga dividendo' : `${dp.filter((v) => v > 0).length} de ${dpAll.length} años con dividendo en los flujos de caja${g4 === null ? ' (menos de 20: no verificable)' : ''} · Graham pide 20`, this.rules[3]),
         C('Crecimiento del BPA ≥ 33 %', g5, isNum(e0) ? `BPA medio ${nS(e0, 2)} → ${nS(e3, 2)} (${pctS(e3 / e0 - 1, 0)})` : 'menos de 7 años de BPA', this.rules[4]),
         C('PER moderado', g6, `PER sobre BPA medio 3 años: ${nS(pe3)}`, this.rules[5]),
         C('Precio/valor contable moderado', g7, `P/VC ${nS(pb, 2)}${isNum(pe3) && isNum(pb) ? ` · PER×P/VC ${nS(pe3 * pb)}` : ''}`, this.rules[6]),

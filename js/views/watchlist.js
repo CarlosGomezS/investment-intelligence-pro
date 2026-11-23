@@ -1,10 +1,10 @@
 // Seguimiento: listas (favoritos y personalizadas), alertas de valoración, historial y análisis guardados.
-import { data } from '../providers/index.js?v=30cb3a13';
-import { store } from '../store.js?v=30cb3a13';
-import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=30cb3a13';
-import { logoHTML } from '../app.js?v=30cb3a13';
-import { exportCSV } from '../export.js?v=30cb3a13';
-import { isNum } from '../calc/finance.js?v=30cb3a13';
+import { data } from '../providers/index.js?v=171d25de';
+import { store } from '../store.js?v=171d25de';
+import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=171d25de';
+import { logoHTML } from '../app.js?v=171d25de';
+import { exportCSV } from '../export.js?v=171d25de';
+import { isNum } from '../calc/finance.js?v=171d25de';
 
 export async function checkAlerts() {
   const A = store.alerts(), out = [];
@@ -17,8 +17,10 @@ export async function checkAlerts() {
       // Precio ×2 o ÷2 desde que guardaste la alerta: se comprueba si hubo un split DE VERDAD (lista del proveedor).
       // Solo si lo hubo se anulan los niveles guardados; si no, es un movimiento real y las alertas se evalúan.
       if (isNum(a.ref) && a.ref > 0 && (p / a.ref < 0.5 || p / a.ref > 2) && a.at) {
-        let split = null; try { split = ((await data.splits(sym)).data || []).find((s) => Date.parse(s.date) > a.at); } catch {}
+        let split = null, checked = false; try { split = ((await data.splits(sym)).data || []).find((s) => Date.parse(s.date) > a.at); checked = true; } catch {}
         if (split) { out.push({ sym, name: a.name, price: p, hits: [], stale: `hubo un split (${split.numerator}:${split.denominator}, ${split.date}) después de guardar la alerta: sus niveles ya no valen, vuelve a guardarla`, a }); return; }
+        // No se pudo comprobar (fuente sin cobertura o sin cuota): no se dispara nada a ciegas
+        if (!checked) { out.push({ sym, name: a.name, price: p, hits: [], stale: 'el precio ha cambiado más de la mitad desde que guardaste la alerta y no se ha podido comprobar si hubo un split: revísala en la ficha', a }); return; }
       }
       if (isNum(a.below) && p <= a.below) hits.push(`precio ${num(p)} ≤ ${num(a.below)}`);
       if (isNum(a.above) && p >= a.above) hits.push(`precio ${num(p)} ≥ ${num(a.above)}`);

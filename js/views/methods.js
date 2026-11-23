@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=30cb3a13';
-import { compute, fxFor } from './company.js?v=30cb3a13';
-import { METHODS, rankMethod } from '../calc/methods.js?v=30cb3a13';
-import { fxRate } from '../providers/fxrate.js?v=30cb3a13';
-import { alligator } from '../calc/alligator.js?v=30cb3a13';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=30cb3a13';
-import { logoHTML } from '../app.js?v=30cb3a13';
-import { isNum } from '../calc/finance.js?v=30cb3a13';
-import { store } from '../store.js?v=30cb3a13';
-import { exportCSV } from '../export.js?v=30cb3a13';
+import { data } from '../providers/index.js?v=171d25de';
+import { compute, fxFor } from './company.js?v=171d25de';
+import { METHODS, rankMethod } from '../calc/methods.js?v=171d25de';
+import { fxRate } from '../providers/fxrate.js?v=171d25de';
+import { alligator } from '../calc/alligator.js?v=171d25de';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=171d25de';
+import { logoHTML } from '../app.js?v=171d25de';
+import { isNum } from '../calc/finance.js?v=171d25de';
+import { store } from '../store.js?v=171d25de';
+import { exportCSV } from '../export.js?v=171d25de';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -137,7 +137,7 @@ async function techTop(view) {
   for (const { r } of top) {
     if (state.techs.has(r.sym)) continue;
     state.techs.set(r.sym, { loading: true });
-    try { const pd = r.S.raw.prices && r.S.raw.prices.ok ? r.S.raw.prices.data : (await data.via(VIA.px, 'pricesDaily', r.sym, from)).data; const a = alligator(pd); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: (e && e.message) || 'sin precios' }); }
+    try { const pd = r.S.m.prices && r.S.m.prices.length ? r.S.m.prices /* ya ajustados a splits */ : r.S.raw.prices && r.S.raw.prices.ok ? r.S.raw.prices.data : (await data.via(VIA.px, 'pricesDaily', r.sym, from)).data; const a = alligator(pd); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: (e && e.message) || 'sin precios' }); }
     if (document.body.contains(view)) draw(view);
   }
 }

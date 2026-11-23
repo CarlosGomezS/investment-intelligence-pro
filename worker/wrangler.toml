@@ -6,7 +6,7 @@ compatibility_date = "2026-11-01"
 # Orígenes permitidos separados por comas (tu GitHub Pages)
 ALLOWED_ORIGIN = "https://carlosgomezs.github.io"
 # La SEC y filings.xbrl.org piden identificarse con un email de contacto
-SEC_USER_AGENT = "InvestmentIntelligencePro github.com/CarlosGomezS/investment-intelligence-pro"
+SEC_USER_AGENT = "InvestmentIntelligencePro carlosgomezs@users.noreply.github.com"
 
 # Secretos (no se escriben aquí). Configura los que tengas:
 #   npx wrangler secret put FMP_KEY
