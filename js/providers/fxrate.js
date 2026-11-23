@@ -1,6 +1,6 @@
 // Tipo de cambio de la moneda de los estados financieros a la de cotización.
 // Maneja subunidades: peniques británicos (GBp/GBX), agorot israelíes (ILA) y céntimos sudafricanos (ZAc): 1 GBP = 100 GBp.
-import { data } from './index.js?v=662c2f83';
+import { data } from './index.js?v=d55e8581';
 
 const SUB = { GBp: ['GBP', 100], GBX: ['GBP', 100], ILA: ['ILS', 100], ZAc: ['ZAR', 100], ZAC: ['ZAR', 100] };
 const norm = (c) => SUB[c] || [c, 1];

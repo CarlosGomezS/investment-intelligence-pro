@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=662c2f83';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=662c2f83';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=d55e8581';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=d55e8581';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -24,7 +24,7 @@ export function dcfDefaults(m) {
     rf: { value: m.market.rf10, origin: (m.market.rfAssumed ? 'supuesto · 4,5 % (sin dato del bono a 10 años)' : `real · bono EE. UU. 10a (${m.market.rfDate})`) + (m.repCur && m.repCur !== 'USD' ? ` · ojo: los flujos están en ${m.repCur}; lo correcto es el bono a 10 años de esa moneda (cámbialo si lo conoces)` : '') },
     beta: { value: m.market.beta, origin: m.market.betaAssumed ? 'supuesto · beta 1 (sin dato)' : `calculado · beta ajustada de Blume (0,67 × ${(m.market.betaRaw || 0).toFixed(2).replace('.', ',')} ${m.market.betaCalc ? 'calculada frente al S&P 500' : 'del proveedor'} + 0,33)` },
     erp: { value: m.market.erp, origin: m.market.erpAssumed ? 'supuesto · 4,5 % (prima típica de mercado desarrollado)' : `real · prima de riesgo ${m.market.erpCountry} (Damodaran vía FMP)` },
-    costDebt: { value: m.market.costDebt, origin: m.market.costDebt != null ? 'real · intereses / deuda, media 3a' : 'falta' },
+    costDebt: { value: m.market.costDebt, origin: m.market.costDebt != null ? 'real · intereses / deuda, media 3a' : 'falta: el WACC usa el coste del capital propio para la deuda (prudente); escribe aquí una estimación si la conoces' },
     wacc: { value: w ? w.wacc : null, origin: w ? 'calculado · CAPM' : 'falta: introduce el WACC a mano' },
     netDebt: { value: m.netDebt, origin: 'real · deuda − caja' },
     shares: { value: m.shares, origin: 'real · acciones en circulación' },
@@ -93,19 +93,26 @@ export function dividendModel(m, ke) {
   return { applicable, reason: applicable ? '' : isNum(payout) && payout < 0.4 ? `Reparte solo el ${Math.round(payout * 100)} % del beneficio en dividendos (el resto va a recompras o reinversión): el DDM infravaloraría la empresa y no cuenta para el valor central.` : 'Historial de dividendo corto o payout > 100 %: el DDM no es fiable.', g5, growth, payout, ke, ...res, up: res && res.value ? upside(res.value, m.price) : null };
 }
 
-/** Valor intrínseco central: mediana de los métodos disponibles (DCF base pesa doble). */
+/** Valor intrínseco central: mediana de los métodos disponibles (DCF base pesa doble).
+ * Variantes del mismo método (PER a 5 y a 10 años) no cuentan como contraste: hacen falta al menos dos FAMILIAS
+ * distintas (flujos de caja, dividendos, múltiplos históricos propios, múltiplos de competidores).
+ * «contrastada» = hay a la vez un método absoluto (DCF o DDM) y uno relativo (múltiplos). */
+export const FAMILY_LABEL = { dcf: 'DCF', ddm: 'dividendos (DDM)', hist: 'múltiplos históricos propios', peers: 'múltiplos de competidores' };
+const famOf = (method) => (/competidores/.test(method) ? 'peers' : 'hist');
 export function composite(m, dcfRes, mult, ddmRes) {
-  const vals = []; let methods = 0;
+  const vals = []; const fams = new Set(); let methods = 0;
   // DCF: si la deuda supera al valor de la empresa, el capital vale 0 (no se descarta: cuenta como 0)
-  if (dcfRes && isNum(dcfRes.perShare)) { const v = Math.max(0, dcfRes.perShare); vals.push(v, v); methods++; }
+  if (dcfRes && isNum(dcfRes.perShare)) { const v = Math.max(0, dcfRes.perShare); vals.push(v, v); methods++; fams.add('dcf'); }
   for (const r of mult) {
     if (r.exclude || !isNum(r.value)) continue;
-    if (r.value > 0) { vals.push(r.value); methods++; } else if (/EV\//.test(r.method)) { vals.push(0); methods++; } // EV menos deuda neta negativo = 0
+    if (r.value > 0) { vals.push(r.value); methods++; fams.add(famOf(r.method)); } else if (/EV\//.test(r.method)) { vals.push(0); methods++; fams.add(famOf(r.method)); } // EV menos deuda neta negativo = 0
   }
-  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) { vals.push(ddmRes.value); methods++; }
-  if (methods < 2) return { value: null, n: methods, reason: 'Hace falta al menos dos métodos de valoración distintos' };
+  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) { vals.push(ddmRes.value); methods++; fams.add('ddm'); }
+  const families = [...fams];
+  if (families.length < 2) return { value: null, n: methods, families, reason: methods ? `valoración insuficientemente contrastada: solo hay ${methods === 1 ? 'un método' : `${methods} variantes`} de una misma familia (${families.map((f) => FAMILY_LABEL[f]).join(', ')}); hacen falta al menos dos familias distintas` : 'Hace falta al menos dos familias de valoración distintas (DCF, dividendos, múltiplos propios o de competidores)' };
   const v = median(vals);
   const sorted = vals.slice().sort((a, b) => a - b);
-  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: methods, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
+  const contrasted = (fams.has('dcf') || fams.has('ddm')) && (fams.has('hist') || fams.has('peers'));
+  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: methods, families, contrasted, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
 }
 export { mean };

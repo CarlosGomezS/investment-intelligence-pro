@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=662c2f83';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=d55e8581';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -22,13 +22,18 @@ export function metricsFor(m, ctx) {
   const eveAvg5 = mean(m.kmHist.slice(-5).map((r) => r.evToEBITDA).filter((v) => isNum(v) && v > 0 && v < 300));
   const eve = isNum(T.ebitda) && T.ebitda > 0 ? div(m.ev, m.X(T.ebitda)) : null;
   const fcfy = div(m.X(T.fcf), m.marketCap);
-  const gmStd = stdev(s('grossMargin').slice(-10));
-  const roicStd = stdev(s('rc').slice(-10));
-  const roicAvg5 = mean(s('rc').slice(-5));
+  // Métricas de historia: con pocos años no se puntúan (2 de 2 años con FCF positivo no son 10 años de estabilidad)
+  const MINY = 5;
+  const enough = (arr, n = MINY) => arr.filter(isNum).length >= n;
+  const gmStd = enough(s('grossMargin').slice(-10)) ? stdev(s('grossMargin').slice(-10).filter(isNum)) : null;
+  const roicStd = enough(s('rc').slice(-10)) ? stdev(s('rc').slice(-10).filter(isNum)) : null;
+  const roicAvg5 = enough(s('rc').slice(-5), 3) ? mean(s('rc').slice(-5).filter(isNum)) : null;
+  const ratioY = (arr) => (arr.length >= MINY ? arr.filter(Boolean).length / arr.length : null);
+  const showY = (arr) => (arr.length ? `${arr.filter(Boolean).length}/${arr.length}${arr.length < MINY ? ` (solo ${arr.length} años: mínimo ${MINY} para puntuar)` : ''}` : '—');
   const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
   // Mismo dato para la nota y para lo que se muestra; solo con ventas positivas
-  const sbcR = isNum(T.sbc) && T.revenue > 0 ? T.sbc / T.revenue : isNum(last.sbc) && last.revenue > 0 ? last.sbc / last.revenue : null;
+  const sbcR = isNum(T.sbc) && T.revenue > 0 && !(m.ttmFilled || []).includes('sbc') ? T.sbc / T.revenue : isNum(last.sbc) && last.revenue > 0 ? last.sbc / last.revenue : null;
   // Paso de beneficios (o FCF) a pérdidas: el CAGR no se puede calcular, pero no es «sin dato»: puntúa 0
   // También pérdidas crónicas (último dato ≤ 0, aunque nunca hubiera beneficio): puntúa 0, no se excluye
   const toLoss = (k) => { const v = s(k).filter(isNum); return v.length >= 1 && v[v.length - 1] <= 0; };
@@ -62,7 +67,7 @@ export function metricsFor(m, ctx) {
 
     M('caja', 'Margen FCF', T.fcfMargin ?? last.fcfMargin, P(T.fcfMargin ?? last.fcfMargin), [[-0.05, 0], [0.08, 55], [0.25, 100]], 'FCF / ventas'),
     M('caja', 'Conversión FCF / beneficio', T.fcfConversion ?? last.fcfConversion, X(T.fcfConversion ?? last.fcfConversion, 2), [[0.3, 0], [0.8, 60], [1.1, 100]], 'FCF / beneficio neto'),
-    M('caja', 'Años con FCF positivo (10a)', fcfPos.length ? fcfPos.filter(Boolean).length / fcfPos.length : null, fcfPos.length ? `${fcfPos.filter(Boolean).length}/${fcfPos.length}` : '—', [[0.5, 0], [0.8, 60], [1, 100]], 'Proporción de años con FCF > 0'),
+    M('caja', 'Años con FCF positivo (10a)', ratioY(fcfPos), showY(fcfPos), [[0.5, 0], [0.8, 60], [1, 100]], 'Proporción de años con FCF > 0'),
     M('caja', 'Capex / caja operativa', T.capexToOcf ?? last.capexToOcf, P(T.capexToOcf ?? last.capexToOcf), [[0.1, 100], [0.35, 60], [0.8, 0]], 'Menos es mejor'),
 
     M('moat', (last.negCapital ? 'ROCE' : 'ROIC') + ' medio 5a − WACC', isNum(roicAvg5) && isNum(w) ? roicAvg5 - w : null, isNum(roicAvg5) && isNum(w) ? P(roicAvg5 - w) : '—', [[-0.03, 0], [0.03, 55], [0.15, 100]], 'Exceso de rentabilidad sostenido'),
@@ -80,9 +85,9 @@ export function metricsFor(m, ctx) {
     M('riesgo', 'Dilución anual 5a', m.growth.shares5, P(m.growth.shares5), [[-0.02, 100], [0, 80], [0.04, 0]], 'CAGR del nº de acciones'),
     M('riesgo', 'Alertas graves', ctx.alerts ? highAlerts : null, ctx.alerts ? String(highAlerts) : '—', [[0, 100], [2, 50], [4, 0]], 'Nº de alertas de severidad alta'),
 
-    M('estabilidad', 'Años con caída de ventas (10a)', revDown.length ? revDown.filter(Boolean).length / revDown.length : null, revDown.length ? `${revDown.filter(Boolean).length}/${revDown.length}` : '—', [[0, 100], [0.2, 60], [0.5, 0]], 'Menos es mejor'),
-    M('estabilidad', 'Años con pérdidas (10a)', niNeg.length ? niNeg.filter(Boolean).length / niNeg.length : null, niNeg.length ? `${niNeg.filter(Boolean).length}/${niNeg.length}` : '—', [[0, 100], [0.1, 55], [0.3, 0]], 'Menos es mejor'),
-    M('estabilidad', 'Volatilidad del crecimiento de ventas', m.stats.revVol, P(m.stats.revVol), [[0.03, 100], [0.1, 60], [0.3, 0]], 'Desviación típica del crecimiento anual'),
+    M('estabilidad', 'Años con caída de ventas (10a)', ratioY(revDown), showY(revDown), [[0, 100], [0.2, 60], [0.5, 0]], 'Menos es mejor'),
+    M('estabilidad', 'Años con pérdidas (10a)', ratioY(niNeg), showY(niNeg), [[0, 100], [0.1, 55], [0.3, 0]], 'Menos es mejor'),
+    M('estabilidad', 'Volatilidad del crecimiento de ventas', revDown.length >= MINY ? m.stats.revVol : null, revDown.length >= MINY ? P(m.stats.revVol) : '—', [[0.03, 100], [0.1, 60], [0.3, 0]], 'Desviación típica del crecimiento anual'),
   ];
 }
 

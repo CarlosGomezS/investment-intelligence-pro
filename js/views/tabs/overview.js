@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=662c2f83';
-import { isNum } from '../../calc/finance.js?v=662c2f83';
-import { coverageTier } from '../../calc/reliability.js?v=662c2f83';
+import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=d55e8581';
+import { isNum } from '../../calc/finance.js?v=d55e8581';
+import { coverageTier } from '../../calc/reliability.js?v=d55e8581';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -14,6 +14,23 @@ const REL_C = { alta: 'pos', media: 'warn', baja: 'neg', 'muy baja': 'neg', 'no 
 export function relBox(r) {
   if (!r) return '';
   return `<div class="alert-row" style="margin-top:8px"><span class="pill ${r.level === 'alta' ? 'baja' : r.level === 'media' ? 'media' : 'alta'}">Fiabilidad</span><div><p style="margin:0"><b class="${REL_C[r.level] || ''}">${esc(r.level)}</b>${isNum(r.score) && r.level !== 'no valorable' ? ` (${r.score}/100)` : ''}${r.reasons && r.reasons.length ? ': ' + esc(r.reasons.join('; ')) + '.' : ': datos y supuestos sólidos.'}</p></div></div>`;
+}
+
+const AX_C = { Excelente: 'pos', Buena: 'pos', Mediocre: 'warn', 'Débil': 'neg', Barata: 'pos', 'Razonable (sin margen suficiente)': 'warn', Cara: 'neg', 'Muy cara': 'neg', 'No valorable': 'mute', 'Valor del capital 0': 'neg', Bajo: 'pos', Moderado: 'warn', Alto: 'neg', 'Muy alto': 'neg' };
+const sp = (v) => (isNum(v) ? (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %' : '—');
+/** Tarjeta de decisión en cuatro ejes (calidad, valoración, potencial, riesgo), sin mezclarlos en una nota. */
+export function decisionCard(D, cur) {
+  if (!D) return '';
+  const V = D.valuation, Q = D.quality, P = D.potential, R = D.risk;
+  const ax = (t, label, body) => `<div class="kpi" style="min-width:0"><span>${t}</span><b class="${AX_C[label] || ''}">${esc(label)}</b><small style="display:block;margin-top:4px;white-space:normal">${body}</small></div>`;
+  return card('Decisión: cuatro evaluaciones independientes', `<div class="verdict" style="margin-bottom:6px">${esc(D.verdict)}</div><p style="margin:0 0 12px">${esc(D.action)}</p>
+    <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+      ${ax('1 · Calidad del negocio', Q.label, isNum(Q.score) ? `${Q.score}/100 (calidad, rentabilidad, foso y caja)` : 'sin datos suficientes')}
+      ${ax('2 · Valoración', V.label, isNum(V.value) ? `Valor ${num(V.value)} ${esc(cur)} · precio ${num(V.price)} ${esc(cur)}<br><strong style="font-size:13px;color:var(--ink)">Precio máximo de compra: ${isNum(V.maxBuy) ? num(V.maxBuy) + ' ' + esc(cur) : '—'}</strong><br>margen exigido ${isNum(V.required) ? Math.round(V.required * 100) + ' %' : '—'} (${esc(V.requiredWhy.join('; '))})` : esc(V.reason || 'sin valoración fiable'))}
+      ${ax('3 · Potencial anual (5 años)', P ? (isNum(P.base) ? sp(P.base) : '—') : 'sin dato', P ? `pesimista ${sp(P.pesimista)} · base ${sp(P.base)} · optimista ${sp(P.optimista)}<br>si el precio llega al valor en 5 años${P.dy ? `, con dividendo del ${(P.dy * 100).toFixed(1).replace('.', ',')} %` : ''}; ${esc(P.source)}` : 'sin valoración no hay potencial calculable')}
+      ${ax('4 · Riesgo de pérdida permanente', R.label, R.reasons.length ? esc(R.reasons.join('; ')) : 'sin señales de riesgo en los datos (revisa los riesgos de negocio)')}
+    </div>
+    <p class="note">Fiabilidad de la valoración: <b>${esc(D.reliability || '—')}</b>. El precio máximo de compra es el valor central menos el margen exigido; el margen sube cuanto menos fiable es la valoración. El potencial no es una previsión: es lo que rentaría si el precio convergiera al valor estimado. No es una recomendación de inversión.</p>`);
 }
 
 export function render(el, S) {
@@ -38,6 +55,7 @@ export function render(el, S) {
   const okN = Object.keys(LABEL).filter((k) => S.raw[k] && (S.raw[k].ok || (DER[k] && (m.derived || []).includes(DER[k])))).length, totN = Object.keys(LABEL).filter((k) => S.raw[k]).length;
   const diag = `<details style="margin-top:14px" class="card"><summary style="padding:12px 16px;cursor:pointer;font-weight:600">Diagnóstico de datos: ${okN} de ${totN} bloques recibidos${m.derived && m.derived.length ? ` · calculados por la app: ${esc(m.derived.join(', '))}` : ''}</summary><div class="cb"><div class="tablewrap"><table class="dense"><tbody>${rows}</tbody></table></div><p class="note">Si una fuente aparece con ✕ en todo, revisa su clave en <a href="#/ajustes">Ajustes</a> (botón «Probar todas»). «…» = sigue descargando.</p></div></details>`;
   el.innerHTML = `
+  <div style="margin-bottom:14px">${decisionCard(S.dec, cur)}</div>
   <div class="grid g3" style="margin-bottom:14px">
     ${card('Puntuación de inversión', `<div class="gauge">${gauge(sc.total)}<div class="verdict">${esc(rep.conclusion)}</div><p class="note">Cobertura de datos: ${pct(sc.coverage, 0)} de las métricas (<b>${esc(coverageTier(sc.coverage).label)}</b>). <a href="#/c/${encodeURIComponent(m.symbol)}/informe">Ver informe completo</a></p></div>`)}
     ${card('Valor intrínseco estimado', `<div class="kpis" style="grid-template-columns:1fr 1fr">
@@ -47,7 +65,7 @@ export function render(el, S) {
         <div class="kpi"><span>Potencial</span><b class="${cls(comp.up)}">${sgnPct(comp.up, 0)}</b></div>
       </div>
       ${relBox(val.reliability)}
-      <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · mediana de ${comp.n} métodos. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
+      <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · mediana de ${comp.n} métodos de ${(comp.families || []).length} familias${comp.contrasted === false ? ' (sin DCF ni dividendos: no contrastada)' : ''}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
     ${card('Señales de alerta', top.length ? top.map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('') + (alerts.length > 4 ? `<p class="note"><a href="#/c/${encodeURIComponent(m.symbol)}/riesgos">Ver las ${alerts.length} alertas</a></p>` : '') : '<p class="note">No se detectan anomalías en los últimos estados financieros.</p>')}
   </div>
   <div class="kpis" style="margin-bottom:14px">${K.map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${b}</b></div>`).join('')}</div>

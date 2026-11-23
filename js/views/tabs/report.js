@@ -1,15 +1,16 @@
 // Informe final: 13 preguntas, conclusión razonada, argumentos a favor y en contra, exportación a PDF.
-import { relBox } from './overview.js?v=662c2f83';
-import { coverageTier } from '../../calc/reliability.js?v=662c2f83';
-import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=662c2f83';
-import { store } from '../../store.js?v=662c2f83';
-import { gauge } from './overview.js?v=662c2f83';
-import { printReport } from '../../export.js?v=662c2f83';
+import { relBox, decisionCard } from './overview.js?v=d55e8581';
+import { coverageTier } from '../../calc/reliability.js?v=d55e8581';
+import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=d55e8581';
+import { store } from '../../store.js?v=d55e8581';
+import { gauge } from './overview.js?v=d55e8581';
+import { printReport } from '../../export.js?v=d55e8581';
 
 export function render(el, S) {
   const { m, rep, sc, val } = S, c = val.composite;
   const prev = store.analyses(m.symbol).slice(0, 5);
   el.innerHTML = `<div class="row between noprint" style="margin-bottom:12px"><span class="note">Informe generado ${datetime(Date.now())} con datos de ${esc([...new Set(Object.values(m.prov).filter((p) => p.source).map((p) => p.source))].join(', '))}.</span><div class="row"><button class="btn" id="pdf">Exportar a PDF</button><button class="btn pri" id="sv">Guardar en el historial</button></div></div>
+  <div style="margin-bottom:14px">${decisionCard(S.dec, m.tradeCur)}</div>
   <div class="grid g3">
     ${card('Conclusión', `<div class="gauge">${gauge(rep.total)}<div class="verdict" style="color:${scoreColor(rep.total)}">${esc(rep.conclusion)}</div></div>${relBox(val.reliability)}<p class="note">Cobertura de datos de la puntuación: ${Math.round((sc.coverage || 0) * 100)} % (<b>${esc(coverageTier(sc.coverage).label)}</b>).</p>
       <div class="kpis" style="grid-template-columns:1fr 1fr;margin-top:10px"><div class="kpi"><span>Precio</span><b>${num(m.price)} ${esc(m.tradeCur)}</b></div><div class="kpi"><span>Valor intrínseco</span><b>${num(c.value)}</b></div><div class="kpi"><span>Margen de seguridad</span><b class="${cls(c.mos)}">${pct(c.mos, 0)}</b></div><div class="kpi"><span>Calidad (media)</span><b>${rep.quality != null ? Math.round(rep.quality) : '—'}/100</b></div></div>`)}

@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=662c2f83';
-import { alphavantage } from './alphavantage.js?v=662c2f83';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=662c2f83';
-import { twelvedata } from './twelvedata.js?v=662c2f83';
-import { roic } from './roic.js?v=662c2f83';
-import { sec, forgetSec } from './sec.js?v=662c2f83';
-import { esef, forgetEsef } from './esef.js?v=662c2f83';
-import { config } from '../config.js?v=662c2f83';
-import { ApiError, usage, queueDelay } from './http.js?v=662c2f83';
-import { setHint } from './hints.js?v=662c2f83';
+import { fmp } from './fmp.js?v=d55e8581';
+import { alphavantage } from './alphavantage.js?v=d55e8581';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=d55e8581';
+import { twelvedata } from './twelvedata.js?v=d55e8581';
+import { roic } from './roic.js?v=d55e8581';
+import { sec, forgetSec } from './sec.js?v=d55e8581';
+import { esef, forgetEsef } from './esef.js?v=d55e8581';
+import { config } from '../config.js?v=d55e8581';
+import { ApiError, usage, queueDelay } from './http.js?v=d55e8581';
+import { setHint } from './hints.js?v=d55e8581';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -181,6 +181,8 @@ data.search = search;
 data.profileLite = (sym) => run('profile', [sym]); // sin completar con otras fuentes (competidores, screener)
 /** Igual que data[method] pero con otro orden de fuentes (p. ej. análisis masivo: Finnhub primero para no gastar FMP). */
 data.via = (order, method, ...args) => run(method, args, order);
+/** Claves nuevas en Ajustes (guardadas o importadas): las fuentes rechazadas antes vuelven a probarse. */
+export function resetProviders() { badKeys.clear(); }
 /** Olvida los datos en memoria de una empresa (botón «Actualizar»). La caché del Worker, si lo usas, expira sola. */
 export function forget(sym) {
   forgetFinnhub(sym); forgetSec(sym); forgetEsef(sym);

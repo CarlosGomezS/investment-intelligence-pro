@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=662c2f83';
+import { isNum, mean, stdev, median } from './finance.js?v=d55e8581';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -10,6 +10,7 @@ const lin = (x, x0, x1) => clamp((x - x0) / (x1 - x0), 0, 1); // 0..1
 const C = (t, ok, v, rule) => ({ t, ok: ok == null ? null : !!ok, v, rule });
 const pctS = (v, d = 1) => (isNum(v) ? (v * 100).toFixed(d).replace('.', ',') + ' %' : 'sin dato');
 // Bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas: su balance no se lee igual (caja, deuda, circulante)
+const PIO_MIN = 20; // empresas comparables mínimas para que el quintil barato de Piotroski signifique algo
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const nS = (v, d = 1) => (isNum(v) ? v.toFixed(d).replace('.', ',') : 'sin dato');
 
@@ -244,19 +245,23 @@ export const METHODS = {
       'Compra: F-Score 8 o 9.',
     ],
     exit: 'En el estudio se mantiene cada posición 12 meses y se rehace la selección. No usa stop de precio.',
-    thresholdsNote: 'El 20 % se calcula sobre el universo que analizas en la app, no sobre todo el mercado.',
+    thresholdsNote: `El 20 % se calcula sobre el universo que analizas en la app, no sobre todo el mercado. Con menos de ${PIO_MIN} empresas comparables se exige además P/VC ≤ 1.`,
     prepare(all) {
       // Bancos y aseguradoras cotizan siempre a P/VC bajo: no compiten por el 20 % barato con el resto
       const v = all.map((r) => { const { m, sector } = base(r.S); const eq = lastVal(m, 'equity'); const bv = isNum(eq) && eq > 0 ? m.X(eq) : null; return { r, pb: !FIN.test(sector) && isNum(bv) && isNum(m.marketCap) ? m.marketCap / bv : null, fin: FIN.test(sector) }; });
       const ok = v.filter((x) => isNum(x.pb)).sort((a, b) => a.pb - b.pb);
+      // Con pocas empresas, «el 20 % más barato» no dice nada (1 de 1 es siempre la más barata). Por debajo de
+      // PIO_MIN empresas comparables se exige además P/VC ≤ 1 (criterio prudente: las empresas del quintil barato del
+      // estudio original cotizaban típicamente por debajo de su valor contable).
+      const small = ok.length < PIO_MIN;
       const cut = Math.max(1, Math.ceil(ok.length * 0.2));
-      ok.forEach((x, i) => (x.r._pi = { pb: x.pb, cheap: i < cut, pos: i + 1, n: ok.length }));
-      v.filter((x) => !isNum(x.pb)).forEach((x) => (x.r._pi = { pb: null, cheap: false, n: ok.length }));
+      ok.forEach((x, i) => (x.r._pi = { pb: x.pb, cheap: i < cut && (!small || x.pb <= 1), pos: i + 1, n: ok.length, small }));
+      v.filter((x) => !isNum(x.pb)).forEach((x) => (x.r._pi = { pb: null, cheap: false, n: ok.length, small: ok.length < PIO_MIN }));
     },
     evaluate(S, r) {
       const { m } = base(S); const p = r._pi || {}; const f = m.scores.piotroskiScore;
       const checks = [
-        C('Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n})` : FIN.test(base(S).sector) ? 'financiera: se compara aparte' : 'sin valor contable positivo', this.rules[0]),
+        C(p.small ? 'Barata por valor contable (P/VC ≤ 1; universo pequeño)' : 'Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n}${p.small ? `; con menos de ${PIO_MIN} empresas comparables el ranking no es representativo y se exige además P/VC ≤ 1` : ''})` : FIN.test(base(S).sector) ? 'financiera: se compara aparte' : 'sin valor contable positivo', this.rules[0]),
         C('F-Score ≥ 8', isNum(f) ? f >= 8 : null, isNum(f) ? `${f}/9` : 'sin dato', this.rules[2]),
       ];
       if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: varias pruebas del F-Score (liquidez, margen bruto) no se leen igual', 'Compruébala en su ficha.'));

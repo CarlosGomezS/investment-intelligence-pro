@@ -1,10 +1,10 @@
 // Screener en dos fases: 1) filtro de universo en el proveedor (capitalización, sector, país, dividendo, beta…);
 // 2) enriquecimiento con ratios TTM de los N primeros para filtrar por calidad, crecimiento y valoración.
-import { data, gather } from '../providers/index.js?v=662c2f83';
-import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=662c2f83';
-import { logoHTML } from '../app.js?v=662c2f83';
-import { isNum, asc } from '../calc/finance.js?v=662c2f83';
-import { exportCSV } from '../export.js?v=662c2f83';
+import { data, gather } from '../providers/index.js?v=d55e8581';
+import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=d55e8581';
+import { logoHTML } from '../app.js?v=d55e8581';
+import { isNum, asc } from '../calc/finance.js?v=d55e8581';
+import { exportCSV } from '../export.js?v=d55e8581';
 
 const SECTORS = ['', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Communication Services', 'Energy', 'Utilities', 'Real Estate', 'Basic Materials'];
 const SECT_ES = { Technology: 'Tecnología', Healthcare: 'Salud', 'Financial Services': 'Financiero', 'Consumer Cyclical': 'Consumo cíclico', 'Consumer Defensive': 'Consumo defensivo', Industrials: 'Industria', 'Communication Services': 'Comunicaciones', Energy: 'Energía', Utilities: 'Utilities', 'Real Estate': 'Inmobiliario', 'Basic Materials': 'Materiales' };

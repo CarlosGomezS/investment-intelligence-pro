@@ -35,6 +35,10 @@ jobs:
       ROIC_KEY: ${{ secrets.ROIC_KEY }}
       AV_KEY: ${{ secrets.AV_KEY }}
     steps:
+      - name: Comprobar que los dos secretos de Cloudflare van juntos
+        run: |
+          if [ -n "$CF_TOKEN" ] && [ -z "$CF_ACCOUNT" ]; then echo "::error::Falta CLOUDFLARE_ACCOUNT_ID (solo hay CLOUDFLARE_API_TOKEN). No se publica para no exponer las claves."; exit 1; fi
+          if [ -z "$CF_TOKEN" ] && [ -n "$CF_ACCOUNT" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN (solo hay CLOUDFLARE_ACCOUNT_ID). No se publica para no exponer las claves."; exit 1; fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''

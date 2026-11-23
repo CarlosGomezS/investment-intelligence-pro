@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=662c2f83';
+import { isNum, div, mean, median, cagr } from './finance.js?v=d55e8581';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -9,8 +9,11 @@ export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtVal
   const E = isNum(equityValue) && equityValue > 0 ? equityValue : 0;
   const D = isNum(debtValue) && debtValue > 0 ? debtValue : 0;
   const we = E > 0 ? E / (E + D) : 1, wd = 1 - we; // sin capitalización conocida no se pondera solo con deuda
+  // Coste de la deuda desconocido con deuda relevante: no se inventa. Se usa el del capital (prudente: no abarata
+  // el WACC) y se marca kdAssumed para que la fiabilidad lo descuente y la interfaz lo diga.
+  const kdAssumed = kd == null && wd > 0;
   const w = we * ke + wd * (kd ?? ke);
-  return { ke, kd, we, wd, wacc: w };
+  return { ke, kd, we, wd, wacc: w, kdAssumed };
 }
 
 /**

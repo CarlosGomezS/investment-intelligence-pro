@@ -1,13 +1,14 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS, exportKeysCode, importKeysCode } from '../config.js?v=662c2f83';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=662c2f83';
-import { fmp } from '../providers/fmp.js?v=662c2f83';
-import { alphavantage } from '../providers/alphavantage.js?v=662c2f83';
-import { finnhub } from '../providers/finnhub.js?v=662c2f83';
-import { twelvedata } from '../providers/twelvedata.js?v=662c2f83';
-import { roic } from '../providers/roic.js?v=662c2f83';
-import { store } from '../store.js?v=662c2f83';
-import { esc, card, toast } from '../ui/dom.js?v=662c2f83';
+import { config, KEYS, exportKeysCode, importKeysCode } from '../config.js?v=d55e8581';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=d55e8581';
+import { fmp } from '../providers/fmp.js?v=d55e8581';
+import { alphavantage } from '../providers/alphavantage.js?v=d55e8581';
+import { finnhub } from '../providers/finnhub.js?v=d55e8581';
+import { twelvedata } from '../providers/twelvedata.js?v=d55e8581';
+import { roic } from '../providers/roic.js?v=d55e8581';
+import { store } from '../store.js?v=d55e8581';
+import { resetProviders } from '../providers/index.js?v=d55e8581';
+import { esc, card, toast } from '../ui/dom.js?v=d55e8581';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -55,7 +56,7 @@ export function render(view, _p, _q, firstRun) {
       ${card('Tus datos (favoritos, listas, análisis, supuestos)', `<p class="note" style="margin-top:0">Se guardan en este navegador. Exporta una copia para pasarlos a otro dispositivo.</p><div class="row"><button class="btn" id="ex">Exportar copia (JSON)</button><label class="btn">Importar copia<input type="file" id="im" accept="application/json" hidden></label></div>`)}
     </div>
   </div>`;
-  const saveKeys = () => config.set({ ...Object.fromEntries(SRC.map((s) => [KEYS[s.id], view.querySelector('#k_' + s.id).value.trim()])), proxyUrl: view.querySelector('#px').value.trim() });
+  const saveKeys = () => { resetProviders(); return config.set({ ...Object.fromEntries(SRC.map((s) => [KEYS[s.id], view.querySelector('#k_' + s.id).value.trim()])), proxyUrl: view.querySelector('#px').value.trim() }); };
   view.querySelector('#kf').onsubmit = (e) => { e.preventDefault(); saveKeys(); toast('Guardado'); window.dispatchEvent(new CustomEvent('iip:usage')); if (firstRun && config.hasData()) location.hash = '#/'; };
   view.querySelector('#test').onclick = async () => {
     saveKeys();
@@ -65,7 +66,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js?v=662c2f83');
+      const { sec } = await import('../providers/sec.js?v=d55e8581');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;
@@ -77,7 +78,7 @@ export function render(view, _p, _q, firstRun) {
     toast('Límites guardados'); window.dispatchEvent(new CustomEvent('iip:usage'));
   };
   view.querySelector('#kcopy').onclick = async () => { const code = exportKeysCode(); try { await navigator.clipboard.writeText(code); toast('Código copiado: guárdalo en tus notas'); } catch { view.querySelector('#kcode').value = code; toast('Copia el código del recuadro'); } };
-  view.querySelector('#kimp').onclick = () => { try { importKeysCode(view.querySelector('#kcode').value); toast('Claves restauradas'); render(view); } catch (e) { toast(e.message); } };
+  view.querySelector('#kimp').onclick = () => { try { importKeysCode(view.querySelector('#kcode').value); resetProviders(); toast('Claves restauradas'); render(view); } catch (e) { toast(e.message); } };
   view.querySelector('#cc').onclick = async () => { await clearCache(); toast('Caché vaciada'); };
   view.querySelector('#ex').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([store.exportAll()], { type: 'application/json' })); a.download = 'investment-intelligence-pro.json'; a.click(); };
   view.querySelector('#im').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { store.importAll(await f.text()); toast('Datos importados'); } catch { toast('Archivo no válido'); } };

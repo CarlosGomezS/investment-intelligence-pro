@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=662c2f83';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=d55e8581';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';
@@ -27,7 +27,7 @@ export function detectAlerts(m) {
   const dg = a.balanceStale ? null : gr(a.debt, b.debt); // balance del año aún sin publicar: no se comparan saldos
   if (isNum(dg) && dg > 0.3 && (!isNum(rg) || dg > rg + 0.15)) add('alta', 'Deuda', 'Aumento excesivo de deuda', `La deuda creció un ${pct(dg)} (hasta ${fmtB(a.debt)}) mientras las ventas variaron un ${isNum(rg) ? pct(rg) : '—'}.`);
 
-  const s1 = gr(a.shares, b.shares), s5 = cagrN(Y.map((y) => y.shares), 5);
+  const s1 = gr(a.shares, b.shares), s5 = m.growth.shares5; // CAGR alineado al calendario (respeta los años que faltan)
   if (isNum(s1) && s1 > 0.03) add('media', 'Accionistas', 'Dilución de acciones', `El número de acciones aumentó un ${pct(s1)} en el último año.`);
   else if (isNum(s5) && s5 > 0.02) add('media', 'Accionistas', 'Dilución sostenida', `Las acciones crecen un ${pct(s5)} anual en 5 años: tu parte de la empresa se reduce.`);
 

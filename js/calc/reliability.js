@@ -1,6 +1,6 @@
 // Fiabilidad de la valoración: independiente del valor intrínseco. Dice cuánto fiarse del número y por qué.
 // Parte de 100 y resta por cada debilidad conocida de los datos o de los supuestos. Los motivos se muestran tal cual.
-import { isNum } from './finance.js?v=662c2f83';
+import { isNum } from './finance.js?v=d55e8581';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 
@@ -29,9 +29,12 @@ export function reliability(m, val, sc, raw) {
   if (isNum(c.low) && isNum(c.high) && c.low <= 0 && c.high > 0) minus(15, 'un método da valor 0 (deuda mayor que el valor) y otro no: discrepan por completo');
   else if (isNum(c.low) && isNum(c.high) && c.low > 0) { const r = c.high / c.low; if (r > 2.5) minus(15, `los métodos discrepan mucho (de ${c.low.toFixed(0)} a ${c.high.toFixed(0)})`); else if (r > 1.6) minus(8, 'los métodos discrepan bastante entre sí'); }
   if (c.n === 2) minus(5, 'solo dos métodos de valoración');
+  if (c.contrasted === false) minus(15, `sin contraste entre flujos y múltiplos: solo ${(c.families || []).map((f) => ({ dcf: 'DCF', ddm: 'dividendos', hist: 'múltiplos propios', peers: 'múltiplos de competidores' })[f]).join(' y ')}`);
+  const W = m.market.wacc;
+  if (W && W.kdAssumed && !manualW && !isNum(I.costDebt)) { if (W.wd > 0.2) minus(15, `coste de la deuda desconocido con un ${Math.round(W.wd * 100)} % de deuda en el capital: el WACC usa el coste del capital propio`); else minus(5, 'coste de la deuda desconocido (poca deuda: efecto pequeño en el WACC)'); }
   if (m.balanceFrom) minus(10, 'el balance del último año aún no está publicado (se usa el anterior)');
   if (m.sharesNote) minus(5, `número de acciones ${m.sharesNote}`);
-  if ((m.ttmFilled || []).includes('fcf')) minus(5, 'el flujo de caja de los últimos 12 meses no está en tu fuente: se usa el del último ejercicio');
+  if (m.ttmPartial) minus(5, 'los últimos 12 meses llegan incompletos (faltan flujos de caja): todo se calcula con el último ejercicio cerrado, sin mezclar periodos');
   if (raw && Object.values(raw).some((r) => r && r.ok && r.stale)) minus(10, 'algunos datos vienen de caché caducada');
   s = Math.max(0, Math.min(100, s));
   const level = s >= 75 ? 'alta' : s >= 55 ? 'media' : s >= 35 ? 'baja' : 'muy baja';

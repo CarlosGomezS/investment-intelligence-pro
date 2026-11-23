@@ -1,10 +1,10 @@
 // Cotización interactiva: rangos de 1 día a máximo, escala lineal/log, rentabilidad acumulada,
 // comparación con índices, volumen y marcas de dividendos y splits.
-import { data } from '../../providers/index.js?v=662c2f83';
-import { priceChart, PALETTE } from '../../ui/charts.js?v=662c2f83';
-import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=662c2f83';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=662c2f83';
-import { extra } from '../company.js?v=662c2f83';
+import { data } from '../../providers/index.js?v=d55e8581';
+import { priceChart, PALETTE } from '../../ui/charts.js?v=d55e8581';
+import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=d55e8581';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=d55e8581';
+import { extra } from '../company.js?v=d55e8581';
 
 const RANGES = [['1D', 1], ['1S', 7], ['1M', 30], ['3M', 91], ['6M', 182], ['1A', 365], ['5A', 1826], ['10A', 3652], ['Máx', 0]];
 const INDEXES = [['', 'Sin comparar'], ['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^DJI', 'Dow Jones'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35'], ['^GDAXI', 'DAX'], ['^FTSE', 'FTSE 100'], ['^N225', 'Nikkei 225'], ['URTH', 'MSCI World (ETF)']];
@@ -97,6 +97,6 @@ export async function render(el, S) {
   el.querySelector('#stats').innerHTML = card('Riesgo de mercado', `<div class="kpis" style="grid-template-columns:1fr 1fr">
     <div class="kpi"><span>Volatilidad anual (1 año)</span><b>${pct(volatility(c1))}</b></div><div class="kpi"><span>Volatilidad anual (5 años)</span><b>${pct(volatility(c5))}</b></div>
     <div class="kpi"><span>Máxima caída (1 año)</span><b class="neg">${pct(maxDrawdown(c1))}</b></div><div class="kpi"><span>Máxima caída (5 años)</span><b class="neg">${pct(maxDrawdown(c5))}</b></div>
-    <div class="kpi"><span>Máxima caída histórica</span><b class="neg">${pct(maxDrawdown(prices.map((p) => p.close)))}</b></div><div class="kpi"><span>Beta</span><b>${num(m.profile.beta ?? m.market.betaRaw, 2)}</b>${!isNum(m.profile.beta) && m.market.betaCalc ? '<small>calculada frente al S&P 500</small>' : ''}</div></div>
+    <div class="kpi"><span>Máxima caída histórica</span><b class="neg">${pct(maxDrawdown(prices.map((p) => p.close)))}</b></div><div class="kpi"><span>Beta</span><b>${m.market.betaAssumed ? '—' : num(m.profile.beta ?? m.market.betaRaw, 2)}</b>${!isNum(m.profile.beta) && m.market.betaCalc ? '<small>calculada frente al S&P 500</small>' : ''}</div></div>
     <p class="note">Histórico disponible: ${prices.length.toLocaleString('es-ES')} sesiones desde ${esc(prices[0].date)}.</p>`);
 }

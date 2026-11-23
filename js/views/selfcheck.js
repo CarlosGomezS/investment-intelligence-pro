@@ -1,10 +1,10 @@
 // Autocomprobación con datos REALES: analiza empresas de referencia con tus fuentes y verifica que las cifras de la
 // app cuadran con las del proveedor y entre sí. Sirve para detectar errores con casos difíciles (splits, doble clase,
 // ADR, patrimonio negativo, bancos, Europa, Londres) sin depender de revisiones del código.
-import { analyzeOne } from './methods.js?v=662c2f83';
-import { esc, card, num, pct, toast } from '../ui/dom.js?v=662c2f83';
-import { isNum } from '../calc/finance.js?v=662c2f83';
-import { exportCSV } from '../export.js?v=662c2f83';
+import { analyzeOne } from './methods.js?v=d55e8581';
+import { esc, card, num, pct, toast } from '../ui/dom.js?v=d55e8581';
+import { isNum } from '../calc/finance.js?v=d55e8581';
+import { exportCSV } from '../export.js?v=d55e8581';
 
 // Cada una representa un caso difícil (por qué está en la lista)
 const REF = [
@@ -23,7 +23,11 @@ function checks(S) {
   // 2. PER: el de la app frente al del proveedor
   const peP = m.rTTM && m.rTTM.priceToEarningsRatioTTM, peA = m.pe;
   // Solo se compara con datos del mismo periodo (TTM); con el PER del último ejercicio cerrado no sería comparable
-  add('PER cuadra con el proveedor (±25 %)', m.ttmIsReal && isNum(peP) && peP > 0 && isNum(peA) && peA > 0 ? Math.abs(peA / peP - 1) < 0.25 : null, m.ttmIsReal ? `${num(peA, 1)}× vs ${num(peP, 1)}×` : `sin cuenta de 12 meses en tus fuentes (PER del último ejercicio ${num(peA, 1)}×, proveedor ${num(peP, 1)}× TTM)`);
+  // Con 12 meses en ambos lados: ±25 %. Sin ellos (PER del último ejercicio frente al TTM del proveedor) solo se
+  // marca fallo si difieren más del doble: eso ya no es el paso del tiempo, sino split, divisa o ADR mal tratados
+  const okPe = isNum(peP) && peP > 0 && isNum(peA) && peA > 0;
+  if (m.ttmIsReal) add('PER cuadra con el proveedor (±25 %)', okPe ? Math.abs(peA / peP - 1) < 0.25 : null, `${num(peA, 1)}× vs ${num(peP, 1)}×`);
+  else add('PER del último ejercicio sin desviación grosera (< 2× el del proveedor)', okPe ? Math.max(peA / peP, peP / peA) < 2 : null, `sin cuenta de 12 meses: ${num(peA, 1)}× (ejercicio) vs ${num(peP, 1)}× (proveedor, TTM)`);
   // 3. BPA sin saltos imposibles entre años (split mal ajustado)
   // Un split mal ajustado hace que el BPA salte MUCHO más (o menos) que el beneficio; un crecimiento real (NVDA) no
   const Y = m.years.filter((y) => isNum(y.eps) && y.eps > 0 && isNum(y.netIncome) && y.netIncome > 0);
@@ -55,7 +59,7 @@ async function run(view) {
   if (running) return; running = true; rows = []; render(view);
   for (const [i, [sym, why]] of REF.entries()) {
     const pg = view.querySelector('#pg'); if (pg) pg.textContent = `${i + 1} de ${REF.length}: ${sym}…`;
-    try { const S = await analyzeOne(sym); rows.push({ sym, why, name: S.m.profile.companyName, c: checks(S), rel: S.val.reliability ? `${S.val.reliability.level}${S.val.reliability.reasons.length ? ': ' + S.val.reliability.reasons.join('; ') : ''}` : '' }); }
+    try { const S = await analyzeOne(sym, { ttm: true }); rows.push({ sym, why, name: S.m.profile.companyName, c: checks(S), rel: S.val.reliability ? `${S.val.reliability.level}${S.val.reliability.reasons.length ? ': ' + S.val.reliability.reasons.join('; ') : ''}` : '' }); }
     catch (e) { rows.push({ sym, why, error: (e && e.message) || 'sin datos' }); }
     if (document.body.contains(view)) draw(view);
   }

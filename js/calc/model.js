@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=662c2f83';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=662c2f83';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=d55e8581';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=d55e8581';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -10,7 +10,7 @@ export function buildModel(raw, fxRate = 1) {
   const profile = val(raw.profile) || {};
   const quote = val(raw.quote) || {};
   const price = quote.price ?? profile.price;
-  const tradeCur = profile.currency || quote.currency || 'USD';
+  const tradeCur = (isNum(quote.price) && quote.currency) || profile.currency || quote.currency || 'USD'; // el precio sale de la cotización: su moneda (GBp frente a GBP del perfil en Londres)
   const inc = asc(val(raw.income) || []), bal = asc(val(raw.balance) || []), cf = asc(val(raw.cashflow) || []);
   const repCur = (inc[inc.length - 1] || {}).reportedCurrency || tradeCur;
   // Unidades de moneda de cotización por 1 unidad de moneda de reporte. Sin tipo de cambio válido NO se supone 1:
@@ -40,8 +40,12 @@ export function buildModel(raw, fxRate = 1) {
 
   // TTM: estados TTM del proveedor si existen; si no, último ejercicio anual (se indica en la interfaz).
   const iT = val(raw.incomeTTM), bT = val(raw.balanceTTM), cT = val(raw.cashflowTTM);
-  const ttmYear = iT ? deriveYear({ year: 'TTM', i: iT, b: bT || (bal[bal.length - 1] || {}), c: cT || {} }) : null;
-  // TTM con algún estado sin llegar (p. ej. flujos de caja por tiempo de espera): esas partidas se toman del último anual
+  let ttmYear = iT ? deriveYear({ year: 'TTM', i: iT, b: bT || (bal[bal.length - 1] || {}), c: cT || {} }) : null;
+  // TTM sin flujos de caja: no se mezclan ventas de 12 meses con caja del último ejercicio (márgenes, conversión,
+  // rentabilidad FCF saldrían de dos periodos distintos). Se usa entero el último ejercicio cerrado y se avisa.
+  const ttmPartial = !!(ttmYear && isNum(ttmYear.revenue) && !isNum(ttmYear.ocf));
+  if (ttmPartial) ttmYear = null;
+  // Partidas sueltas que la fuente no da en 12 meses: se toman del último anual y quedan listadas (ttmFilled)
   const ttmFilled = [];
   if (ttmYear && isNum(ttmYear.revenue)) for (const [k, v] of Object.entries(last)) if (ttmYear[k] == null && v != null && !['year', 'eps', 'shares', 'fcfPerShare'].includes(k)) { ttmYear[k] = v; ttmFilled.push(k); } // lo que va por acción no se copia (podría ir sin ajustar a splits)
   const T = ttmYear && isNum(ttmYear.revenue) ? ttmYear : last;
@@ -198,7 +202,7 @@ export function buildModel(raw, fxRate = 1) {
   const periodLabel = ttmIsReal ? 'últimos 12 meses (TTM)' : `último ejercicio cerrado (${last.year || '—'}${last.date ? ', cierre ' + String(last.date).slice(0, 10) : ''})`;
 
   return {
-    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, netDebtFrom, balanceFrom, sharesNote, mcProv, shares, marketCap, ev, netDebt: netDebtT,
+    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, ttmPartial, netDebtFrom, balanceFrom, sharesNote, mcProv, shares, marketCap, ev, netDebt: netDebtT,
     years, last, T, ttmIsReal, prices, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
