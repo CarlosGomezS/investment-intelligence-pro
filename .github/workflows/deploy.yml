@@ -34,6 +34,7 @@ jobs:
       TD_KEY: ${{ secrets.TD_KEY }}
       ROIC_KEY: ${{ secrets.ROIC_KEY }}
       AV_KEY: ${{ secrets.AV_KEY }}
+      SEC_CONTACT_EMAIL: ${{ secrets.SEC_CONTACT_EMAIL }}
     steps:
       - name: Comprobar que los dos secretos de Cloudflare van juntos
         run: |
@@ -53,7 +54,7 @@ jobs:
           L="$(curl -s -H "Authorization: Bearer $T" 'https://api.cloudflare.com/client/v4/accounts?per_page=50')"
           N="$(echo "$L" | jq -r '.result | length // 0')"
           echo "Cuentas que este token puede ver: $N"
-          echo "$L" | jq -r '.result[]? | "  - " + .name + " (ID que empieza por " + (.id[0:6]) + "…)"'
+          echo "$L" | jq -r '.result[]? | "  - cuenta con ID que empieza por " + (.id[0:6]) + "…"' # sin el nombre: el registro es público
           if echo "$L" | jq -e --arg a "$A" '.result[]? | select(.id == $a)' >/dev/null; then echo "El Account ID guardado COINCIDE con una cuenta del token."; else echo "::error::El Account ID guardado NO coincide con ninguna cuenta que el token pueda ver. Copia el ID de la lista de arriba (Workers & Pages → Account ID) o crea el token con Account Resources = Include → tu cuenta."; fi
           S="$(curl -s -H "Authorization: Bearer $T" "https://api.cloudflare.com/client/v4/accounts/$A/workers/subdomain")"
           echo "Subdominio workers.dev: $(echo "$S" | jq -r 'if .success then (.result.subdomain // "sin crear") else "no accesible: " + ([.errors[]?.message] | join("; ")) end')"
@@ -80,6 +81,8 @@ jobs:
             V="${!K}"
             if [ -n "$V" ]; then printf '%s' "$V" | npx --yes wrangler@3 secret put "$K" >/dev/null; echo "Secreto $K guardado en el Worker"; fi
           done
+          # La SEC exige identificarse con un nombre y un email de contacto real; va como secreto, nunca en el código público
+          if [ -n "${SEC_CONTACT_EMAIL:-}" ]; then printf 'InvestmentIntelligencePro %s' "$SEC_CONTACT_EMAIL" | npx --yes wrangler@3 secret put SEC_USER_AGENT >/dev/null; echo "Identificación para la SEC guardada en el Worker"; else echo "::warning::Falta el secreto SEC_CONTACT_EMAIL: la SEC rechazará las peticiones (403) y las cuentas saldrán de FMP y Finnhub"; fi
           U=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
           echo "url=${U}" >> "$GITHUB_OUTPUT"
           if [ -z "$U" ]; then echo "No se obtuvo la dirección del Worker: se detiene la publicación para no exponer las claves"; exit 1; fi
@@ -94,7 +97,7 @@ jobs:
           t() { R="$(curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' -w '\n%{http_code}' "$U/$2")"; C="$(echo "$R" | tail -1)"; B="$(echo "$R" | sed '$d')"; echo "$1 → HTTP $C · $(echo "$B" | jq -r "$3" 2>/dev/null | head -c 160)"; }
           t "SEC EDGAR (cuentas de Apple)" "sec/api/xbrl/companyfacts/CIK0000320193.json" '"\(.entityName) · \(.facts["us-gaap"] | length) conceptos contables"'
           t "SEC EDGAR (lista de tickers)" "sec/files/company_tickers.json" '"\(length) empresas"'
-          echo "Respuesta de la SEC (inicio):"; curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' "$U/sec/api/xbrl/companyfacts/CIK0000320193.json" | head -c 600 | tr -s '\n\t ' ' '; echo
+          curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' "$U/sec/files/company_tickers.json" | head -c 400 | grep -q 'Undeclared Automated Tool' && echo "::warning::La SEC no acepta la identificación: revisa el secreto SEC_CONTACT_EMAIL (debe ser un email real)" || true
           t "Europa ESEF (filings.xbrl.org)" "esef/api/filings?page%5Bsize%5D=1" '"\(.data | length) informe(s) recibido(s)"'
           t "FMP (perfil de Apple)" "fmp/profile?symbol=AAPL" 'if type=="array" then .[0].companyName else (.error // ."Error Message" // .) end'
           t "Finnhub (perfil de Apple)" "finnhub/stock/profile2?symbol=AAPL" '.name // .error'

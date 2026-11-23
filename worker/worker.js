@@ -46,12 +46,12 @@ export default {
     if (provider === 'sec') {
       const host = path.startsWith('files/') ? 'https://www.sec.gov/' : 'https://data.sec.gov/';
       upstream = host + path;
-      init = { headers: { 'User-Agent': env.SEC_USER_AGENT || 'InvestmentIntelligencePro contacto@example.com', Accept: 'application/json' } };
+      init = { headers: { 'User-Agent': env.SEC_USER_AGENT || 'InvestmentIntelligencePro sin-contacto', Accept: 'application/json' } };
     } else if (UPSTREAM[provider]) {
       const U = UPSTREAM[provider];
       if (U.secret) { if (!env[U.secret]) return json({ error: `Falta el secreto ${U.secret} en el Worker` }, 401, H); params.set(U.key, env[U.secret]); }
       upstream = U.flat ? `${U.base}?${params}` : `${U.base}${path}${[...params].length ? '?' + params : ''}`;
-      if (U.ua) init = { headers: { 'User-Agent': env.SEC_USER_AGENT || 'InvestmentIntelligencePro contacto@example.com' } };
+      if (U.ua) init = { headers: { 'User-Agent': env.SEC_USER_AGENT || 'InvestmentIntelligencePro sin-contacto' } };
     } else return json({ error: 'Proveedor desconocido' }, 404, H);
 
     // Alpha Vantage lleva el tipo de dato en ?function=, no en la ruta

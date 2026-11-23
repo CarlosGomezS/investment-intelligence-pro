@@ -5,8 +5,8 @@ compatibility_date = "2026-11-01"
 [vars]
 # Orígenes permitidos separados por comas (tu GitHub Pages)
 ALLOWED_ORIGIN = "https://carlosgomezs.github.io"
-# La SEC y filings.xbrl.org piden identificarse con un email de contacto
-SEC_USER_AGENT = "InvestmentIntelligencePro carlosgomezs@users.noreply.github.com"
+# La SEC y filings.xbrl.org piden identificarse con un email de contacto real: va como secreto SEC_USER_AGENT
+# (lo pone la publicación a partir del secreto de GitHub SEC_CONTACT_EMAIL), no aquí, porque este archivo es público
 
 # Secretos (no se escriben aquí). Configura los que tengas:
 #   npx wrangler secret put FMP_KEY
@@ -14,3 +14,4 @@ SEC_USER_AGENT = "InvestmentIntelligencePro carlosgomezs@users.noreply.github.co
 #   npx wrangler secret put TD_KEY
 #   npx wrangler secret put ROIC_KEY
 #   npx wrangler secret put AV_KEY
+#   npx wrangler secret put SEC_USER_AGENT   (p. ej. «InvestmentIntelligencePro tu@email.com»)
