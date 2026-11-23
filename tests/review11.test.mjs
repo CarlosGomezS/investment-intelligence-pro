@@ -47,8 +47,8 @@ test('cocodrilo: un PER histórico de 100× no hace «razonable» un PER de 75×
 
 test('valor central: cuatro múltiplos propios no anulan al DCF', () => {
   const c = composite({ price: 100 }, { perShare: 200 }, ['PER medio 5 años', 'PER medio 10 años', 'EV/EBITDA medio 5 años', 'EV/FCF medio 5 años'].map((method) => ({ method, value: 100 })), null);
-  // familias: DCF 200 (doble) y múltiplos propios 100 → mediana de [200, 200, 100] = 200
-  assert.equal(c.value, 200);
+  // 2 familias: media ponderada (DCF doble) → (200×2 + 100) / 3; ni el DCF anula a los múltiplos ni al revés
+  assert.ok(Math.abs(c.value - 500 / 3) < 1e-9);
 });
 
 const base = (o = {}) => ({ price: 100, tradeCur: 'USD', profile: { companyName: 'X', sector: 'Technology' }, scores: {}, growth: {}, T: {}, last: {}, ...o });

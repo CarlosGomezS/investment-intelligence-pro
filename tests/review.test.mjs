@@ -42,7 +42,7 @@ test('el valor central exige dos métodos distintos y cuenta 0 si la deuda super
   const m = { price: 10 };
   assert.equal(composite(m, { perShare: 20 }, [], null).value, null);
   const c = composite(m, { perShare: -5 }, [{ method: 'PER medio 5 años', value: 12 }], null);
-  assert.equal(c.n, 2); assert.equal(c.value, 0); // [0, 0, 12] → mediana 0
+  assert.equal(c.n, 2); assert.equal(c.value, 4); assert.equal(c.low, 0); // 2 familias: (0×2 + 12) / 3 = 4, rango 0–12
 });
 
 test('escenarios con crecimiento negativo siguen ordenados', () => {

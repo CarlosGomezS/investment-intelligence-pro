@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=984486c8';
-import { fmtB } from './alerts.js?v=984486c8';
+import { isNum } from './finance.js?v=38c5f79f';
+import { fmtB } from './alerts.js?v=38c5f79f';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -21,7 +21,7 @@ export function buildReport(m, sc, val, alerts, dec) {
   const vs = cat(sc, 'valoracion');
   A('¿Está cara o barata?', vs == null ? 'sin datos suficientes' : vs >= 65 ? 'barata' : vs >= 45 ? 'precio razonable' : 'cara', `PER ${N(m.pe, 1)}×, rentabilidad FCF ${P(isNum(T.fcf) && m.marketCap ? m.X(T.fcf) / m.marketCap : null)}.`, vs);
   const c = val.composite;
-  A('¿Cuál es su valor intrínseco estimado?', isNum(c.value) ? `${N(c.value)} ${cur}` : 'no calculable', isNum(c.value) ? `Mediana de ${c.n} estimaciones (DCF base con doble peso, múltiplos históricos y de competidores${val.ddm && val.ddm.applicable ? ', DDM' : ''}). Rango central ${N(c.low)}–${N(c.high)} ${cur}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? N(val.dcf.perShare) + ' ' + cur : 'no aplicable'}.` : 'Faltan datos (FCF negativo o sin historial).', null);
+  A('¿Cuál es su valor intrínseco estimado?', isNum(c.value) ? `${N(c.value)} ${cur}` : 'no calculable', isNum(c.value) ? `${c.n} estimaciones: primero la mediana de cada familia (DCF, múltiplos propios, de competidores${val.ddm && val.ddm.applicable ? ', DDM' : ''}), luego se combinan con el DCF a doble peso: media ponderada si hay 2 familias, mediana si hay más. Rango entre familias ${N(c.low)}–${N(c.high)} ${cur}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? N(val.dcf.perShare) + ' ' + cur : 'no aplicable'}.` : c.reason || 'Faltan datos (FCF negativo o sin historial).', null);
   A('¿Qué margen de seguridad ofrece?', isNum(c.mos) ? P(c.mos, 0) : 'sin dato', isNum(c.mos) ? (c.mos > 0.25 ? 'Holgado: el precio deja colchón ante errores de estimación.' : c.mos > 0 ? 'Escaso: poco colchón ante errores de estimación.' : (c.value === 0 ? 'Negativo: el valor estimado del capital es 0 (la deuda supera al valor de la empresa).' : `Negativo: el precio supera el valor estimado en un ${P(isNum(c.value) && c.value > 0 ? m.price / c.value - 1 : null, 0)}.`)) : '', null);
   const risks = alerts.slice(0, 5).map((a) => a.title.toLowerCase());
   A('¿Cuáles son sus principales riesgos?', risks.length ? `${alerts.length} alertas` : 'sin alertas cuantitativas', risks.length ? 'Detectados en los datos: ' + risks.join('; ') + '.' : 'Los estados no muestran anomalías; revisa riesgos de negocio, regulación y noticias.', null);

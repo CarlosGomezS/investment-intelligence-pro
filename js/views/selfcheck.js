@@ -1,10 +1,10 @@
 // Autocomprobación con datos REALES: analiza empresas de referencia con tus fuentes y verifica que las cifras de la
 // app cuadran con las del proveedor y entre sí. Sirve para detectar errores con casos difíciles (splits, doble clase,
 // ADR, patrimonio negativo, bancos, Europa, Londres) sin depender de revisiones del código.
-import { analyzeOne } from './methods.js?v=984486c8';
-import { esc, card, num, pct, toast } from '../ui/dom.js?v=984486c8';
-import { isNum } from '../calc/finance.js?v=984486c8';
-import { exportCSV } from '../export.js?v=984486c8';
+import { analyzeOne } from './methods.js?v=38c5f79f';
+import { esc, card, num, pct, toast } from '../ui/dom.js?v=38c5f79f';
+import { isNum } from '../calc/finance.js?v=38c5f79f';
+import { exportCSV } from '../export.js?v=38c5f79f';
 
 // Cada una representa un caso difícil (por qué está en la lista)
 const REF = [

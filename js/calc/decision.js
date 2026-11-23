@@ -1,7 +1,7 @@
 // Decisión en cuatro ejes independientes: calidad del negocio, valoración, potencial de rentabilidad y riesgo de
 // pérdida permanente. No se mezclan en una sola nota: una empresa excelente puede estar cara y una barata puede
 // estar deteriorándose. Todas las reglas y umbrales están aquí, a la vista, y la interfaz los explica.
-import { isNum, maxDrawdown } from './finance.js?v=984486c8';
+import { isNum, maxDrawdown } from './finance.js?v=38c5f79f';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const cat = (sc, k) => (sc.cats.find((c) => c.key === k) || {}).score;
@@ -12,20 +12,21 @@ export const REQUIRED_MOS = { alta: 0.2, media: 0.3, baja: 0.4, 'muy baja': 0.5 
 
 export function decide(m, sc, val, alerts) {
   const c = val.composite || {}, rel = val.reliability || {}, price = m.price;
+  const fin = FIN.test(`${(m.profile && m.profile.sector) || ''} ${(m.profile && m.profile.industry) || ''}`); // bancos, seguros, REIT, eléctricas
   // 1. Calidad del negocio (calidad contable, rentabilidad, ventajas competitivas, caja)
   const qs = avg([cat(sc, 'calidad'), cat(sc, 'rentabilidad'), cat(sc, 'moat'), cat(sc, 'caja')]);
   const quality = { score: isNum(qs) ? Math.round(qs) : null, label: !isNum(qs) ? 'sin datos' : qs >= 75 ? 'Excelente' : qs >= 60 ? 'Buena' : qs >= 45 ? 'Mediocre' : 'Débil' };
 
   // 2. Valoración y precio máximo de compra
-  const valuable = isNum(c.value) && isNum(price) && price > 0 && rel.level !== 'no valorable';
+  const valuable = !fin && isNum(c.value) && isNum(price) && price > 0 && rel.level !== 'no valorable'; // en financieras el DCF de caja libre no sirve: ni precio de compra ni potencial
   let req = REQUIRED_MOS[rel.level] ?? null; const reqWhy = [];
   if (isNum(req)) { reqWhy.push(`${Math.round(req * 100)} % por fiabilidad ${rel.level}`); if (isNum(qs) && qs < 60) { req += 0.1; reqWhy.push('+10 puntos por negocio de calidad no probada'); } if (c.contrasted === false) { req += 0.1; reqWhy.push('+10 puntos porque solo hay múltiplos, sin DCF ni dividendos'); } }
   const maxBuy = valuable && isNum(req) && c.value > 0 ? c.value * (1 - req) : null;
   const mos = valuable ? c.mos : null;
   const valuation = {
     value: valuable ? c.value : null, price, maxBuy, required: req, requiredWhy: reqWhy, mos,
-    label: !valuable ? 'No valorable' : c.value === 0 ? 'Valor del capital 0' : isNum(maxBuy) && price <= maxBuy ? 'Barata' : mos >= 0 ? 'Razonable (sin margen suficiente)' : mos >= -0.25 ? 'Cara' : 'Muy cara',
-    reason: valuable ? '' : (rel.reasons || [c.reason]).filter(Boolean).slice(0, 2).join('; '),
+    label: fin ? 'No aplicable al sector' : !valuable ? 'No valorable' : c.value === 0 ? 'Valor del capital 0' : isNum(maxBuy) && price <= maxBuy ? 'Barata' : mos >= 0 ? 'Razonable (sin margen suficiente)' : mos >= -0.25 ? 'Cara' : 'Muy cara',
+    reason: fin ? 'banco, aseguradora, inmobiliaria o eléctrica: valóralo con ROE, valor contable y dividendo' : valuable ? '' : (rel.reasons || [c.reason]).filter(Boolean).slice(0, 2).join('; '),
   };
 
   // 3. Potencial de rentabilidad anual: si el precio converge al valor de cada escenario en 5 años, más dividendo
@@ -43,7 +44,7 @@ export function decide(m, sc, val, alerts) {
 
   // 4. Riesgo de pérdida permanente de capital
   const R = []; let r = 0;
-  const z = m.scores && m.scores.altmanZScore, fin = FIN.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`);
+  const z = m.scores && m.scores.altmanZScore;
   if (!fin && isNum(z)) { if (z < 1.8) { r += 2; R.push(`Altman Z ${z.toFixed(1).replace('.', ',')}: zona de riesgo de insolvencia`); } else if (z < 3) { r += 1; R.push(`Altman Z ${z.toFixed(1).replace('.', ',')}: zona gris`); } }
   const high = (alerts || []).filter((a) => a.sev === 'alta');
   if (high.length) { r += Math.min(4, high.length * 2); R.push(`${high.length} alerta${high.length > 1 ? 's' : ''} grave${high.length > 1 ? 's' : ''}: ${high.slice(0, 2).map((a) => a.title.toLowerCase()).join('; ')}`); }

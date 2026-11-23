@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=984486c8';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=38c5f79f';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -117,7 +117,8 @@ export const METHODS = {
       // Con 5 ejercicios exactos (plan gratuito) hay 4 intervalos: se mide el crecimiento a 4 años y se indica
       const epsS = s('eps').filter(isNum), nG = rev.length >= 6 ? 5 : 4;
       const gRev = nG === 5 ? g.rev5 : cagrN(rev, 4), gEps = nG === 5 ? g.eps5 : epsS.length >= 5 ? cagrN(epsS, 4) : null;
-      const c1 = rev.length >= 5 ? (isNum(gRev) && isNum(gEps) ? gRev > 0 && gEps > 0 && (!isNum(g.rev10) || g.rev10 > 0) && ni5.length >= 5 && ni5.every((v) => v > 0) && drops.filter(Boolean).length <= 2 : null) : null;
+      // Pérdidas o demasiadas caídas de ventas suspenden aunque no se pueda calcular el CAGR (con base o final negativos no existe)
+      const c1 = rev.length < 5 ? null : ni5.some((v) => v <= 0) || drops.filter(Boolean).length > 2 ? false : isNum(gRev) && isNum(gEps) ? gRev > 0 && gEps > 0 && (!isNum(g.rev10) || g.rev10 > 0) && ni5.length >= 5 : null;
       // 2. Foso en buen estado (sin erosión)
       const rc = last(s('rc').filter(isNum), 10), rcAvg = rc.length >= 5 ? mean(rc) : null, rc3 = rc.length >= 5 ? mean(last(rc, 3)) : null;
       const gm = last(s('grossMargin').filter(isNum), 10), om = last(s('operatingMargin').filter(isNum), 10), mg = gm.length >= 5 ? gm : om;
@@ -130,8 +131,11 @@ export const METHODS = {
       const ret = retY.reduce((a, y) => a + (y.dividendsPaid || 0) + (y.buybacks || 0), 0);
       const fcf5 = retY.reduce((a, y) => a + y.fcf, 0);
       const payout = retY.length >= 3 && fcf5 > 0 ? ret / fcf5 : null;
-      const noDil = isNum(g.shares5) ? g.shares5 <= 0.005 : null;
-      const reinv = isNum(rc3) && isNum(g.rev5) ? rc3 >= 0.15 && g.rev5 >= 0.08 : null;
+      // Mismo horizonte que el criterio 1: con 5 ejercicios, 4 años
+      const shS = s('shares').filter((v) => isNum(v) && v > 0);
+      const gSh = nG === 5 ? g.shares5 : shS.length >= 5 ? cagrN(shS, 4) : null;
+      const noDil = isNum(gSh) ? gSh <= 0.005 : null;
+      const reinv = isNum(rc3) && isNum(gRev) ? rc3 >= 0.15 && gRev >= 0.08 : null;
       const c3 = noDil === false ? false : noDil === null ? null : (isNum(payout) && payout >= 0.5) || reinv === true ? true : payout === null && reinv === null ? null : false;
       // 4. Precio razonable frente a su propia historia
       const peH = last(m.ratiosHist || [], 5).map((r) => r.priceToEarningsRatio).filter((v) => isNum(v) && v > 0 && v < 300);
@@ -162,7 +166,7 @@ export const METHODS = {
       const checks = [
         C('Negocio previsible', c1, rev.length >= 5 ? `ventas ${P(gRev)}/año (${nG}a${nG === 4 ? ': solo hay 5 ejercicios' : ''})${isNum(g.rev10) ? `, ${P(g.rev10)} (10a)` : ''} · BPA ${P(gEps)}/año · ${ni5.filter((v) => v > 0).length} de ${ni5.length} años con beneficio · ${drops.filter(Boolean).length} años de caída de ventas de ${drops.length}` : `solo ${rev.length} años de cuentas (mín. 5)`, this.rules[0]),
         C('Foso en buen estado (sin erosión)', c2, isNum(rcAvg) ? `rentabilidad del capital media ${P(rcAvg)}, últimos 3 años ${P(rc3)} · margen ${gm.length >= 5 ? 'bruto' : 'operativo'} medio ${P(mgAvg)}, últimos 3 años ${P(mg3)}` : 'menos de 5 años de datos', this.rules[1]),
-        C('Directiva que cuida al accionista', c3, `acciones ${P(g.shares5)}/año · devuelto en 5 años: ${isNum(payout) ? P(payout, 0) + ' del FCF en dividendos y recompras' : 'sin dato de dividendos y recompras'}${reinv ? ' · reinvierte con alta rentabilidad y crecimiento' : ''}`, this.rules[2]),
+        C('Directiva que cuida al accionista', c3, `acciones ${P(gSh)}/año (${nG}a) · devuelto en 5 años: ${isNum(payout) ? P(payout, 0) + ' del FCF en dividendos y recompras' : 'sin dato de dividendos y recompras'}${reinv ? ' · reinvierte con alta rentabilidad y crecimiento' : ''}`, this.rules[2]),
         C('Precio razonable', c4, c4how === 'historia' ? (slowed ? 'el crecimiento se ha frenado: sus múltiplos pasados no sirven y la valoración no es fiable para sustituirlos' : `PER ${isNum(pe) ? nS(pe) + '×' : 'sin dato'} vs media ${isNum(peAvg) ? nS(peAvg) + '×' : 'sin historia'} · rentabilidad FCF ${P(fy)} vs media ${isNum(fyAvg) ? P(fyAvg) : 'sin historia'}${capNote}`) : `${slowed ? 'múltiplos históricos descartados porque el crecimiento se ha frenado' : 'sin historia de múltiplos'}: margen de seguridad ${P(mos)} (fiabilidad ${rel || '—'})`, this.rules[3]),
         C('Oportunidad de pánico (caída ≥ 30 %)', panic, isNum(dd) ? `${P(dd)} desde el máximo de 52 semanas (${nS(hi, 2)})` : 'sin precios de un año', this.rules[4]),
       ];

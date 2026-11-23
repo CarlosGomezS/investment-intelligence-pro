@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=984486c8';
-import { isNum } from '../../calc/finance.js?v=984486c8';
-import { coverageTier } from '../../calc/reliability.js?v=984486c8';
+import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=38c5f79f';
+import { isNum } from '../../calc/finance.js?v=38c5f79f';
+import { coverageTier } from '../../calc/reliability.js?v=38c5f79f';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -16,7 +16,7 @@ export function relBox(r) {
   return `<div class="alert-row" style="margin-top:8px"><span class="pill ${r.level === 'alta' ? 'baja' : r.level === 'media' ? 'media' : 'alta'}">Fiabilidad</span><div><p style="margin:0"><b class="${REL_C[r.level] || ''}">${esc(r.level)}</b>${isNum(r.score) && r.level !== 'no valorable' ? ` (${r.score}/100)` : ''}${r.reasons && r.reasons.length ? ': ' + esc(r.reasons.join('; ')) + '.' : ': datos y supuestos sólidos.'}</p></div></div>`;
 }
 
-const AX_C = { Excelente: 'pos', Buena: 'pos', Mediocre: 'warn', 'Débil': 'neg', Barata: 'pos', 'Razonable (sin margen suficiente)': 'warn', Cara: 'neg', 'Muy cara': 'neg', 'No valorable': 'mute', 'Valor del capital 0': 'neg', Bajo: 'pos', Moderado: 'warn', Alto: 'neg', 'Muy alto': 'neg' };
+const AX_C = { Excelente: 'pos', Buena: 'pos', Mediocre: 'warn', 'Débil': 'neg', Barata: 'pos', 'Razonable (sin margen suficiente)': 'warn', Cara: 'neg', 'Muy cara': 'neg', 'No valorable': 'mute', 'Valor del capital 0': 'neg', Bajo: 'pos', Moderado: 'warn', Alto: 'neg', 'Muy alto': 'neg', 'No medible': 'mute', 'No aplicable al sector': 'mute' };
 const sp = (v) => (isNum(v) ? (v >= 0 ? '+' : '') + (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %' : '—');
 /** Tarjeta de decisión en cuatro ejes (calidad, valoración, potencial, riesgo), sin mezclarlos en una nota. */
 export function decisionCard(D, cur) {
@@ -65,7 +65,7 @@ export function render(el, S) {
         <div class="kpi"><span>Potencial</span><b class="${cls(comp.up)}">${sgnPct(comp.up, 0)}</b></div>
       </div>
       ${relBox(val.reliability)}
-      <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · mediana de ${comp.n} métodos de ${(comp.families || []).length} familias${comp.contrasted === false ? ' (sin DCF ni dividendos: no contrastada)' : ''}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
+      <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · ${comp.n} estimaciones en ${(comp.families || []).length} familias (una cifra por familia, DCF con doble peso)${comp.contrasted === false ? ' (sin DCF ni dividendos: no contrastada)' : ''}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
     ${card('Señales de alerta', top.length ? top.map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('') + (alerts.length > 4 ? `<p class="note"><a href="#/c/${encodeURIComponent(m.symbol)}/riesgos">Ver las ${alerts.length} alertas</a></p>` : '') : '<p class="note">No se detectan anomalías en los últimos estados financieros.</p>')}
   </div>
   <div class="kpis" style="margin-bottom:14px">${K.map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
