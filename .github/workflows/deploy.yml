@@ -94,10 +94,11 @@ jobs:
         run: |
           sleep 5
           declare -A ST
-          t() { R="$(curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' -w '\n%{http_code}' "$U/$2")"; C="$(echo "$R" | tail -1)"; B="$(echo "$R" | sed '$d')"; ST[$4]=$C; echo "$1 → HTTP $C · $(echo "$B" | jq -r "$3" 2>/dev/null | head -c 160)"; }
-          t "SEC EDGAR (cuentas de Apple)" "sec/api/xbrl/companyfacts/CIK0000320193.json" '"\(.entityName) · \(.facts["us-gaap"] | length) conceptos contables"' sec
+          # Cada petición con 60 s y un reintento; un fallo de curl (tiempo agotado) no aborta el paso: queda como HTTP 000
+          t() { for i in 1 2; do R="$(curl -s -m 60 -H 'Origin: https://carlosgomezs.github.io' -w '\n%{http_code}' "$U/$2" || true)"; C="$(echo "$R" | tail -1)"; [ "$C" = "200" ] && break; sleep 5; done; B="$(echo "$R" | sed '$d')"; ST[$4]=$C; echo "$1 → HTTP $C · $(echo "$B" | jq -r "$3" 2>/dev/null | head -c 160)"; }
+          t "SEC EDGAR (ventas de Apple)" "sec/api/xbrl/companyconcept/CIK0000320193/us-gaap/RevenueFromContractWithCustomerExcludingAssessedTax.json" '"\(.entityName) · \(.units.USD | length) datos de ventas"' sec
           t "SEC EDGAR (lista de tickers)" "sec/files/company_tickers.json" '"\(length) empresas"' sect
-          curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' "$U/sec/files/company_tickers.json" | head -c 400 | grep -q 'Undeclared Automated Tool' && echo "::warning::La SEC no acepta la identificación: revisa el secreto SEC_CONTACT_EMAIL (debe ser un email real)" || true
+          (curl -s -m 60 -H 'Origin: https://carlosgomezs.github.io' "$U/sec/files/company_tickers.json" || true) | head -c 400 | grep -q 'Undeclared Automated Tool' && echo "::warning::La SEC no acepta la identificación: revisa el secreto SEC_CONTACT_EMAIL (debe ser un email real)" || true
           t "Europa ESEF (filings.xbrl.org)" "esef/api/filings?page%5Bsize%5D=1" '"\(.data | length) informe(s) recibido(s)"' esef
           t "FMP (perfil de Apple)" "fmp/profile?symbol=AAPL" 'if type=="array" then .[0].companyName else (.error // ."Error Message" // .) end' fmp
           t "Finnhub (perfil de Apple)" "finnhub/stock/profile2?symbol=AAPL" '.name // .error' fh
