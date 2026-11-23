@@ -1,6 +1,6 @@
 // Fiabilidad de la valoración: independiente del valor intrínseco. Dice cuánto fiarse del número y por qué.
 // Parte de 100 y resta por cada debilidad conocida de los datos o de los supuestos. Los motivos se muestran tal cual.
-import { isNum } from './finance.js?v=5a9bda09';
+import { isNum } from './finance.js?v=30cb3a13';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 

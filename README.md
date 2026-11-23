@@ -46,7 +46,10 @@ La app combina **siete fuentes gratuitas** y reparte las consultas entre ellas p
 1. Consigue las claves que quieras (todas gratis, sin tarjeta).
 2. Abre la app → **Ajustes** → pégalas → **Probar todas**.
 
-Las claves se guardan solo en tu navegador. Nunca se suben al repositorio.
+Las claves que escribas en Ajustes se guardan solo en tu navegador. Además, la publicación automática (GitHub Actions) puede leerlas de los secretos del repositorio:
+
+- **Modo seguro (recomendado):** si añades los secretos `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`, la Action publica el Worker con tus claves como secretos del Worker y la web solo lleva la dirección del Worker. Las claves no aparecen en la web.
+- **Modo sencillo:** sin Cloudflare, las claves de los secretos se escriben en `js/env.js` y **quedan visibles para cualquiera que mire el código de la web publicada** (pueden gastarte la cuota). Nunca se guardan en el repositorio.
 
 ### Cómo evita quedarse sin cuota
 

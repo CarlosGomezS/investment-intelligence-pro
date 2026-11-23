@@ -1,5 +1,10 @@
-# Publica la app en GitHub Pages e incrusta las claves guardadas como secretos del repositorio.
-# Aviso: las claves quedan dentro de js/env.js de la web publicada (visibles para quien mire el código).
+# Publica la app en GitHub Pages.
+#
+# Modo seguro (recomendado): si el repositorio tiene los secretos CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID,
+# primero se publica el Worker de Cloudflare con tus claves de API como secretos DEL WORKER, y la web solo lleva
+# la dirección del Worker: las claves NO aparecen en la web publicada.
+#
+# Modo sencillo (si no hay Cloudflare configurado): las claves se escriben en js/env.js y quedan visibles en la web.
 name: Publicar app
 
 on:
@@ -17,7 +22,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  worker:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.url.outputs.url }}
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      FMP_KEY: ${{ secrets.FMP_KEY }}
+      FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+      TD_KEY: ${{ secrets.TD_KEY }}
+      ROIC_KEY: ${{ secrets.ROIC_KEY }}
+      AV_KEY: ${{ secrets.AV_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publicar el Worker con las claves como secretos
+        id: deploy
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          secrets: |
+            FMP_KEY
+            FINNHUB_KEY
+            TD_KEY
+            ROIC_KEY
+            AV_KEY
+      - name: Dirección del Worker
+        id: url
+        run: |
+          U="${{ steps.deploy.outputs.deployment-url }}"
+          echo "url=${U}" >> "$GITHUB_OUTPUT"
+          if [ -n "$U" ]; then echo "Worker publicado en $U"; else echo "Sin Cloudflare configurado: se usa el modo sencillo"; fi
+
   deploy:
+    needs: worker
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -29,8 +70,9 @@ jobs:
           node-version: 22
       - name: Pruebas
         run: npm test
-      - name: Escribir claves en js/env.js
+      - name: Escribir la configuración en js/env.js
         env:
+          WORKER_URL: ${{ needs.worker.outputs.url }}
           FMP_KEY: ${{ secrets.FMP_KEY }}
           FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
           TD_KEY: ${{ secrets.TD_KEY }}
@@ -39,10 +81,12 @@ jobs:
           PROXY_URL: ${{ secrets.PROXY_URL }}
         run: |
           node -e '
-            const k = { fmpKey: process.env.FMP_KEY, finnhubKey: process.env.FINNHUB_KEY, tdKey: process.env.TD_KEY, roicKey: process.env.ROIC_KEY, avKey: process.env.AV_KEY, proxyUrl: process.env.PROXY_URL };
+            const proxy = process.env.WORKER_URL || process.env.PROXY_URL;
+            // Con Worker: solo su dirección (las claves viven en el Worker). Sin Worker: las claves (visibles).
+            const k = proxy ? { proxyUrl: proxy } : { fmpKey: process.env.FMP_KEY, finnhubKey: process.env.FINNHUB_KEY, tdKey: process.env.TD_KEY, roicKey: process.env.ROIC_KEY, avKey: process.env.AV_KEY };
             for (const x in k) if (!k[x]) delete k[x];
             require("fs").writeFileSync("js/env.js", "window.__IIP_KEYS = " + JSON.stringify(k) + ";\n");
-            console.log("Claves incluidas:", Object.keys(k).join(", ") || "ninguna");
+            console.log(proxy ? "Modo seguro: la web solo lleva la dirección del Worker" : "Modo sencillo: claves incluidas en la web: " + (Object.keys(k).join(", ") || "ninguna"));
           '
           sed -i "s#src=\"js/env.js[^\"]*\"#src=\"js/env.js?v=${GITHUB_RUN_NUMBER}\"#" index.html
       - uses: actions/configure-pages@v5
