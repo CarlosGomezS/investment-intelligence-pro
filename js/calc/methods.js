@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=d55e8581';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=c8fdab36';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -15,6 +15,14 @@ const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|re
 const nS = (v, d = 1) => (isNum(v) ? v.toFixed(d).replace('.', ',') : 'sin dato');
 
 /** Último valor disponible de una partida (si el último balance no ha llegado, el anterior) */
+const cagrOf = (arr, n) => cagrN(arr, n);
+/** Respuestas del usuario a los criterios que no se pueden medir con datos (por empresa, en este navegador). */
+const MK = 'iip.methods.manual.v1';
+export const manualStore = {
+  all() { try { return JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(MK)) || '{}'); } catch { return {}; } },
+  get(sym) { return this.all()[sym] || {}; },
+  set(sym, k, v) { const a = this.all(); a[sym] = { ...(a[sym] || {}), [k]: v }; if (v == null) delete a[sym][k]; try { localStorage.setItem(MK, JSON.stringify(a)); } catch {} },
+};
 const lastVal = (m, k) => { const y = [...(m.years || [])].reverse().find((x) => isNum(x[k])); return y ? y[k] : null; };
 
 function base(S) {
@@ -25,7 +33,7 @@ function base(S) {
 
 export const METHODS = {
   buffett: {
-    name: 'Buffett · foso con cocodrilos',
+    name: 'Buffett · foso duradero',
     author: 'Warren Buffett (Berkshire Hathaway)',
     summary: 'Negocios con un «foso» ancho y duradero que protege rentabilidades altas, poca deuda, beneficios constantes y comprados con margen de seguridad. Para mantener muchos años.',
     rules: [
@@ -78,6 +86,101 @@ export const METHODS = {
     },
   },
 
+  cocodrilo: {
+    name: 'Buffett · cocodrilo paciente (4 factores y pánico)',
+    author: 'Warren Buffett, según «5 sencillas estrategias» (canal Arte de invertir) y sus cartas a los accionistas',
+    summary: 'Vigila una lista corta de negocios excepcionales y espera quieto, como un cocodrilo. Compra con fuerza solo cuando cumplen los 4 factores (negocio previsible, foso en buen estado, directiva que cuida al accionista y precio razonable), sobre todo si el pánico del mercado los ha hundido por un problema temporal.',
+    rules: [
+      'Negocio previsible: ventas y BPA creciendo a 5 años (y a 10 si hay datos), beneficios los 5 últimos años y como mucho 2 años de caída de ventas en los últimos 10 (mín. 5 años de cuentas).',
+      'Foso en buen estado: rentabilidad del capital media ≥ 15 % (mín. 5 años) y sin erosión: la media de los 3 últimos años ≥ 80 % de la media larga y el margen bruto (u operativo) reciente no más de 2 puntos por debajo de su media.',
+      'Directiva que cuida al accionista: no diluye (acciones sin subir más de un 0,5 % anual en 5 años) y devuelve al menos el 50 % del FCF de 5 años en dividendos y recompras, o reinvierte con rentabilidad del capital ≥ 15 % y ventas creciendo ≥ 8 % anual.',
+      'Precio razonable (no hace falta ganga): PER actual no superior a su media histórica y rentabilidad FCF no inferior a su media histórica (mín. 3 años de historia). Si el crecimiento se ha frenado frente a cuando cotizaba a esos múltiplos, la comparación no vale y se usa el margen de seguridad (≥ 0 con valoración de fiabilidad alta o media).',
+      'Oportunidad de pánico (suma, no es obligatoria): cotiza al menos un 30 % por debajo de su máximo de 52 semanas.',
+      '¿Problema temporal o permanente? Indicios en los datos: ventas del último periodo sin caer más de un 10 %, sigue con beneficios y el foso no se erosiona. La respuesta de fondo la das tú.',
+      'Entiendes el negocio y su demanda seguirá dentro de 10-20 años (sin sector en declive): lo confirmas tú.',
+    ],
+    exit: 'Sin stop de precio ni objetivo: Buffett mantiene mientras el negocio conserve el foso. Se vende si el foso se rompe, si el problema resulta permanente o si el precio se dispara muy por encima de lo razonable.',
+    thresholdsNote: 'El vídeo da las ideas; los umbrales numéricos (15 %, 80 %, 2 puntos, 50 %, 30 %) son la forma en que la app las convierte en reglas medibles con datos reales. Lo que no se puede medir con datos (entender el negocio, si el problema es temporal) lo marcas tú en el detalle de cada empresa.',
+    manual: [
+      { key: 'entiendo', label: 'Entiendo el negocio y su demanda seguirá dentro de 10-20 años' },
+      { key: 'temporal', label: 'Si ha caído, creo que el problema es temporal (no estructural)' },
+    ],
+    evaluate(S) {
+      const { m, Y, s, iv, mos, price } = base(S);
+      const fin = FIN.test(base(S).sector);
+      const user = manualStore.get(m.symbol);
+      const T = m.T || {};
+      // 1. Previsibilidad
+      const rev = s('revenue').filter(isNum), ni5 = last(s('netIncome').filter(isNum), 5);
+      const drops = last(Y, 10).map((y, i, a) => (i && isNum(y.revenue) && isNum(a[i - 1].revenue) ? y.revenue < a[i - 1].revenue : null)).filter((v) => v !== null);
+      const g = m.growth || {};
+      const c1 = rev.length >= 5 ? isNum(g.rev5) && g.rev5 > 0 && isNum(g.eps5) && g.eps5 > 0 && (!isNum(g.rev10) || g.rev10 > 0) && ni5.length >= 5 && ni5.every((v) => v > 0) && drops.filter(Boolean).length <= 2 : null;
+      // 2. Foso en buen estado (sin erosión)
+      const rc = last(s('rc').filter(isNum), 10), rcAvg = rc.length >= 5 ? mean(rc) : null, rc3 = rc.length >= 5 ? mean(last(rc, 3)) : null;
+      const gm = last(s('grossMargin').filter(isNum), 10), om = last(s('operatingMargin').filter(isNum), 10), mg = gm.length >= 5 ? gm : om;
+      const mgAvg = mg.length >= 5 ? mean(mg) : null, mg3 = mg.length >= 5 ? mean(last(mg, 3)) : null;
+      const c2 = isNum(rcAvg) && isNum(mgAvg) ? rcAvg >= 0.15 && rc3 >= 0.8 * rcAvg && mg3 >= mgAvg - 0.02 : null;
+      // 3. Directiva / asignación de capital
+      const Y5 = last(Y, 5);
+      const retY = Y5.filter((y) => isNum(y.dividendsPaid) || isNum(y.buybacks));
+      const ret = retY.reduce((a, y) => a + (y.dividendsPaid || 0) + (y.buybacks || 0), 0);
+      const fcf5 = Y5.reduce((a, y) => a + (isNum(y.fcf) ? y.fcf : 0), 0);
+      const payout = retY.length >= 3 && fcf5 > 0 ? ret / fcf5 : null;
+      const noDil = isNum(g.shares5) ? g.shares5 <= 0.005 : null;
+      const reinv = isNum(rc3) && isNum(g.rev5) ? rc3 >= 0.15 && g.rev5 >= 0.08 : null;
+      const c3 = noDil === false ? false : noDil === null ? null : (isNum(payout) && payout >= 0.5) || reinv === true ? true : payout === null && reinv === null ? null : false;
+      // 4. Precio razonable frente a su propia historia
+      const peH = last(m.ratiosHist || [], 5).map((r) => r.priceToEarningsRatio).filter((v) => isNum(v) && v > 0 && v < 300);
+      const fyH = last(m.kmHist || [], 5).map((r) => r.freeCashFlowYield).filter((v) => isNum(v) && v > -1 && v < 1);
+      const peAvg = peH.length >= 3 ? mean(peH) : null, fyAvg = fyH.length >= 3 ? mean(fyH) : null;
+      const pe = isNum(m.pe) && m.pe > 0 ? m.pe : null, fy = isNum(T.fcf) && isNum(m.marketCap) && m.marketCap > 0 ? m.X(T.fcf) / m.marketCap : null;
+      const gThen = rev.length >= 8 ? cagrOf(rev.slice(0, -2), 5) : null, gNow = median([g.rev1, g.rev3].filter(isNum));
+      const slowed = isNum(gThen) && isNum(gNow) && gThen > 0.05 && gNow < 0.6 * gThen;
+      const rel = S.val && S.val.reliability ? S.val.reliability.level : null;
+      const parts = [];
+      if (!slowed && isNum(pe) && isNum(peAvg)) parts.push(pe <= peAvg);
+      if (!slowed && isNum(fy) && isNum(fyAvg) && fyAvg > 0) parts.push(fy >= fyAvg);
+      let c4 = parts.length ? parts.every(Boolean) : null, c4how = 'historia';
+      if (c4 === null && isNum(mos) && !['baja', 'muy baja', 'no valorable'].includes(rel)) { c4 = mos >= 0; c4how = 'margen'; }
+      // 5. Pánico: caída desde el máximo de 52 semanas (precios ajustados a splits)
+      const cl = (m.prices || []).slice(-252).map((p) => p.close).filter(isNum);
+      const hi = cl.length >= 120 ? Math.max(...cl) : null;
+      const dd = isNum(hi) && isNum(price) && hi > 0 ? price / hi - 1 : null;
+      const panic = isNum(dd) ? dd <= -0.3 : null;
+      // 6. Indicios de problema temporal (solo con caída fuerte)
+      const yy = Y.filter((y) => isNum(y.revenue)), revChg = yy.length >= 2 ? yy[yy.length - 1].revenue / yy[yy.length - 2].revenue - 1 : null;
+      const niNow = isNum(T.netIncome) ? T.netIncome : lastVal(m, 'netIncome');
+      const c6 = panic ? (isNum(revChg) && isNum(niNow) && c2 !== null ? revChg >= -0.1 && niNow > 0 && c2 : null) : null;
+      const P = (v, d) => pctS(v, d);
+      const checks = [
+        C('Negocio previsible', c1, rev.length >= 5 ? `ventas ${P(g.rev5)}/año (5a)${isNum(g.rev10) ? `, ${P(g.rev10)} (10a)` : ''} · BPA ${P(g.eps5)}/año · ${ni5.filter((v) => v > 0).length} de ${ni5.length} años con beneficio · ${drops.filter(Boolean).length} años de caída de ventas de ${drops.length}` : `solo ${rev.length} años de cuentas (mín. 5)`, this.rules[0]),
+        C('Foso en buen estado (sin erosión)', c2, isNum(rcAvg) ? `rentabilidad del capital media ${P(rcAvg)}, últimos 3 años ${P(rc3)} · margen ${gm.length >= 5 ? 'bruto' : 'operativo'} medio ${P(mgAvg)}, últimos 3 años ${P(mg3)}` : 'menos de 5 años de datos', this.rules[1]),
+        C('Directiva que cuida al accionista', c3, `acciones ${P(g.shares5)}/año · devuelto en 5 años: ${isNum(payout) ? P(payout, 0) + ' del FCF en dividendos y recompras' : 'sin dato de dividendos y recompras'}${reinv ? ' · reinvierte con alta rentabilidad y crecimiento' : ''}`, this.rules[2]),
+        C('Precio razonable', c4, c4how === 'historia' ? (slowed ? 'el crecimiento se ha frenado: sus múltiplos pasados no sirven' : `PER ${isNum(pe) ? nS(pe) + '×' : 'sin dato'} vs media ${isNum(peAvg) ? nS(peAvg) + '×' : 'sin historia'} · rentabilidad FCF ${P(fy)} vs media ${isNum(fyAvg) ? P(fyAvg) : 'sin historia'}`) : `sin historia de múltiplos: margen de seguridad ${P(mos)} (fiabilidad ${rel || '—'})`, this.rules[3]),
+        C('Oportunidad de pánico (caída ≥ 30 %)', panic, isNum(dd) ? `${P(dd)} desde el máximo de 52 semanas (${nS(hi, 2)})` : 'sin precios de un año', this.rules[4]),
+      ];
+      if (panic) checks.push(C('Indicios de problema temporal', c6, isNum(revChg) ? `ventas ${P(revChg)} en el último ejercicio · ${isNum(niNow) && niNow > 0 ? 'con beneficios' : 'en pérdidas'} · foso ${c2 ? 'intacto' : c2 === false ? 'dañado' : 'sin dato'}` : 'sin dato', this.rules[5]));
+      checks.push(C('Tú: entiendes el negocio y seguirá existiendo', user.entiendo ?? null, user.entiendo == null ? 'pendiente: márcalo en el detalle' : user.entiendo ? 'confirmado por ti' : 'has indicado que no', this.rules[6]));
+      if (panic) checks.push(C('Tú: el problema es temporal', user.temporal ?? null, user.temporal == null ? 'pendiente: márcalo en el detalle' : user.temporal ? 'confirmado por ti' : 'has indicado que es permanente', this.rules[5]));
+      if (fin) checks.unshift(C('Sector analizable con estos criterios', false, `${base(S).sector.trim() || 'financiero'}: FCF y rentabilidad del capital no se leen igual en bancos, aseguradoras, inmobiliarias o eléctricas`, 'Analízala en su ficha con ROE, solvencia y valor contable.'));
+      const sc = (c1 ? 25 : 0) + (c2 ? 25 : 0) + (c3 ? 20 : 0) + (c4 ? 30 : 0) + (panic && c1 && c2 ? 10 : 0);
+      const userNo = user.entiendo === false || (panic && user.temporal === false);
+      const core = c1 && c2 && c3;
+      const verdict = fin || userNo ? 'no' : core && c4 ? 'entra' : core ? 'vigilar' : 'no';
+      // Entrada: precio al que volvería a su PER medio o a su rentabilidad FCF media (la más exigente)
+      const lv = [];
+      if (!slowed && isNum(pe) && isNum(peAvg)) lv.push(price * (peAvg / pe));
+      if (!slowed && isNum(fy) && fy > 0 && isNum(fyAvg) && fyAvg > 0) lv.push(price * (fy / fyAvg));
+      const entry = lv.length ? Math.min(...lv) : isNum(iv) && c4how === 'margen' ? iv : null;
+      return {
+        score: Math.min(fin ? 40 : userNo ? 20 : 100, sc), verdict, checks,
+        entry, entryNote: lv.length ? 'precio con el que vuelve a su PER medio y a su rentabilidad FCF media (el más bajo)' : 'valor intrínseco central (sin historia de múltiplos)',
+        target: iv, targetNote: 'valor intrínseco central (referencia: Buffett no vende por objetivo)',
+        stop: null, stopNote: 'sin stop de precio: se vende si el foso se rompe o el problema resulta permanente',
+        horizon: core && !c4 ? 'lista corta: esperar precio' : 'años (largo plazo)',
+      };
+    },
+  },
   graham: {
     name: 'Graham · inversor defensivo',
     author: 'Benjamin Graham, «El inversor inteligente», cap. 14',

@@ -1,18 +1,18 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather, forget } from '../providers/index.js?v=d55e8581';
-import { fxRate } from '../providers/fxrate.js?v=d55e8581';
-import { buildModel } from '../calc/model.js?v=d55e8581';
-import { evaluateRatios } from '../calc/ratios.js?v=d55e8581';
-import { detectAlerts } from '../calc/alerts.js?v=d55e8581';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=d55e8581';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=d55e8581';
-import { reliability } from '../calc/reliability.js?v=d55e8581';
-import { decide } from '../calc/decision.js?v=d55e8581';
-import { buildReport } from '../calc/report.js?v=d55e8581';
-import { store } from '../store.js?v=d55e8581';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=d55e8581';
-import { logoHTML, countryOf } from '../app.js?v=d55e8581';
-import { isNum } from '../calc/finance.js?v=d55e8581';
+import { data, gather, forget } from '../providers/index.js?v=c8fdab36';
+import { fxRate } from '../providers/fxrate.js?v=c8fdab36';
+import { buildModel } from '../calc/model.js?v=c8fdab36';
+import { evaluateRatios } from '../calc/ratios.js?v=c8fdab36';
+import { detectAlerts } from '../calc/alerts.js?v=c8fdab36';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=c8fdab36';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=c8fdab36';
+import { reliability } from '../calc/reliability.js?v=c8fdab36';
+import { decide } from '../calc/decision.js?v=c8fdab36';
+import { buildReport } from '../calc/report.js?v=c8fdab36';
+import { store } from '../store.js?v=c8fdab36';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=c8fdab36';
+import { logoHTML, countryOf } from '../app.js?v=c8fdab36';
+import { isNum } from '../calc/finance.js?v=c8fdab36';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -20,10 +20,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=d55e8581'), grafico: () => import('./tabs/chart.js?v=d55e8581'), estados: () => import('./tabs/statements.js?v=d55e8581'), ratios: () => import('./tabs/ratios.js?v=d55e8581'),
-  crecimiento: () => import('./tabs/growth.js?v=d55e8581'), deuda: () => import('./tabs/debt.js?v=d55e8581'), valoracion: () => import('./tabs/valuation.js?v=d55e8581'), dividendos: () => import('./tabs/dividends.js?v=d55e8581'),
-  competidores: () => import('./tabs/peers.js?v=d55e8581'), moat: () => import('./tabs/moat.js?v=d55e8581'), noticias: () => import('./tabs/news.js?v=d55e8581'), analistas: () => import('./tabs/analysts.js?v=d55e8581'),
-  riesgos: () => import('./tabs/risks.js?v=d55e8581'), scoring: () => import('./tabs/scoring.js?v=d55e8581'), informe: () => import('./tabs/report.js?v=d55e8581'), simulador: () => import('./tabs/simulator.js?v=d55e8581'),
+  resumen: () => import('./tabs/overview.js?v=c8fdab36'), grafico: () => import('./tabs/chart.js?v=c8fdab36'), estados: () => import('./tabs/statements.js?v=c8fdab36'), ratios: () => import('./tabs/ratios.js?v=c8fdab36'),
+  crecimiento: () => import('./tabs/growth.js?v=c8fdab36'), deuda: () => import('./tabs/debt.js?v=c8fdab36'), valoracion: () => import('./tabs/valuation.js?v=c8fdab36'), dividendos: () => import('./tabs/dividends.js?v=c8fdab36'),
+  competidores: () => import('./tabs/peers.js?v=c8fdab36'), moat: () => import('./tabs/moat.js?v=c8fdab36'), noticias: () => import('./tabs/news.js?v=c8fdab36'), analistas: () => import('./tabs/analysts.js?v=c8fdab36'),
+  riesgos: () => import('./tabs/risks.js?v=c8fdab36'), scoring: () => import('./tabs/scoring.js?v=c8fdab36'), informe: () => import('./tabs/report.js?v=c8fdab36'), simulador: () => import('./tabs/simulator.js?v=c8fdab36'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -185,7 +185,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=d55e8581').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=c8fdab36').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -221,13 +221,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=d55e8581');
+      const { exportAll } = await import('../exportall.js?v=c8fdab36');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=d55e8581');
+    const { clearCache } = await import('../providers/http.js?v=c8fdab36');
     const base = m.symbol.split('.')[0], p = m.profile || {};
     const cik = p.cik ? 'CIK' + String(p.cik).replace(/^0+/, '').padStart(10, '0') : null;
     await clearCache(m.symbol, [`symbol=${encodeURIComponent(base)}&`, cik, p.isin, p.isin && `isin=${p.isin}`]); forget(m.symbol); cache.delete(m.symbol); view.dataset.loaded = ''; // solo esta empresa

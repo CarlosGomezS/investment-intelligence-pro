@@ -84,3 +84,22 @@ test('decisión: sin valoración fiable no hay precio de compra', () => {
   const D = decide(m, { cats: [] }, { composite: { value: null, reason: 'x' }, reliability: { level: 'no valorable', reasons: ['x'] } }, []);
   assert.equal(D.valuation.maxBuy, null); assert.equal(D.potential, null);
 });
+
+test('cocodrilo paciente (Buffett): devuelve los 4 factores, pánico y casillas del usuario, sin stop', () => {
+  const m = buildModel(raw);
+  const [x] = rankMethod('cocodrilo', [{ sym: 'AAPL', S: { m, val: { composite: { value: 100, mos: 0.1 }, reliability: { level: 'media' } } } }]);
+  const t = x.res.checks.map((c) => c.t);
+  for (const k of ['Negocio previsible', 'Foso en buen estado (sin erosión)', 'Directiva que cuida al accionista', 'Precio razonable', 'Oportunidad de pánico (caída ≥ 30 %)', 'Tú: entiendes el negocio y seguirá existiendo']) assert.ok(t.includes(k), k);
+  assert.equal(x.res.stop, null);
+  assert.ok(['entra', 'vigilar', 'no'].includes(x.res.verdict));
+  assert.equal(METHODS.buffett.name, 'Buffett · foso duradero');
+});
+test('cocodrilo paciente: si el usuario dice que no entiende el negocio, no entra', async () => {
+  const { manualStore } = await import('../js/calc/methods.js');
+  const store = {}; globalThis.localStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; } };
+  const m = buildModel(raw);
+  manualStore.set(m.symbol, 'entiendo', false);
+  const [x] = rankMethod('cocodrilo', [{ sym: m.symbol, S: { m, val: { composite: { value: 1e6, mos: 0.9 }, reliability: { level: 'alta' } } } }]);
+  assert.equal(x.res.verdict, 'no');
+  delete globalThis.localStorage;
+});

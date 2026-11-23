@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
-// más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=d55e8581';
-import { compute, fxFor } from './company.js?v=d55e8581';
-import { METHODS, rankMethod } from '../calc/methods.js?v=d55e8581';
-import { fxRate } from '../providers/fxrate.js?v=d55e8581';
-import { alligator } from '../calc/alligator.js?v=d55e8581';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=d55e8581';
-import { logoHTML } from '../app.js?v=d55e8581';
-import { isNum } from '../calc/finance.js?v=d55e8581';
-import { store } from '../store.js?v=d55e8581';
-import { exportCSV } from '../export.js?v=d55e8581';
+// más la señal técnica Alligator de Bill Williams para el momento de entrada y su stop.
+import { data } from '../providers/index.js?v=c8fdab36';
+import { compute, fxFor } from './company.js?v=c8fdab36';
+import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=c8fdab36';
+import { fxRate } from '../providers/fxrate.js?v=c8fdab36';
+import { alligator } from '../calc/alligator.js?v=c8fdab36';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=c8fdab36';
+import { logoHTML } from '../app.js?v=c8fdab36';
+import { isNum } from '../calc/finance.js?v=c8fdab36';
+import { store } from '../store.js?v=c8fdab36';
+import { exportCSV } from '../export.js?v=c8fdab36';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -44,7 +44,7 @@ export async function analyzeOne(sym, opt = {}) {
     prof0 ? Promise.resolve(prof0) : lim(wrap(data.via(VIA.profile, 'profile', sym))), lim(wrap(data.via(VIA.quote, 'quote', sym))),
     lim(wrap(data.via(VIA.st, 'income', sym, 'annual', 12))), lim(wrap(data.via(VIA.st, 'balance', sym, 'annual', 12))), lim(wrap(data.via(VIA.st, 'cashflow', sym, 'annual', 12))),
     lim(wrap(data.via(VIA.ttm, 'ratiosTTM', sym))), lim(wrap(data.via(VIA.ttm, 'keyMetricsTTM', sym))),
-    lim(wrap(data.via(VIA.px, 'pricesDaily', sym, from)), 40000), // múltiplos históricos propios (segundo método de valoración) y cocodrilo
+    lim(wrap(data.via(VIA.px, 'pricesDaily', sym, from)), 40000), // múltiplos históricos propios (segundo método de valoración) y Alligator
   ]);
   const raw = Object.fromEntries(KEYS.map((k) => [k, { ok: false, error: { code: 'not_found' } }]));
   Object.assign(raw, { profile, quote, income, balance, cashflow, ratiosTTM, keyMetricsTTM, treasury, riskPremium, prices });
@@ -97,7 +97,7 @@ export async function render(view) {
       <p class="note" style="margin-top:8px"><b>${esc(M.author)}.</b> ${esc(M.summary)}</p>
       <ol class="note" style="padding-left:18px">${M.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ol>
       <p class="note"><b>Salida según el método:</b> ${esc(M.exit)}</p>
-      <p class="note">${esc(M.thresholdsNote)} <b>Cocodrilo técnico</b> (Alligator de Bill Williams, solo para las 10 primeras): mandíbula SMMA 13 desplazada 8, dientes SMMA 8 desplazada 5, labios SMMA 5 desplazada 3 sobre el precio mediano. Entrada al romper el último fractal superior por encima de los dientes; stop tras el último fractal inferior; salida cuando las líneas se juntan. Es una herramienta de momento de entrada, no forma parte de los métodos fundamentales.</p>
+      <p class="note">${esc(M.thresholdsNote)} <b>Alligator técnico</b> (indicador de Bill Williams, solo para las 10 primeras; no tiene nada que ver con el «cocodrilo paciente» de Buffett): mandíbula SMMA 13 desplazada 8, dientes SMMA 8 desplazada 5, labios SMMA 5 desplazada 3 sobre el precio mediano. Entrada al romper el último fractal superior por encima de los dientes; stop tras el último fractal inferior; salida cuando las líneas se juntan. Es una herramienta de momento de entrada, no forma parte de los métodos fundamentales.</p>
     </details>`)}
   <div id="mr" style="margin-top:14px"></div>
   <p class="note" style="margin-top:12px">Herramienta de análisis con reglas publicadas por sus autores y datos de tus fuentes. No es una recomendación de compra ni asesoramiento financiero. Comprueba cada empresa en su ficha antes de invertir.</p>`;
@@ -110,7 +110,7 @@ export async function render(view) {
   $('#go').onclick = () => run(view);
   $('#csv').onclick = () => csv();
   draw(view);
-  if (results.size && !state.running) techTop(view); // el top cambia con el método: cocodrilo de los nuevos
+  if (results.size && !state.running) techTop(view); // el top cambia con el método: Alligator de los nuevos
 }
 
 async function run(view) {
@@ -132,7 +132,7 @@ async function run(view) {
   await techTop(view);
 }
 
-// Cocodrilo técnico para las 10 primeras del método elegido (precios diarios de 1 año)
+// Alligator técnico para las 10 primeras del método elegido (precios diarios de 1 año)
 async function techTop(view) {
   const top = rankMethod(state.method, [...results.values()]).slice(0, 10);
   const from = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
@@ -165,8 +165,8 @@ function draw(view) {
   box.innerHTML = card(`Top 10 · ${esc(METHODS[state.method].name)}`, `<div>
     ${top.map(({ r, res }, i) => { const t = T(r.sym); return `<div data-s="${esc(r.sym)}" style="cursor:pointer;padding:10px 0;border-bottom:1px solid var(--line)">
       <div style="display:grid;grid-template-columns:26px auto minmax(0,1fr) auto;gap:8px;align-items:center"><span class="mute">${i + 1}</span>${logoHTML(r.sym, 26)}<div style="min-width:0"><b>${esc(r.sym)}</b> <span class="${VERD[res.verdict][1]}" style="font-size:12px">· ${VERD[res.verdict][0]}</span><br><small class="mute" style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.S.m.profile.companyName || '')}</small></div><div style="text-align:right"><b style="font-size:20px">${res.score}</b><br><small class="mute">nota</small></div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0 0 34px;font-size:12px">${kv('Precio', num(r.S.m.price))}${kv('Entrada', isNum(res.entry) ? num(res.entry) : '—')}${kv('Objetivo', isNum(res.target) ? num(res.target) : '—')}${kv('Cocodrilo', techCell(r.sym))}${kv('Stop técnico', t && isNum(t.stop) ? num(t.stop) : '—')}</div></div>`; }).join('')}
-    </div><p class="note">Toca una empresa para ver cada criterio con sus datos. Importes en la moneda de cotización. Entrada y objetivo salen de las reglas del método; el stop técnico sale del cocodrilo (último fractal inferior bajo el precio) y no es parte del método fundamental.</p><div id="det"></div>`)
+      <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0 0 34px;font-size:12px">${kv('Precio', num(r.S.m.price))}${kv('Entrada', isNum(res.entry) ? num(res.entry) : '—')}${kv('Objetivo', isNum(res.target) ? num(res.target) : '—')}${kv('Alligator', techCell(r.sym))}${kv('Stop técnico', t && isNum(t.stop) ? num(t.stop) : '—')}</div></div>`; }).join('')}
+    </div><p class="note">Toca una empresa para ver cada criterio con sus datos. Importes en la moneda de cotización. Entrada y objetivo salen de las reglas del método; el stop técnico sale del Alligator de Bill Williams (último fractal inferior bajo el precio) y no es parte del método fundamental.</p><div id="det"></div>`)
     + `<details class="card" style="margin-top:14px"><summary style="padding:12px 16px;cursor:pointer;font-weight:600">Resto de empresas analizadas (${Math.max(0, ranked.length - 10)})${fails.length ? ` · sin datos: ${fails.length}` : ''}</summary><div class="cb">
       ${ranked.slice(10).map(({ r, res }, i) => `<div class="row between" style="padding:6px 0;border-bottom:1px solid var(--line)"><a href="#/c/${encodeURIComponent(r.sym)}/resumen">${i + 11}. <b>${esc(r.sym)}</b> <span class="mute">${esc((r.S.m.profile.companyName || '').slice(0, 30))}</span></a><span><b>${res.score}</b> · <span class="${VERD[res.verdict][1]}">${VERD[res.verdict][0]}</span></span></div>`).join('')}
       ${fails.length ? `<p class="note" style="margin-top:8px">Sin datos suficientes: ${fails.map((f) => `${esc(f.sym)} (${esc(f.error)})`).join(' · ')}</p>` : ''}</div></details>`;
@@ -178,20 +178,22 @@ function detail(box, item) {
   const { r, res } = item, m = r.S.m, t = state.techs.get(r.sym), cur = m.tradeCur || '';
   const icon = (ok) => (ok === true ? '<span class="pos">✓</span>' : ok === false ? '<span class="neg">✕</span>' : '<span class="mute">?</span>');
   box.querySelector('#det').innerHTML = `<div class="card" style="margin-top:12px"><header><h3>${esc(r.sym)} · ${esc(m.profile.companyName || '')}</h3><a class="btn sm" href="#/c/${encodeURIComponent(r.sym)}/resumen">Ficha completa</a></header><div class="cb">
+    ${(METHODS[state.method].manual || []).length ? `<div class="empty" style="margin-bottom:10px"><b>Lo que solo puedes juzgar tú</b> (se guarda en este móvil):${METHODS[state.method].manual.map((q) => { const v = manualStore.get(r.sym)[q.key]; return `<div style="margin-top:8px">${esc(q.label)}<div class="row" style="gap:6px;margin-top:4px">${[['sí', true], ['no', false], ['sin decidir', null]].map(([t, val]) => `<button class="btn sm${v === val || (val === null && v == null) ? ' pri' : ''}" data-mk="${esc(q.key)}" data-mv="${val}">${t}</button>`).join('')}</div></div>`; }).join('')}</div>` : ''}
     ${res.checks.map((c) => `<div style="display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">${icon(c.ok)}<div><b>${esc(c.t)}</b> — ${esc(c.v)}<br><small class="mute">${esc(c.rule)}</small></div></div>`).join('')}
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:12px">
       <div class="kpi"><span>Entrada (método)</span><b>${isNum(res.entry) ? num(res.entry) + ' ' + esc(cur) : '—'}</b><small>${esc(res.entryNote)}</small></div>
       <div class="kpi"><span>Objetivo (método)</span><b>${isNum(res.target) ? num(res.target) + ' ' + esc(cur) : '—'}</b><small>${esc(res.targetNote)}</small></div>
       <div class="kpi"><span>Salida según el método</span><b>${esc(res.horizon)}</b><small>${esc(res.stopNote)}</small></div>
-      <div class="kpi"><span>Cocodrilo (técnico)</span><b>${t && t.state ? esc(t.state) : '—'}</b><small>${t && t.state ? `entrada ${isNum(t.entry) ? 'al romper ' + num(t.entry) : t.state.includes('alza') ? '— (el último fractal ya está superado: tendencia en marcha)' : '— (el cocodrilo no come al alza: no hay entrada técnica)'} · stop ${isNum(t.stop) ? num(t.stop) + ` (fractal del ${esc(t.stopDate)})` : '—'} · cierre ${num(t.close)} del ${esc(t.date)}` : 'se calcula solo para las 10 primeras'}</small></div>
+      <div class="kpi"><span>Alligator (técnico, Bill Williams)</span><b>${t && t.state ? esc(t.state) : '—'}</b><small>${t && t.state ? `entrada ${isNum(t.entry) ? 'al romper ' + num(t.entry) : t.state.includes('alza') ? '— (el último fractal ya está superado: tendencia en marcha)' : '— (el Alligator no come al alza: no hay entrada técnica)'} · stop ${isNum(t.stop) ? num(t.stop) + ` (fractal del ${esc(t.stopDate)})` : '—'} · cierre ${num(t.close)} del ${esc(t.date)}` : 'se calcula solo para las 10 primeras'}</small></div>
     </div>
     ${t && isNum(t.stop) && isNum(res.target) && isNum(m.price) && m.price > t.stop && res.target > m.price ? `<p class="note">Con entrada al precio actual: riesgo hasta el stop ${pct((m.price - t.stop) / m.price)} · recorrido hasta el objetivo ${pct(res.target / m.price - 1)} · relación ${num((res.target - m.price) / (m.price - t.stop), 1)} a 1.</p>` : ''}
   </div></div>`;
+  box.querySelectorAll('#det [data-mk]').forEach((b) => (b.onclick = () => { manualStore.set(r.sym, b.dataset.mk, b.dataset.mv === 'null' ? null : b.dataset.mv === 'true'); draw(box.parentElement); const again = rankMethod(state.method, [...results.values()]).find((x) => x.r.sym === r.sym); detail(box, again); }));
   box.querySelector('#det').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function csv() {
   const ranked = rankMethod(state.method, [...results.values()]);
-  exportCSV('metodo_' + state.method, [['Puesto', 'Símbolo', 'Empresa', 'Nota', 'Veredicto', 'Precio', 'Entrada (método)', 'Objetivo (método)', 'Salida', 'Cocodrilo', 'Stop técnico', ...METHODS[state.method].rules.map((_, i) => 'Criterio ' + (i + 1))],
+  exportCSV('metodo_' + state.method, [['Puesto', 'Símbolo', 'Empresa', 'Nota', 'Veredicto', 'Precio', 'Entrada (método)', 'Objetivo (método)', 'Salida', 'Alligator (técnico)', 'Stop técnico', ...METHODS[state.method].rules.map((_, i) => 'Criterio ' + (i + 1))],
     ...ranked.map(({ r, res }, i) => { const t = state.techs.get(r.sym) || {}; return [i + 1, r.sym, r.S.m.profile.companyName || '', res.score, VERD[res.verdict][0], r.S.m.price, res.entry ?? '', res.target ?? '', res.stopNote, t.state || '', t.stop ?? '', ...res.checks.map((c) => `${c.ok === true ? 'Sí' : c.ok === false ? 'No' : 'Sin dato'}: ${c.v}`)]; })]);
 }

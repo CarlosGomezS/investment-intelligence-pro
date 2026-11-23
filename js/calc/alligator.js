@@ -1,11 +1,12 @@
-// «Cocodrilo» (Alligator) de Bill Williams y fractales, sobre velas diarias.
+// Alligator de Bill Williams y fractales, sobre velas diarias. Indicador técnico: no tiene relación con el
+// «cocodrilo paciente» de Buffett (método fundamental en methods.js).
 // Definición estándar (MetaTrader, StockCharts, Barchart):
 //   precio mediano = (máximo + mínimo) / 2
 //   Mandíbula = SMMA(13) desplazada 8 velas · Dientes = SMMA(8) desplazada 5 · Labios = SMMA(5) desplazada 3
 //   Fractal inferior: vela cuyo mínimo es menor que el de las dos anteriores y las dos siguientes (superior: al revés).
 // Uso de Williams: solo se opera cuando el cocodrilo «come» (líneas separadas y ordenadas); entrada al romper el
 // fractal por encima de los dientes, stop tras el fractal contrario y salida cuando las líneas vuelven a juntarse.
-import { isNum } from './finance.js?v=d55e8581';
+import { isNum } from './finance.js?v=c8fdab36';
 
 export function smma(values, n) {
   const out = new Array(values.length).fill(null);
