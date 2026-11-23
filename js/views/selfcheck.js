@@ -1,10 +1,10 @@
 // Autocomprobación con datos REALES: analiza empresas de referencia con tus fuentes y verifica que las cifras de la
 // app cuadran con las del proveedor y entre sí. Sirve para detectar errores con casos difíciles (splits, doble clase,
 // ADR, patrimonio negativo, bancos, Europa, Londres) sin depender de revisiones del código.
-import { analyzeOne } from './methods.js?v=171d25de';
-import { esc, card, num, pct, toast } from '../ui/dom.js?v=171d25de';
-import { isNum } from '../calc/finance.js?v=171d25de';
-import { exportCSV } from '../export.js?v=171d25de';
+import { analyzeOne } from './methods.js?v=662c2f83';
+import { esc, card, num, pct, toast } from '../ui/dom.js?v=662c2f83';
+import { isNum } from '../calc/finance.js?v=662c2f83';
+import { exportCSV } from '../export.js?v=662c2f83';
 
 // Cada una representa un caso difícil (por qué está en la lista)
 const REF = [
@@ -22,7 +22,8 @@ function checks(S) {
   add('Capitalización cuadra con el proveedor (±15 %)', isNum(mcP) && isNum(m.marketCap) ? Math.abs(m.marketCap / mcP - 1) < 0.15 : null, isNum(mcP) ? `${num(m.marketCap / 1e9, 1)} vs ${num(mcP / 1e9, 1)} mil M` : 'el proveedor no la da');
   // 2. PER: el de la app frente al del proveedor
   const peP = m.rTTM && m.rTTM.priceToEarningsRatioTTM, peA = m.pe;
-  add('PER cuadra con el proveedor (±25 %)', isNum(peP) && peP > 0 && isNum(peA) && peA > 0 ? Math.abs(peA / peP - 1) < 0.25 : null, `${num(peA, 1)}× vs ${num(peP, 1)}×`);
+  // Solo se compara con datos del mismo periodo (TTM); con el PER del último ejercicio cerrado no sería comparable
+  add('PER cuadra con el proveedor (±25 %)', m.ttmIsReal && isNum(peP) && peP > 0 && isNum(peA) && peA > 0 ? Math.abs(peA / peP - 1) < 0.25 : null, m.ttmIsReal ? `${num(peA, 1)}× vs ${num(peP, 1)}×` : `sin cuenta de 12 meses en tus fuentes (PER del último ejercicio ${num(peA, 1)}×, proveedor ${num(peP, 1)}× TTM)`);
   // 3. BPA sin saltos imposibles entre años (split mal ajustado)
   // Un split mal ajustado hace que el BPA salte MUCHO más (o menos) que el beneficio; un crecimiento real (NVDA) no
   const Y = m.years.filter((y) => isNum(y.eps) && y.eps > 0 && isNum(y.netIncome) && y.netIncome > 0);

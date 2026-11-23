@@ -1,5 +1,5 @@
 // Simulaciones de rentabilidad: histórica (con y sin reinversión de dividendos) y prospectiva por supuestos.
-import { isNum } from './finance.js?v=171d25de';
+import { isNum } from './finance.js?v=662c2f83';
 
 /** Rentabilidad histórica: precios ajustados por dividendo (= reinversión) frente a precios sin ajustar. */
 export function historical(adjAsc, rawAsc, indexAsc, years, amount = 10000) {
@@ -11,7 +11,9 @@ export function historical(adjAsc, rawAsc, indexAsc, years, amount = 10000) {
   const A0 = pick(adjAsc), R0 = pick(rawAsc);
   const span = (a) => (a ? (new Date(a[a.length - 1].date) - new Date(a[0].date)) / (365.25 * 864e5) : 0);
   const long = [A0, R0].filter((a) => a && span(a) >= years * 0.8);
-  const base = long.length ? long : [A0, R0].filter(Boolean);
+  // Si ninguna llega al 80 %, se queda la más larga y las que cubran al menos la mitad que ella (100 días nunca recortan 5 años)
+  const maxSpan = Math.max(span(A0), span(R0));
+  const base = long.length ? long : [A0, R0].filter((a) => a && span(a) >= maxSpan * 0.5);
   const first = base.map((a) => a[0].date).sort().pop() || s;
   const from = (arr) => { const a = (arr || []).filter((p) => p.date >= first && isNum(p.close)); return a.length > 20 ? a : null; };
   const keep = (a0) => (a0 && base.includes(a0) ? from(a0) : null);
@@ -19,7 +21,7 @@ export function historical(adjAsc, rawAsc, indexAsc, years, amount = 10000) {
   const I1 = from(indexAsc), I = I1 && (new Date(I1[0].date) - new Date(first)) / 864e5 < 31 ? I1 : null;
   const dropped = [A0 && !A ? 'con dividendos' : null, R0 && !R ? 'solo precio' : null, indexAsc && indexAsc.length && !I ? 'S&P 500' : null].filter(Boolean);
   const yrs = (a) => Math.max(1 / 365, (new Date(a[a.length - 1].date) - new Date(a[0].date)) / (365.25 * 864e5));
-  const res = (a) => (a ? { final: amount * (a[a.length - 1].close / a[0].close), cagr: (a[a.length - 1].close / a[0].close) ** (1 / yrs(a)) - 1, from: a[0].date, years: yrs(a) } : null);
+  const res = (a) => (a ? { final: amount * (a[a.length - 1].close / a[0].close), cagr: yrs(a) >= 1 ? (a[a.length - 1].close / a[0].close) ** (1 / yrs(a)) - 1 : null, /* con menos de un año no se anualiza */ from: a[0].date, years: yrs(a) } : null);
   const out = { drip: res(A), noDrip: res(R), index: res(I), amount, years, dropped };
   out.actualYears = (out.drip || out.noDrip || {}).years ?? null;
   out.from = (out.drip || out.noDrip || {}).from ?? null;

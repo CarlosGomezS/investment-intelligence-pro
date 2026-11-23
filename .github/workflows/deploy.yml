@@ -43,29 +43,30 @@ jobs:
       - name: Publicar el Worker y guardar en él solo las claves que existan
         id: url
         if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
-        continue-on-error: true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         working-directory: worker
         run: |
+          # Si algo falla con Cloudflare configurado, la publicación se DETIENE: nunca se cae al modo con claves visibles
+          set -euo pipefail
           npx --yes wrangler@3 deploy | tee deploy.log
           for K in FMP_KEY FINNHUB_KEY TD_KEY ROIC_KEY AV_KEY; do
             V="${!K}"
-            if [ -n "$V" ]; then printf '%s' "$V" | npx --yes wrangler@3 secret put "$K" >/dev/null && echo "Secreto $K guardado en el Worker"; fi
+            if [ -n "$V" ]; then printf '%s' "$V" | npx --yes wrangler@3 secret put "$K" >/dev/null; echo "Secreto $K guardado en el Worker"; fi
           done
           U=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
           echo "url=${U}" >> "$GITHUB_OUTPUT"
-          if [ -n "$U" ]; then echo "Worker publicado en $U"; else echo "No se obtuvo la dirección del Worker: se usa el modo sencillo"; fi
+          if [ -z "$U" ]; then echo "No se obtuvo la dirección del Worker: se detiene la publicación para no exponer las claves"; exit 1; fi
+          echo "Worker publicado en $U"
       - name: Modo
         env:
           U: ${{ steps.url.outputs.url }}
         run: |
-          if [ -n "$U" ]; then echo "Modo seguro"; else echo "Sin Cloudflare configurado (o falló), modo sencillo"; fi
+          if [ -n "$U" ]; then echo "Modo seguro"; else echo "Sin Cloudflare configurado: modo sencillo"; fi
 
   deploy:
     needs: worker
-    if: ${{ always() }} # si Cloudflare falla, la web se publica igual (modo sencillo)
     runs-on: ubuntu-latest
     environment:
       name: github-pages

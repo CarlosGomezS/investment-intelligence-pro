@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=171d25de';
-import { alphavantage } from './alphavantage.js?v=171d25de';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=171d25de';
-import { twelvedata } from './twelvedata.js?v=171d25de';
-import { roic } from './roic.js?v=171d25de';
-import { sec, forgetSec } from './sec.js?v=171d25de';
-import { esef, forgetEsef } from './esef.js?v=171d25de';
-import { config } from '../config.js?v=171d25de';
-import { ApiError, usage, queueDelay } from './http.js?v=171d25de';
-import { setHint } from './hints.js?v=171d25de';
+import { fmp } from './fmp.js?v=662c2f83';
+import { alphavantage } from './alphavantage.js?v=662c2f83';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=662c2f83';
+import { twelvedata } from './twelvedata.js?v=662c2f83';
+import { roic } from './roic.js?v=662c2f83';
+import { sec, forgetSec } from './sec.js?v=662c2f83';
+import { esef, forgetEsef } from './esef.js?v=662c2f83';
+import { config } from '../config.js?v=662c2f83';
+import { ApiError, usage, queueDelay } from './http.js?v=662c2f83';
+import { setHint } from './hints.js?v=662c2f83';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -127,7 +127,7 @@ async function run(method, args, order) {
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(e.code || 'not_found', e.message || 'Sin datos', { provider: id });
       tried.push([id, ({ premium: 'plan de pago', not_found: 'sin datos', rate_limit: 'límite alcanzado', bad_key: 'clave no válida', network: 'no responde', no_key: 'sin clave', needs_proxy: 'necesita el Worker' })[err.code] || err.message]);
-      if (err.code === 'bad_key') badKeys.add(id);
+      if (err.code === 'bad_key' || err.code === 'no_key') badKeys.add(id); // sin clave (también en el Worker): no se reintenta en esta sesión
       if (err.code === 'premium' && isSym(args[0]) && ['profile', 'income', 'quote'].includes(method)) block(id, args[0]);
       if (!best || (PRIORITY[err.code] || 0) > (PRIORITY[best.code] || 0)) best = err;
     }

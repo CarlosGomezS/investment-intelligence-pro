@@ -1,23 +1,25 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=171d25de';
-import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=171d25de';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=171d25de';
+import { fundamentals } from '../../ui/charts.js?v=662c2f83';
+import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=662c2f83';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=662c2f83';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;
   if (!Y.length) { el.innerHTML = unavailable('Crecimiento y calidad', { code: 'not_found', message: 'Aún no hay estados financieros anuales de esta empresa (puede que alguna fuente siga descargando: pulsa «Actualizar» en un minuto).' }); return; }
-  const s = (f) => Y.map((y) => y[f]);
+  // Serie alineada al calendario (si falta un ejercicio, hueco): los CAGR no miden más años de los que dicen
+  const s = (f) => Y.map((y) => y[f]); // para gráficos (una columna por ejercicio)
+  const sg = (f) => { const out = []; Y.forEach((y, i) => { if (i > 0) { const gap = Number(y.year) - Number(Y[i - 1].year); for (let k = 1; k < gap && gap < 30; k++) out.push(null); } out.push(y[f]); }); return out; };
   const H = [1, 3, 5, 10];
   const rows = [['Ingresos', 'revenue'], ['Beneficio neto', 'netIncome'], ['BPA diluido', 'eps'], ['Flujo de caja libre', 'fcf'], ['EBITDA', 'ebitda'], ['Acciones en circulación', 'shares'], ['Deuda total', 'debt'], ['Patrimonio neto', 'equity']]
-    .map(([l, f]) => ({ l, ...Object.fromEntries(H.map((h) => [h, cagrN(s(f), h)])) }));
+    .map(([l, f]) => ({ l, ...Object.fromEntries(H.map((h) => [h, cagrN(sg(f), h)])) }));
   const labels = Y.map((y) => y.year);
   const first = Y[Math.max(0, Y.length - 6)], last = Y[Y.length - 1];
   const win = Y.slice(-6);
   const acq = sum(win.slice(1).map((y) => y.acquisitions)), revInc = isNum(last.revenue) && isNum(first.revenue) ? last.revenue - first.revenue : null;
   const gwInc = isNum(last.goodwill) && isNum(first.goodwill) ? last.goodwill - first.goodwill : null;
   const debtInc = isNum(last.debt) && isNum(first.debt) ? last.debt - first.debt : null;
-  const shG = cagrN(s('shares'), Math.min(5, Y.length - 1));
+  const shG = cagrN(sg('shares'), Math.min(5, Y.length - 1));
   const buy = sum(win.slice(1).map((y) => y.buybacks)), iss = sum(win.slice(1).map((y) => y.issuance)), sbc = sum(win.slice(1).map((y) => y.sbc));
   const assetTurn = Y.map((y) => div(y.revenue, y.assets));
   const revStd = stdev(yoy(s('revenue')).slice(-10).filter(isNum));

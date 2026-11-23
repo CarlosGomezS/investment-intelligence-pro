@@ -1,10 +1,10 @@
 // Comparador de empresas (hasta 5, métricas actuales e históricas) y comparador sectorial (medianas del sector).
-import { data, gather } from '../providers/index.js?v=171d25de';
-import { fundamentals } from '../ui/charts.js?v=171d25de';
-import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=171d25de';
-import { logoHTML } from '../app.js?v=171d25de';
-import { isNum, buildAnnual, deriveYear, median, cagrN, adjustSplits } from '../calc/finance.js?v=171d25de';
-import { exportCSV } from '../export.js?v=171d25de';
+import { data, gather } from '../providers/index.js?v=662c2f83';
+import { fundamentals } from '../ui/charts.js?v=662c2f83';
+import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=662c2f83';
+import { logoHTML } from '../app.js?v=662c2f83';
+import { isNum, buildAnnual, deriveYear, median, cagrN, adjustSplits } from '../calc/finance.js?v=662c2f83';
+import { exportCSV } from '../export.js?v=662c2f83';
 
 const METRICS = [['revenue', 'Ingresos', 'big'], ['netIncome', 'Beneficio neto', 'big'], ['fcf', 'FCF', 'big'], ['ebitda', 'EBITDA', 'big'], ['eps', 'BPA', 'n'], ['grossMargin', 'Margen bruto', 'pct'], ['operatingMargin', 'Margen operativo', 'pct'], ['netMargin', 'Margen neto', 'pct'], ['roic', 'ROIC', 'pct'], ['roe', 'ROE', 'pct'], ['debt', 'Deuda total', 'big'], ['cash', 'Caja', 'big'], ['equity', 'Patrimonio', 'big'], ['shares', 'Acciones', 'big']];
 let metric = 'revenue', mode = 'empresas';
@@ -39,7 +39,7 @@ export async function render(view, _p, qs) {
   const rows = [
     ['Capitalización', (c) => big(c.p.marketCap, c.p.currency)], ['Ingresos (último)', (c) => big(L(c).revenue, K(c))], ['Crec. ventas 5a (anual)', (c) => pct(cagrN(c.years.map((y) => y.revenue), 5))], ['Beneficio neto', (c) => big(L(c).netIncome, K(c))],
     ['Margen bruto', (c) => pct(L(c).grossMargin)], ['Margen operativo', (c) => pct(L(c).operatingMargin)], ['Margen neto', (c) => pct(L(c).netMargin)], ['ROIC (ROCE si el capital es negativo*)', (c) => (L(c).negCapital ? pct(L(c).roce) + '*' : pct(L(c).roic))], ['ROE', (c) => (L(c).negCapital ? 'n/a*' : pct(L(c).roe))],
-    ['Deuda neta/EBITDA', (c) => mult(L(c).netDebtToEbitda)], ['FCF', (c) => big(L(c).fcf, K(c))], ['PER', (c) => (c.rt.priceToEarningsRatioTTM > 0 ? mult(c.rt.priceToEarningsRatioTTM) : '—')], ['EV/EBITDA', (c) => (c.km.evToEBITDATTM > 0 && c.km.evToEBITDATTM < 200 ? mult(c.km.evToEBITDATTM) : '—')], ['Rent. FCF', (c) => pct(c.km.freeCashFlowYieldTTM)], ['Rent. dividendo', (c) => pct(c.rt.dividendYieldTTM, 2)],
+    ['Deuda neta/EBITDA', (c) => mult(L(c).netDebtToEbitda)], ['FCF', (c) => big(L(c).fcf, K(c))], ['PER', (c) => (c.rt.priceToEarningsRatioTTM > 0 && c.rt.priceToEarningsRatioTTM < 200 ? mult(c.rt.priceToEarningsRatioTTM) : '—')], ['EV/EBITDA', (c) => (c.km.evToEBITDATTM > 0 && c.km.evToEBITDATTM < 200 ? mult(c.km.evToEBITDATTM) : '—')], ['Rent. FCF', (c) => pct(c.km.freeCashFlowYieldTTM)], ['Rent. dividendo', (c) => pct(c.rt.dividendYieldTTM, 2)],
   ];
   cr.innerHTML = `${fails.length ? `<div class="empty" style="margin-bottom:12px">Sin datos: ${fails.join(' · ')}</div>` : ''}
     ${card('Comparativa', `<div class="tablewrap fixed"><table id="cmpT"><thead><tr><th class="l">Métrica</th>${C.map((c) => `<th><a href="#/c/${encodeURIComponent(c.sym)}/resumen" style="display:inline-flex;gap:6px;align-items:center">${logoHTML(c.sym, 20)}${esc(c.sym)}</a></th>`).join('')}</tr></thead><tbody>${rows.map(([l, f]) => `<tr><td class="l">${l}</td>${C.map((c) => `<td>${f(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="note">Cifras absolutas en la moneda de cada empresa. * Patrimonio negativo por recompras: el ROIC y el ROE no tienen sentido y se muestra el ROCE. Margen bruto «—» = la empresa no publica coste de ventas (habitual en plataformas como Booking). <button class="btn sm" id="cx">CSV</button></p>`)}
@@ -56,7 +56,10 @@ export async function render(view, _p, qs) {
   cr.querySelector('#mt').onchange = (e) => { metric = e.target.value; plot(); };
   // rentabilidad: muestreo mensual (último cierre de cada mes, sin interpolar)
   const months = [...new Set(C.flatMap((c) => c.px.map((p) => p.date.slice(0, 7))))].sort();
-  fundamentals('cm2', months, C.map((c) => { const byM = {}; c.px.forEach((p) => (byM[p.date.slice(0, 7)] = p.close)); const base = c.px[0] && c.px[0].close; return { label: c.sym, type: 'line', data: months.map((mo) => (byM[mo] && base ? byM[mo] / base - 1 : null)) }; }), { fmt: 'pct' });
+  // Todas las curvas parten del mismo mes (el primero en que TODAS cotizan): si no, una que cotiza desde hace 2 años y otra desde hace 5 no serían comparables
+  const startM = C.filter((c) => c.px.length).map((c) => c.px[0].date.slice(0, 7)).sort().pop();
+  const monthsC = months.filter((mo) => !startM || mo >= startM);
+  fundamentals('cm2', monthsC, C.map((c) => { const byM = {}; c.px.forEach((p) => (byM[p.date.slice(0, 7)] = p.close)); const base = byM[monthsC[0]]; return { label: c.sym, type: 'line', data: monthsC.map((mo) => (byM[mo] && base ? byM[mo] / base - 1 : null)) }; }), { fmt: 'pct' });
   suggestFix(cr, res, syms);
   cr.querySelector('#cx').onclick = () => exportCSV('comparativa', [['Métrica', ...C.map((c) => c.sym)], ...rows.map(([l, f]) => [l, ...C.map((c) => f(c))])]);
 }

@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=171d25de';
+import { isNum, mean, stdev, median } from './finance.js?v=662c2f83';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -113,7 +113,11 @@ export const METHODS = {
       const dpAll = last(Y.map((y) => y.dividendsPaid), 20); const dp = dpAll.filter((v) => v != null);
       const hasHist = dYears.size > 0;
       // Confirmado que no paga: el proveedor respondió con una lista vacía de dividendos y no hay pagos en los flujos
-      const noDiv = !hasHist && S.raw && S.raw.dividends && S.raw.dividends.ok && Array.isArray(S.raw.dividends.data) && !S.raw.dividends.data.length && !dp.some((v) => v > 0);
+      const listEmpty = S.raw && S.raw.dividends && S.raw.dividends.ok && Array.isArray(S.raw.dividends.data) && !S.raw.dividends.data.length;
+      // …o, sin lista, al menos 5 años de flujos de caja sin ningún pago, sin último dividendo en la ficha y sin rentabilidad por dividendo
+      const cfYears = Y.filter((y) => isNum(y.ocf)).slice(-10);
+      const cfNoPay = cfYears.length >= 5 && cfYears.every((y) => !(y.dividendsPaid > 0)) && !(m.profile.lastDividend > 0) && !((m.rTTM || {}).dividendYieldTTM > 0);
+      const noDiv = !hasHist && !dp.some((v) => v > 0) && (listEmpty || cfNoPay);
       const g4 = noDiv ? false : hasHist ? (run >= 20 ? true : Math.min(...dYears) <= lastClosed - 19 ? false : run === dYears.size ? null : false)
         : dp.some((v) => !(v > 0)) ? false : dpAll.length >= 20 && dpAll.every((v) => v != null && v > 0) ? true : null;
       const eps = s('eps').filter(isNum); const w = last(eps, 10);

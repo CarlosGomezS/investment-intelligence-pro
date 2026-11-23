@@ -49,3 +49,13 @@ test('FMP: capitalización y precio de la cotización van juntos (caída del dí
   const m = buildModel(r);
   assert.ok(Math.abs(m.shares / base.shares - 1) < 1e-9);
 });
+
+import { historical } from '../js/calc/simulate.js';
+test('simulador: 100 días no recortan 5 años y no se anualiza con menos de un año', () => {
+  const mk = (from, n, step) => Array.from({ length: n }, (_, i) => ({ date: new Date(Date.parse(from) + i * 864e5 * step).toISOString().slice(0, 10), close: 100 + i }));
+  const today = Date.now(), d = (y) => new Date(today - y * 365.25 * 864e5).toISOString().slice(0, 10);
+  const A = mk(d(5), 260, 7), R = mk(d(0.3), 100, 1);
+  const h = historical(A, R, [], 10);
+  assert.ok(h.drip && h.drip.years > 4); assert.equal(h.noDrip, null);
+  const h1 = historical(null, R, [], 1); assert.equal(h1.noDrip.cagr, null);
+});
