@@ -1,5 +1,5 @@
 // Gráficos: Chart.js para series fundamentales y TradingView Lightweight Charts para cotizaciones.
-import { big, num, pct } from './dom.js?v=69ff756a';
+import { big, num, pct } from './dom.js?v=05f60eff';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 export const PALETTE = () => [css('--c1'), css('--c2'), css('--c3'), css('--c4'), css('--c5'), css('--c6')];

@@ -6,7 +6,7 @@
 //   Fractal inferior: vela cuyo mínimo es menor que el de las dos anteriores y las dos siguientes (superior: al revés).
 // Uso de Williams: solo se opera cuando el cocodrilo «come» (líneas separadas y ordenadas); entrada al romper el
 // fractal por encima de los dientes, stop tras el fractal contrario y salida cuando las líneas vuelven a juntarse.
-import { isNum } from './finance.js?v=69ff756a';
+import { isNum } from './finance.js?v=05f60eff';
 
 export function smma(values, n) {
   const out = new Array(values.length).fill(null);

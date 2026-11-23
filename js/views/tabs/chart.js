@@ -1,10 +1,10 @@
 // Cotización interactiva: rangos de 1 día a máximo, escala lineal/log, rentabilidad acumulada,
 // comparación con índices, volumen y marcas de dividendos y splits.
-import { data } from '../../providers/index.js?v=69ff756a';
-import { priceChart, PALETTE } from '../../ui/charts.js?v=69ff756a';
-import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=69ff756a';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=69ff756a';
-import { extra } from '../company.js?v=69ff756a';
+import { data } from '../../providers/index.js?v=05f60eff';
+import { priceChart, PALETTE } from '../../ui/charts.js?v=05f60eff';
+import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=05f60eff';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=05f60eff';
+import { extra } from '../company.js?v=05f60eff';
 
 const RANGES = [['1D', 1], ['1S', 7], ['1M', 30], ['3M', 91], ['6M', 182], ['1A', 365], ['5A', 1826], ['10A', 3652], ['Máx', 0]];
 const INDEXES = [['', 'Sin comparar'], ['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^DJI', 'Dow Jones'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35'], ['^GDAXI', 'DAX'], ['^FTSE', 'FTSE 100'], ['^N225', 'Nikkei 225'], ['URTH', 'MSCI World (ETF)']];

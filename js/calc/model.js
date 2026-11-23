@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=69ff756a';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=69ff756a';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=05f60eff';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=05f60eff';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -71,9 +71,12 @@ export function buildModel(raw, fxRate = 1) {
   // La capitalización del proveedor es de un momento anterior: se compara con el precio DE ESE MOMENTO (el del perfil,
   // o el cierre del día en que se descargó), nunca con el de hoy; si no se sabe ese precio, no se toca nada
   // (así una subida o caída fuerte del día no se confunde con un problema de clases de acciones).
-  const pRef = mcFromQuote ? (isNum(quote.price) && quote.price > 0 ? quote.price : null)
+  let pRef = mcFromQuote ? (isNum(quote.price) && quote.price > 0 ? quote.price : null)
     : isNum(profile.price) && profile.price > 0 ? profile.price
     : raw.profile && raw.profile.fetchedAt && prices.length ? (closeAt(prices, new Date(raw.profile.fetchedAt - 864e5).toISOString().slice(0, 10)) || {}).close : null;
+  // Precio de referencia del perfil en la unidad principal (libras) frente a cotización en subunidades (peniques):
+  // se pasa a peniques, igual que la capitalización, o las acciones saldrían 100 veces más
+  if (!mcFromQuote && isNum(pRef) && isNum(price) && price > 0 && /^(GBp|GBX|ILA|ZAc|ZAC)$/.test(tradeCur)) { const rp = pRef / price; if (rp > 0.005 && rp < 0.02) pRef *= 100; }
   if (isNum(shares) && isNum(pRef) && pRef > 0 && isNum(mcProv) && mcProv > 0) {
     const ratio = (shares * pRef) / mcProv;
     if (ratio > 1.25 || ratio < 0.8) { shares = mcProv / pRef; sharesNote = 'equivalentes a la capitalización (doble clase de acciones o ADR)'; }

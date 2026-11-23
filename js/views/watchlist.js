@@ -1,10 +1,10 @@
 // Seguimiento: listas (favoritos y personalizadas), alertas de valoración, historial y análisis guardados.
-import { data } from '../providers/index.js?v=69ff756a';
-import { store } from '../store.js?v=69ff756a';
-import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=69ff756a';
-import { logoHTML } from '../app.js?v=69ff756a';
-import { exportCSV } from '../export.js?v=69ff756a';
-import { isNum } from '../calc/finance.js?v=69ff756a';
+import { data } from '../providers/index.js?v=05f60eff';
+import { store } from '../store.js?v=05f60eff';
+import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=05f60eff';
+import { logoHTML } from '../app.js?v=05f60eff';
+import { exportCSV } from '../export.js?v=05f60eff';
+import { isNum } from '../calc/finance.js?v=05f60eff';
 
 export async function checkAlerts() {
   const A = store.alerts(), out = [];

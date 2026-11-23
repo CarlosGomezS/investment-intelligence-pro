@@ -5,16 +5,17 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=69ff756a';
-import { alphavantage } from './alphavantage.js?v=69ff756a';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=69ff756a';
-import { twelvedata } from './twelvedata.js?v=69ff756a';
-import { roic } from './roic.js?v=69ff756a';
-import { sec, forgetSec } from './sec.js?v=69ff756a';
-import { esef, forgetEsef } from './esef.js?v=69ff756a';
-import { config } from '../config.js?v=69ff756a';
-import { ApiError, usage, queueDelay } from './http.js?v=69ff756a';
-import { setHint } from './hints.js?v=69ff756a';
+import { fmp } from './fmp.js?v=05f60eff';
+import { alphavantage } from './alphavantage.js?v=05f60eff';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=05f60eff';
+import { twelvedata } from './twelvedata.js?v=05f60eff';
+import { roic } from './roic.js?v=05f60eff';
+import { sec, forgetSec } from './sec.js?v=05f60eff';
+import { esef, forgetEsef } from './esef.js?v=05f60eff';
+import { config } from '../config.js?v=05f60eff';
+import { ApiError, usage, queueDelay } from './http.js?v=05f60eff';
+import { reconcileBalance } from './merge.js?v=05f60eff';
+import { setHint } from './hints.js?v=05f60eff';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -92,7 +93,10 @@ async function complete(method, args, base, rest) {
         const mine = rows.find((x) => (eo && endOf(x) ? Math.abs(endOf(x) - eo) < 45 * 864e5 : fyOf(x) === fyOf(o)));
         if (!mine) { rows.push({ ...o, _from: id }); added = true; continue; }
         // Dentro de una fila ya existente no se mezclan acciones ni BPA de otra fuente (pueden ir sin ajustar a splits)
-        for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null && !/eps|Shs|shares/i.test(k)) { mine[k] = v; added = true; }
+        const filled = [];
+        for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null && !/eps|Shs|shares/i.test(k)) { mine[k] = v; added = true; filled.push(k); }
+        // Deuda neta propia (cuentas XBRL de SEC/ESEF/Finnhub) se recalcula; la publicada por FMP o ROIC.AI no se toca
+        if (method === 'balance') reconcileBalance(mine, filled, ['sec', 'esef', 'finnhub'].includes(base.provider));
       }
       if (added) used.push(id);
     } catch (e) { /* la fuente secundaria no aporta: se sigue con lo que hay */ }
