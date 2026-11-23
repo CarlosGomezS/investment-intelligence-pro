@@ -1,9 +1,9 @@
 // Panel principal: mercados, alertas activadas, seguimiento, próximos resultados y accesos rápidos.
-import { data } from '../providers/index.js?v=5ad630d4';
-import { store } from '../store.js?v=5ad630d4';
-import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=5ad630d4';
-import { logoHTML } from '../app.js?v=5ad630d4';
-import { checkAlerts } from './watchlist.js?v=5ad630d4';
+import { data } from '../providers/index.js?v=5a9bda09';
+import { store } from '../store.js?v=5a9bda09';
+import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=5a9bda09';
+import { logoHTML } from '../app.js?v=5a9bda09';
+import { checkAlerts } from './watchlist.js?v=5a9bda09';
 
 const MARKETS = [['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35']];
 const IDEAS = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['GOOGL', 'Alphabet'], ['AMZN', 'Amazon'], ['META', 'Meta'], ['V', 'Visa'], ['KO', 'Coca-Cola'], ['JNJ', 'Johnson & Johnson'], ['ASML', 'ASML'], ['NVO', 'Novo Nordisk'], ['SAN.MC', 'Banco Santander'], ['ITX.MC', 'Inditex']];
@@ -11,7 +11,7 @@ const IDEAS = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['G
 export async function render(view) {
   const S = store.get(), fav = Object.values(S.lists).flat();
   const uniq = [...new Map(fav.map((x) => [x.symbol, x])).values()];
-  view.innerHTML = `<section class="hero" style="margin-bottom:14px"><h1>Analiza cualquier empresa cotizada a fondo</h1><p>Estados financieros completos, 24 ratios con su historia, valoración intrínseca por DCF, múltiplos y dividendos, competidores, alertas contables y un informe final razonado. Cada cifra muestra su fuente y su fecha.</p><p style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn pri sm" href="#/metodos">Métodos Buffett, Graham, Lynch…</a><a class="btn sm" href="#/calendario">Calendario de resultados</a></p>
+  view.innerHTML = `<section class="hero" style="margin-bottom:14px"><h1>Analiza cualquier empresa cotizada a fondo</h1><p>Estados financieros completos, 24 ratios con su historia, valoración intrínseca por DCF, múltiplos y dividendos, competidores, alertas contables y un informe final razonado. Cada cifra muestra su fuente y su fecha.</p><p style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn pri sm" href="#/metodos">Métodos Buffett, Graham, Lynch…</a><a class="btn sm" href="#/calendario">Calendario de resultados</a><a class="btn sm" href="#/comprobar">Autocomprobación con datos reales</a></p>
       <div class="chips" style="margin-top:12px">${IDEAS.map(([s, n]) => `<a class="chip" href="#/c/${encodeURIComponent(s)}/resumen">${esc(n)} <span class="mono mute">${esc(s)}</span></a>`).join('')}</div></section>
     <div class="kpis" id="mk" style="margin-bottom:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${MARKETS.map(([s, n]) => `<div class="kpi"><span>${n}</span><b id="mk_${s.replace(/\W/g, '')}">…</b></div>`).join('')}</div>
     <div id="alerts"></div>

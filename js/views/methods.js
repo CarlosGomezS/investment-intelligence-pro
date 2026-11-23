@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=5ad630d4';
-import { compute, fxFor } from './company.js?v=5ad630d4';
-import { METHODS, rankMethod } from '../calc/methods.js?v=5ad630d4';
-import { fxRate } from '../providers/fxrate.js?v=5ad630d4';
-import { alligator } from '../calc/alligator.js?v=5ad630d4';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=5ad630d4';
-import { logoHTML } from '../app.js?v=5ad630d4';
-import { isNum } from '../calc/finance.js?v=5ad630d4';
-import { store } from '../store.js?v=5ad630d4';
-import { exportCSV } from '../export.js?v=5ad630d4';
+import { data } from '../providers/index.js?v=5a9bda09';
+import { compute, fxFor } from './company.js?v=5a9bda09';
+import { METHODS, rankMethod } from '../calc/methods.js?v=5a9bda09';
+import { fxRate } from '../providers/fxrate.js?v=5a9bda09';
+import { alligator } from '../calc/alligator.js?v=5a9bda09';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=5a9bda09';
+import { logoHTML } from '../app.js?v=5a9bda09';
+import { isNum } from '../calc/finance.js?v=5a9bda09';
+import { store } from '../store.js?v=5a9bda09';
+import { exportCSV } from '../export.js?v=5a9bda09';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -34,7 +34,7 @@ async function sharedMarket() {
   return shared;
 }
 
-async function analyzeOne(sym) {
+export async function analyzeOne(sym) {
   const [treasury, riskPremium] = await sharedMarket();
   const lim = (p, ms = 25000) => Promise.race([p, new Promise((res) => setTimeout(() => res({ ok: false, error: { code: 'network', message: 'tarda demasiado' } }), ms))]);
   const from = new Date(Date.now() - 6 * 365 * 864e5).toISOString().slice(0, 10);

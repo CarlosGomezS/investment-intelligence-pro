@@ -1,6 +1,6 @@
 // Metodología: fuentes, arquitectura, fórmulas, reglas de alerta y limitaciones conocidas.
-import { card } from '../ui/dom.js?v=5ad630d4';
-import { RATIOS } from '../calc/ratios.js?v=5ad630d4';
+import { card } from '../ui/dom.js?v=5a9bda09';
+import { RATIOS } from '../calc/ratios.js?v=5a9bda09';
 
 const APIS = [
   ['Financial Modeling Prep', 'Principal', 'Estados (anual/trimestral/TTM), ratios históricos, estimaciones, DCF, dividendos, insiders, screener, índices', '250 peticiones/día; sobre todo EE. UU.', 'Sí', 'https://site.financialmodelingprep.com/developer/docs'],
@@ -15,7 +15,7 @@ const APIS = [
 ];
 
 export function render(view) {
-  view.innerHTML = `<h1 style="font-size:22px;margin-bottom:14px">Metodología y fuentes</h1>
+  view.innerHTML = `<h1 style="font-size:22px;margin-bottom:14px">Metodología y fuentes</h1><p><a class="btn pri sm" href="#/comprobar">Autocomprobación con empresas reales</a></p>
   <div class="stack-y">
   ${card('Principios', `<ul style="margin:0;padding-left:18px;line-height:1.7">
     <li><b>No se inventan cifras.</b> Si un proveedor no da un dato, se muestra «—» o «sin dato» con la razón (plan de pago, límite, no existe). No se interpolan años ni se presentan datos anuales como trimestrales.</li>

@@ -1,6 +1,6 @@
 // Proveedor Alpha Vantage (respaldo). Normaliza sus respuestas al modelo canónico (nombres de FMP).
-import { getJSON } from './http.js?v=5ad630d4';
-import { config } from '../config.js?v=5ad630d4';
+import { getJSON } from './http.js?v=5a9bda09';
+import { config } from '../config.js?v=5a9bda09';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v === undefined || v === null || v === 'None' || v === '-' || v === '' ? null : Number(v));
