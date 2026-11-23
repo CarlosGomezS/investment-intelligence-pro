@@ -1,17 +1,17 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=c2b29189';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=c2b29189';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=5b306087';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=5b306087';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
   const fcfTTM = m.T.fcf;
   const fcf3 = lastAvg(fcfs, 3);
-  const g = suggestGrowth({ fcfCagr5: cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev });
+  const g = suggestGrowth({ fcfCagr5: cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
     fcfBase: { value: m.X(fcfTTM), origin: m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio', alt: m.X(fcf3) },
-    growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts },
+    growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts, capped: g.capped },
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
     rf: { value: m.market.rf10, origin: m.market.rfAssumed ? 'supuesto · 4,5 % (sin dato del bono a 10 años)' : `real · bono EE. UU. 10a (${m.market.rfDate})` },

@@ -72,7 +72,10 @@ export function buildAnnual(income, balance, cash) {
 
 /** Métricas derivadas por año calculadas a partir de los estados (fuente de verdad propia, auditable). */
 export function deriveYear(y, taxFallback = 0.21) {
-  const i = y.i || {}, b = y.b || {}, c = y.c || {};
+  let i = y.i || {}; const b = y.b || {}, c = y.c || {};
+  // Si el parser no trae beneficio neto o bruto, se calculan de partidas presentes (BAI − impuestos; ventas − coste)
+  if (!isNum(i.netIncome) && isNum(i.incomeBeforeTax) && isNum(i.incomeTaxExpense)) i = { ...i, netIncome: i.incomeBeforeTax - i.incomeTaxExpense, _niCalc: true };
+  if (!isNum(i.grossProfit) && isNum(i.revenue) && isNum(i.costOfRevenue)) i = { ...i, grossProfit: i.revenue - i.costOfRevenue };
   const ebit = i.ebit ?? i.operatingIncome;
   const tax = div(i.incomeTaxExpense, i.incomeBeforeTax);
   const t = isNum(tax) && tax >= 0 && tax < 0.6 ? tax : taxFallback;
@@ -93,9 +96,12 @@ export function deriveYear(y, taxFallback = 0.21) {
     buybacks: isNum(c.commonStockRepurchased) ? Math.abs(c.commonStockRepurchased) : null, issuance: c.commonStockIssuance ?? null,
     acquisitions: isNum(c.acquisitionsNet) ? Math.abs(c.acquisitionsNet) : null, sbc: c.stockBasedCompensation ?? null, rnd: i.researchAndDevelopmentExpenses,
     grossMargin: div(i.grossProfit, i.revenue), operatingMargin: div(i.operatingIncome, i.revenue), netMargin: div(i.netIncome, i.revenue),
-    fcfMargin: div(fcf, i.revenue), roe: div(i.netIncome, b.totalStockholdersEquity), roa: div(i.netIncome, b.totalAssets),
-    roic: div(isNum(ebit) ? ebit * (1 - t) : null, invested), roce: div(ebit, capEmployed), taxRate: t,
-    netDebtToEbitda: div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda), debtToEquity: div(debt, b.totalStockholdersEquity),
+    fcfMargin: div(fcf, i.revenue), roe: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(i.netIncome, b.totalStockholdersEquity) : null, roa: div(i.netIncome, b.totalAssets),
+    roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: div(ebit, capEmployed), taxRate: t,
+    negCapital: isNum(invested) && invested <= 0,
+    // Rentabilidad del capital usada en puntuación y foso: ROIC; si el capital invertido es negativo, ROCE
+    rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : div(ebit, capEmployed),
+    netDebtToEbitda: div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda), debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
     currentRatio: div(b.totalCurrentAssets, b.totalCurrentLiabilities), interestCoverage: isNum(i.interestExpense) && i.interestExpense !== 0 ? div(ebit, Math.abs(i.interestExpense)) : null,
     fcfConversion: div(fcf, i.netIncome), incomeQuality: div(c.operatingCashFlow, i.netIncome), capexToOcf: div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, c.operatingCashFlow),
     fcfPerShare: div(fcf, shares), costOfDebt: div(isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, debt),

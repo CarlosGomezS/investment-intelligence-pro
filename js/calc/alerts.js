@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=c2b29189';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=5b306087';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';
@@ -30,8 +30,8 @@ export function detectAlerts(m) {
   if (isNum(s1) && s1 > 0.03) add('media', 'Accionistas', 'Dilución de acciones', `El número de acciones aumentó un ${pct(s1)} en el último año.`);
   else if (isNum(s5) && s5 > 0.02) add('media', 'Accionistas', 'Dilución sostenida', `Las acciones crecen un ${pct(s5)} anual en 5 años: tu parte de la empresa se reduce.`);
 
-  const roic3 = mean(Y.slice(-4, -1).map((y) => y.roic));
-  if (isNum(a.roic) && isNum(roic3) && a.roic < roic3 - 0.05) add('media', 'Rentabilidad', 'Deterioro del ROIC', `ROIC ${pct(a.roic)} frente a ${pct(roic3)} de media previa.`);
+  const roic3 = mean(Y.slice(-4, -1).map((y) => y.roic).filter(isNum));
+  if (isNum(a.roic) && isNum(roic3) && Y.slice(-4).every((y) => !y.negCapital) && a.roic < roic3 - 0.05) add('media', 'Rentabilidad', 'Deterioro del ROIC', `ROIC ${pct(a.roic)} frente a ${pct(roic3)} de media previa.`);
 
   const ig = gr(a.inventory, b.inventory);
   if (isNum(ig) && isNum(rg) && ig > rg + 0.15 && a.inventory > 0.05 * a.revenue) add('media', 'Circulante', 'Inventarios crecen más que las ventas', `Inventario +${pct(ig)} frente a ventas ${pct(rg)}: posible exceso de stock o demanda más débil.`);

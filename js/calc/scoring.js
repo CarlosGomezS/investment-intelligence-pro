@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown } from './finance.js?v=c2b29189';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown } from './finance.js?v=5b306087';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -23,8 +23,9 @@ export function metricsFor(m, ctx) {
   const eve = isNum(T.ebitda) && T.ebitda > 0 ? div(m.ev, m.X(T.ebitda)) : null;
   const fcfy = div(m.X(T.fcf), m.marketCap);
   const gmStd = stdev(s('grossMargin').slice(-10));
-  const roicStd = stdev(s('roic').slice(-10));
-  const roicAvg5 = mean(s('roic').slice(-5));
+  const roicStd = stdev(s('rc').slice(-10));
+  const roicAvg5 = mean(s('rc').slice(-5));
+  const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
 
   const M = (cat, name, value, display, pts, formula) => ({ cat, name, value, display, pts, formula, score: isNum(value) ? Math.round(lin(value, pts)) : null });
@@ -39,7 +40,7 @@ export function metricsFor(m, ctx) {
     M('crecimiento', 'FCF CAGR 5 años', cagrN(s('fcf'), 5), P(cagrN(s('fcf'), 5)), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR FCF 5a'),
     M('crecimiento', 'Ventas previstas (analistas)', m.growth.analystRev, P(m.growth.analystRev), [[-0.02, 0], [0.05, 55], [0.15, 100]], 'CAGR estimado de ventas'),
 
-    M('rentabilidad', 'ROIC', T.roic ?? last.roic, P(T.roic ?? last.roic), [[0, 0], [0.1, 60], [0.25, 100]], 'NOPAT / capital invertido'),
+    M('rentabilidad', RC, T.rc ?? last.rc, P(T.rc ?? last.rc), [[0, 0], [0.1, 60], [0.25, 100]], last.negCapital ? 'EBIT / (activos − pasivo corriente)' : 'NOPAT / capital invertido'),
     M('rentabilidad', 'ROE', T.roe ?? last.roe, P(T.roe ?? last.roe), [[0, 0], [0.12, 60], [0.25, 100]], 'Beneficio / patrimonio'),
     M('rentabilidad', 'Margen operativo', T.operatingMargin, P(T.operatingMargin), [[0, 0], [0.12, 60], [0.3, 100]], 'EBIT / ventas'),
     M('rentabilidad', 'Margen neto', T.netMargin, P(T.netMargin), [[0, 0], [0.08, 55], [0.22, 100]], 'Beneficio neto / ventas'),
@@ -54,9 +55,9 @@ export function metricsFor(m, ctx) {
     M('caja', 'Años con FCF positivo (10a)', fcfPos.length ? fcfPos.filter(Boolean).length / fcfPos.length : null, fcfPos.length ? `${fcfPos.filter(Boolean).length}/${fcfPos.length}` : '—', [[0.5, 0], [0.8, 60], [1, 100]], 'Proporción de años con FCF > 0'),
     M('caja', 'Capex / caja operativa', T.capexToOcf ?? last.capexToOcf, P(T.capexToOcf ?? last.capexToOcf), [[0.1, 100], [0.35, 60], [0.8, 0]], 'Menos es mejor'),
 
-    M('moat', 'ROIC medio 5a − WACC', isNum(roicAvg5) && isNum(w) ? roicAvg5 - w : null, isNum(roicAvg5) && isNum(w) ? P(roicAvg5 - w) : '—', [[-0.03, 0], [0.03, 55], [0.15, 100]], 'Exceso de rentabilidad sostenido'),
+    M('moat', (last.negCapital ? 'ROCE' : 'ROIC') + ' medio 5a − WACC', isNum(roicAvg5) && isNum(w) ? roicAvg5 - w : null, isNum(roicAvg5) && isNum(w) ? P(roicAvg5 - w) : '—', [[-0.03, 0], [0.03, 55], [0.15, 100]], 'Exceso de rentabilidad sostenido'),
     M('moat', 'Estabilidad del margen bruto (desv. 10a)', gmStd, isNum(gmStd) ? P(gmStd) : '—', [[0.01, 100], [0.04, 60], [0.1, 0]], 'Desviación típica; menos es mejor'),
-    M('moat', 'Estabilidad del ROIC (desv. 10a)', roicStd, isNum(roicStd) ? P(roicStd) : '—', [[0.02, 100], [0.06, 60], [0.15, 0]], 'Desviación típica; menos es mejor'),
+    M('moat', 'Estabilidad de la rentabilidad del capital (desv. 10a)', roicStd, isNum(roicStd) ? P(roicStd) : '—', [[0.02, 100], [0.06, 60], [0.15, 0]], 'Desviación típica; menos es mejor'),
     ...(isNum(ctx.moatUser) ? [M('moat', 'Evaluación cualitativa del usuario', ctx.moatUser, Math.round(ctx.moatUser) + '/100', [[0, 0], [100, 100]], 'Checklist del módulo Moat')] : []),
 
     M('valoracion', 'Margen de seguridad (valor intrínseco)', ctx.mos, P(ctx.mos), [[-0.5, 0], [0, 50], [0.3, 100]], '(Valor − precio)/valor'),

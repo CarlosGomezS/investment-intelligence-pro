@@ -46,3 +46,14 @@ test('modelo de empresa con datos reales', () => {
   assert.equal(rep.questions.length, 13);
   assert.ok(rep.conclusion.length > 10);
 });
+
+test('split posterior al último ejercicio: BPA y PER ajustados (caso Booking 2026)', () => {
+  const r2 = JSON.parse(JSON.stringify(raw));
+  const q = r2.quote.data[0] || r2.quote.data; const p = r2.profile.data[0] || r2.profile.data;
+  q.price = q.price / 25; p.price = q.price; // misma capitalización, 25 veces más acciones
+  delete q.sharesOutstanding; delete p.sharesOutstanding;
+  const base = buildModel(raw), m = buildModel(r2);
+  assert.ok(m.splitsAdj.some((s) => s.recent && s.factor === 25));
+  assert.ok(Math.abs(m.last.eps * 25 / base.last.eps - 1) < 0.01);
+  assert.ok(Math.abs((m.price / m.T.eps) / (base.price / base.T.eps) - 1) < 0.02); // mismo PER
+});

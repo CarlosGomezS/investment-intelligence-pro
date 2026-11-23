@@ -1,11 +1,11 @@
 // Ventajas competitivas (moat): indicadores cuantitativos que dejan huella en las cuentas
 // + evaluación cualitativa del usuario (factores que ningún proveedor mide), guardada y usada en el scoring.
-import { data } from '../../providers/index.js?v=c2b29189';
-import { fundamentals } from '../../ui/charts.js?v=c2b29189';
-import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=c2b29189';
-import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=c2b29189';
-import { store } from '../../store.js?v=c2b29189';
-import { extra } from '../company.js?v=c2b29189';
+import { data } from '../../providers/index.js?v=5b306087';
+import { fundamentals } from '../../ui/charts.js?v=5b306087';
+import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=5b306087';
+import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=5b306087';
+import { store } from '../../store.js?v=5b306087';
+import { extra } from '../company.js?v=5b306087';
 
 const FACTORS = [
   ['precios', 'Poder de fijación de precios', 'Puede subir precios sin perder clientes (márgenes brutos altos y estables lo sugieren).'],
@@ -34,14 +34,14 @@ function concentration(seg) {
 export async function render(el, S, ctx) {
   const m = S.m, Y = m.years, s = (f) => Y.map((y) => y[f]);
   const w = m.market.wacc ? m.market.wacc.wacc : null;
-  const roic = s('roic'), gm = s('grossMargin'), om = s('operatingMargin');
+  const roic = s('rc'), gm = s('grossMargin'), om = s('operatingMargin');
   const roicAbove = roic.slice(-10).filter(isNum), above = roicAbove.filter((r) => isNum(w) && r > w).length;
   const rnd = mean(Y.slice(-3).map((y) => div(y.rnd, y.revenue)));
   const opLev = (() => { const r = cagrN(s('revenue'), 5), o = cagrN(s('operatingIncome'), 5); return isNum(r) && isNum(o) ? o - r : null; })();
   const [prodR, geoR] = await Promise.allSettled([extra(S, 'segP', () => data.productSegments(m.symbol)), extra(S, 'segG', () => data.geoSegments(m.symbol))]);
   const prod = prodR.status === 'fulfilled' ? concentration(prodR.value.data) : null, geo = geoR.status === 'fulfilled' ? concentration(geoR.value.data) : null;
   const Q = [
-    ['Rentabilidad sostenida', isNum(w) ? `ROIC por encima del WACC (${pct(w)}) en ${above} de ${roicAbove.length} años; media 5a ${pct(m.stats.roicAvg5)}.` : 'Sin WACC.', isNum(w) && roicAbove.length ? above / roicAbove.length >= 0.8 : null],
+    ['Rentabilidad sostenida', isNum(w) ? `${m.stats.roicIsRoce ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC'} por encima del WACC (${pct(w)}) en ${above} de ${roicAbove.length} años; media 5a ${pct(m.stats.roicAvg5)}.` : 'Sin WACC.', isNum(w) && roicAbove.length ? above / roicAbove.length >= 0.8 : null],
     ['Poder de precios', `Margen bruto medio 5a ${pct(m.stats.gmAvg5)} con desviación de ${pct(stdev(gm.slice(-10)))} en 10 años.`, isNum(m.stats.gmAvg5) ? m.stats.gmAvg5 > 0.4 && (stdev(gm.slice(-10)) ?? 1) < 0.04 : null],
     ['Apalancamiento operativo / escala', `El beneficio operativo crece ${isNum(opLev) ? (opLev >= 0 ? pct(opLev) + ' más' : pct(-opLev) + ' menos') : '—'} al año que las ventas (5a). Ingresos de ${big(m.last.revenue, m.repCur)}.`, isNum(opLev) ? opLev > 0 : null],
     ['Intensidad tecnológica', `I+D equivale al ${pct(rnd)} de las ventas (media 3a).`, isNum(rnd) ? rnd > 0.05 : null],

@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=c2b29189';
-import { fmtB } from './alerts.js?v=c2b29189';
+import { isNum } from './finance.js?v=5b306087';
+import { fmtB } from './alerts.js?v=5b306087';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -13,11 +13,11 @@ export function buildReport(m, sc, val, alerts) {
   const A = (question, verdict, text, s) => q.push({ question, verdict, text, score: s });
   A('¿Es una empresa de calidad?', level(cat(sc, 'calidad')), `Piotroski ${m.scores.piotroskiScore ?? '—'}/9, margen bruto ${P(T.grossMargin)}, la caja operativa equivale al ${P(T.incomeQuality)} del beneficio.`, cat(sc, 'calidad'));
   A('¿Está creciendo?', level(cat(sc, 'crecimiento')), `Ventas: ${P(m.growth.rev1)} el último año, ${P(m.growth.rev5)} anual a 5 años${isNum(m.growth.rev10) ? ` y ${P(m.growth.rev10)} a 10` : ''}. BPA ${P(m.growth.eps5)} anual (5a). Analistas esperan ${P(m.growth.analystRev)} anual en ventas.${growthQuality(m)}`, cat(sc, 'crecimiento'));
-  A('¿Es rentable?', level(cat(sc, 'rentabilidad')), `ROIC ${P(T.roic ?? m.last.roic)}, ROE ${P(T.roe ?? m.last.roe)}, margen operativo ${P(T.operatingMargin)} y neto ${P(T.netMargin)}.`, cat(sc, 'rentabilidad'));
+  A('¿Es rentable?', level(cat(sc, 'rentabilidad')), `${m.last.negCapital ? `ROCE ${P(T.rc ?? m.last.rc)} (ROIC y ROE no aplican: patrimonio negativo por recompras)` : `ROIC ${P(T.roic ?? m.last.roic)}, ROE ${P(T.roe ?? m.last.roe)}`}, margen operativo ${P(T.operatingMargin)} y neto ${P(T.netMargin)}.`, cat(sc, 'rentabilidad'));
   const sol = cat(sc, 'solidez');
   A('¿Tiene deuda preocupante?', sol == null ? 'sin datos suficientes' : sol >= 65 ? 'no' : sol >= 45 ? 'vigilable' : 'sí', `Deuda total ${fmtB(m.X(T.debt))} ${cur}, deuda neta ${fmtB(m.netDebt)} ${cur} (${N(T.netDebtToEbitda, 1)}× EBITDA). Cobertura de intereses ${N(T.interestCoverage, 1)}×.`, sol);
   A('¿Genera efectivo?', level(cat(sc, 'caja')), `FCF ${fmtB(m.X(T.fcf))} ${cur} (${P(T.fcfMargin)} de las ventas), ${N(T.fcfConversion, 2)}× el beneficio neto.`, cat(sc, 'caja'));
-  A('¿Tiene ventajas competitivas?', level(cat(sc, 'moat')), `ROIC medio 5a ${P(m.stats.roicAvg5)} frente a un WACC de ${P(m.market.wacc && m.market.wacc.wacc)}; margen bruto con desviación de ${P(m.stats.gmStd)} en 10 años. Indicadores cuantitativos: confirma el foso con el módulo Moat.`, cat(sc, 'moat'));
+  A('¿Tiene ventajas competitivas?', level(cat(sc, 'moat')), `${m.stats.roicIsRoce ? 'ROCE' : 'ROIC'} medio 5a ${P(m.stats.roicAvg5)} frente a un WACC de ${P(m.market.wacc && m.market.wacc.wacc)}; margen bruto con desviación de ${P(m.stats.gmStd)} en 10 años. Indicadores cuantitativos: confirma el foso con el módulo Moat.`, cat(sc, 'moat'));
   const vs = cat(sc, 'valoracion');
   A('¿Está cara o barata?', vs == null ? 'sin datos suficientes' : vs >= 65 ? 'barata' : vs >= 45 ? 'precio razonable' : 'cara', `PER ${N(m.pe, 1)}×, rentabilidad FCF ${P(isNum(T.fcf) && m.marketCap ? m.X(T.fcf) / m.marketCap : null)}.`, vs);
   const c = val.composite;

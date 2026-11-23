@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=c2b29189';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=c2b29189';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=5b306087';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=5b306087';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -31,6 +31,16 @@ export function buildModel(raw, fxRate = 1) {
   const ttmIsReal = !!(ttmYear && isNum(ttmYear.revenue));
 
   const shares = quote.sharesOutstanding ?? profile.sharesOutstanding ?? (isNum(profile.marketCap) && isNum(price) && price > 0 ? profile.marketCap / price : null) ?? last.shares;
+  // Split posterior al último ejercicio (p. ej. ejecutado este año): las acciones actuales son k veces las del último
+  // informe. Se ajustan acciones y BPA de todos los años (y del TTM si viene sin ajustar) para que PER y múltiplos cuadren.
+  {
+    const COMMON = [2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50];
+    const near = (r) => COMMON.find((c) => Math.abs(r / c - 1) < 0.12);
+    const fix = (y, f) => { if (isNum(y.shares)) y.shares *= f; if (isNum(y.eps)) y.eps /= f; if (isNum(y.fcfPerShare)) y.fcfPerShare /= f; };
+    const f = isNum(shares) && isNum(last.shares) && last.shares > 0 && shares !== last.shares ? near(shares / last.shares) : null;
+    if (f) { years.forEach((y) => fix(y, f)); splitsAdj.push({ year: String(Number(last.year) + 1), factor: f, recent: true }); }
+    if (ttmYear && ttmYear !== last && isNum(ttmYear.shares) && isNum(shares)) { const g = near(shares / ttmYear.shares); if (g) fix(ttmYear, g); }
+  }
   const marketCap = quote.marketCap ?? profile.marketCap ?? (isNum(shares) && isNum(price) ? shares * price : null);
   const netDebtT = isNum(T.netDebt) ? T.netDebt * fx : isNum(last.netDebt) ? last.netDebt * fx : null;
   const ev = isNum(marketCap) ? marketCap + (netDebtT || 0) : null;
@@ -117,7 +127,7 @@ export function buildModel(raw, fxRate = 1) {
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
     market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaRaw, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
     pe: peRatio, peProvider, periodLabel, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
-    stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
+    stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('rc'), 5), roicMin5: Math.min(...series('rc').slice(-5).filter(isNum)), roicIsRoce: !!last.negCapital, gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,
   };
 }

@@ -1,7 +1,7 @@
 // Proveedor Financial Modeling Prep (API "stable"). Devuelve datos ya en el modelo canónico
 // (el modelo canónico de la app usa los nombres de campo de FMP; ver docs/ARQUITECTURA.md).
-import { getJSON } from './http.js?v=c2b29189';
-import { config } from '../config.js?v=c2b29189';
+import { getJSON } from './http.js?v=5b306087';
+import { config } from '../config.js?v=5b306087';
 
 const H = () => config.get().cacheHours;
 const arr = (x) => (Array.isArray(x) ? x : x ? [x] : []);

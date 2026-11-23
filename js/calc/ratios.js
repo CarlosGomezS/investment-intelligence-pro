@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=c2b29189';
+import { isNum, div, mean } from './finance.js?v=5b306087';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -44,7 +44,7 @@ export const RATIOS = [
     interp: (v) => v == null ? '—' : `${fx(v * 100, 1)} % sobre sus activos. En bancos un 1 % ya es bueno; en industria, más del 7 %.`, alert: (v) => v < 0 && 'ROA negativo.' },
   { id: 'roic', label: 'ROIC', group: 'Rentabilidad', fmt: 'pct', better: 'high', formula: 'EBIT·(1−tipo impositivo) / (patrimonio + deuda − caja)',
     cur: (m) => m.T.roic ?? m.last.roic, hist: (m) => histDerived(m.years, 'roic'),
-    interp: (v, _a, m) => { if (v == null) return '—'; const w = m.market.wacc && m.market.wacc.wacc; return `${fx(v * 100, 1)} %${w ? `, frente a un coste de capital (WACC) de ${fx(w * 100, 1)} %: ${v > w + 0.03 ? 'crea valor con holgura' : v > w ? 'crea algo de valor' : 'no cubre su coste de capital'}` : ''}.`; },
+    interp: (v, _a, m) => { if (v == null) return m.last.negCapital ? `No aplicable: el capital invertido es negativo (patrimonio negativo por recompras de acciones). Se usa el ROCE${isNum(m.last.roce) ? ` (${fx(m.last.roce * 100, 1)} %)` : ''} en la puntuación.` : '—'; const w = m.market.wacc && m.market.wacc.wacc; return `${fx(v * 100, 1)} %${w ? `, frente a un coste de capital (WACC) de ${fx(w * 100, 1)} %: ${v > w + 0.03 ? 'crea valor con holgura' : v > w ? 'crea algo de valor' : 'no cubre su coste de capital'}` : ''}.`; },
     alert: (v, m) => m.market.wacc && v < m.market.wacc.wacc && 'El ROIC no supera el WACC: el crecimiento destruye valor.' },
   { id: 'roce', label: 'ROCE', group: 'Rentabilidad', fmt: 'pct', better: 'high', formula: 'EBIT / (activos totales − pasivo corriente)',
     cur: (m) => m.T.roce ?? m.last.roce, hist: (m) => histDerived(m.years, 'roce'),

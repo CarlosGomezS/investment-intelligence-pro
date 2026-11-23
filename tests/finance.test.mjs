@@ -65,7 +65,7 @@ test('múltiplos EV y margen de seguridad', () => {
 
 test('crecimiento sugerido acotado y con origen', () => {
   const s = suggestGrowth({ fcfCagr5: 0.4, revCagr5: 0.3, analystRevGrowth: 0.25 });
-  assert.equal(s.value, 0.3); assert.equal(s.parts.length, 3);
+  assert.equal(s.value, 0.25); assert.equal(s.parts.length, 3); // limitada por la previsión de analistas
   assert.equal(suggestGrowth({}).value, null);
 });
 
@@ -118,4 +118,16 @@ test('estados ajustados a splits: acciones y BPA comparables, importes intactos'
   const rows = splitAdjustRows([{ fiscalYear: '2020', weightedAverageShsOut: 600, eps: 4, revenue: 100 }, { fiscalYear: '2025', weightedAverageShsOut: 24000, eps: 3, revenue: 900 }], adj);
   assert.equal(rows[0].weightedAverageShsOut, 24000); assert.equal(rows[0].eps, 0.1); assert.equal(rows[0].revenue, 100);
   assert.equal(rows[1].eps, 3);
+});
+
+test('patrimonio negativo por recompras: ROIC y ROE no aplican, se usa ROCE', () => {
+  const y = deriveYear({ year: '2025', i: { revenue: 26000, operatingIncome: 8500, incomeBeforeTax: 6832, incomeTaxExpense: 1428 }, b: { totalStockholdersEquity: -5578, totalDebt: 17000, cashAndCashEquivalents: 15467, totalAssets: 30000, totalCurrentLiabilities: 18000 }, c: {} });
+  assert.equal(y.roic, null); assert.equal(y.roe, null); assert.ok(y.negCapital);
+  assert.ok(Math.abs(y.rc - 8500 / 12000) < 1e-9);
+  assert.equal(y.netIncome, 6832 - 1428);
+});
+
+test('crecimiento del DCF no extrapola rebotes (BKNG tras 2020)', () => {
+  const s = suggestGrowth({ fcfCagr5: 0.45, revCagr5: 0.317, analystRevGrowth: 0.10, rev1: 0.134, rev10: 0.113 });
+  assert.equal(s.value, 0.134); assert.equal(s.capped, 0.134);
 });
