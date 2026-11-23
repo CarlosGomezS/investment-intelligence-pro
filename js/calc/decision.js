@@ -1,7 +1,7 @@
 // Decisión en cuatro ejes independientes: calidad del negocio, valoración, potencial de rentabilidad y riesgo de
 // pérdida permanente. No se mezclan en una sola nota: una empresa excelente puede estar cara y una barata puede
 // estar deteriorándose. Todas las reglas y umbrales están aquí, a la vista, y la interfaz los explica.
-import { isNum, maxDrawdown } from './finance.js?v=5cb10694';
+import { isNum, maxDrawdown } from './finance.js?v=169485d7';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const cat = (sc, k) => (sc.cats.find((c) => c.key === k) || {}).score;
@@ -32,6 +32,7 @@ export function decide(m, sc, val, alerts) {
   // 3. Potencial de rentabilidad anual: si el precio converge al valor de cada escenario en 5 años, más dividendo
   const dyRaw = isNum(m.dpsTTM) && price > 0 ? m.dpsTTM / price : 0;
   const dy = dyRaw > 0 && dyRaw < 0.25 ? dyRaw : 0; // un dividendo > 25 % del precio es un pago extraordinario o un error: no se suma
+  const dyUnknown = !isNum(m.dpsTTM); // dividendo desconocido: el potencial no lo incluye y se avisa
   const scen = val.dcf && val.dcf.scen ? val.dcf.scen : [];
   const sv = (id) => { const s = scen.find((x) => x.id === id); return s && s.result && !s.result.error && isNum(s.result.perShare) ? Math.max(0, s.result.perShare) : null; };
   // Base = el mismo valor central de la valoración. Pesimista/optimista: ese valor movido lo que se mueve el DCF entre
@@ -40,7 +41,7 @@ export function decide(m, sc, val, alerts) {
   if (isNum(dB) && dB > 0 && isNum(sv('pesimista')) && isNum(sv('optimista')) && isNum(c.value)) { src = 'valor central movido según los escenarios pesimista y optimista del DCF'; pts = { pesimista: c.value * (sv('pesimista') / dB), base: c.value, optimista: c.value * (sv('optimista') / dB) }; }
   else { src = 'rango de los métodos de valoración (cuartiles)'; pts = { pesimista: c.low, base: c.value, optimista: c.high }; }
   const ann = (v) => (isNum(v) && price > 0 ? (v <= 0 ? -1 : (v / price) ** (1 / 5) - 1 + dy) : null);
-  const potential = valuable ? { source: src, years: 5, dy, pesimista: ann(pts.pesimista), base: ann(pts.base), optimista: ann(pts.optimista), values: pts } : null;
+  const potential = valuable ? { source: src, years: 5, dy, dyUnknown, pesimista: ann(pts.pesimista), base: ann(pts.base), optimista: ann(pts.optimista), values: pts } : null;
 
   // 4. Riesgo de pérdida permanente de capital
   const R = []; let r = 0;

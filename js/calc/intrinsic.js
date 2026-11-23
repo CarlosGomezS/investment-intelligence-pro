@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=5cb10694';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=5cb10694';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=169485d7';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=169485d7';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -84,14 +84,16 @@ export function multiples(m, peersAll) {
 export function dividendModel(m, ke) {
   const d = m.dpsSeries;
   if (!isNum(m.dpsTTM)) return { applicable: false, reason: 'Sin datos de dividendos (no se pudo descargar el historial).' };
-  if (!d.length || !(m.dpsTTM > 0)) return { applicable: false, reason: 'La empresa no paga dividendo.' };
+  if (!(m.dpsTTM > 0)) return { applicable: false, reason: 'La empresa no paga dividendo.' };
+  if (!d.length) return { applicable: false, reason: 'Paga dividendo, pero no hay historial anual suficiente para el modelo de dividendos.' };
   const vals = d.map((x) => x.dps);
   const g5 = cagrN(vals, 5);
   const payout = isNum(m.T.dividendsPaid) && isNum(m.T.netIncome) && m.T.netIncome > 0 ? m.T.dividendsPaid / m.T.netIncome : null;
   const growth = isNum(g5) ? Math.min(g5, (ke || 0.08) - 0.01, 0.08) : 0.02;
+  const growthAssumed = !isNum(g5); // sin CAGR de 5 años: 2 % supuesto (marcado)
   const res = ddm({ dps: m.dpsTTM, growth, ke });
   const applicable = vals.length >= 5 && isNum(payout) && payout >= 0.4 && payout < 1;
-  return { applicable, reason: applicable ? '' : isNum(payout) && payout < 0.4 ? `Reparte solo el ${Math.round(payout * 100)} % del beneficio en dividendos (el resto va a recompras o reinversión): el DDM infravaloraría la empresa y no cuenta para el valor central.` : 'Historial de dividendo corto o payout > 100 %: el DDM no es fiable.', g5, growth, payout, ke, ...res, up: res && res.value ? upside(res.value, m.price) : null };
+  return { applicable, reason: applicable ? '' : isNum(payout) && payout < 0.4 ? `Reparte solo el ${Math.round(payout * 100)} % del beneficio en dividendos (el resto va a recompras o reinversión): el DDM infravaloraría la empresa y no cuenta para el valor central.` : 'Historial de dividendo corto o payout > 100 %: el DDM no es fiable.', g5, growth, growthAssumed, payout, ke, ...res, up: res && res.value ? upside(res.value, m.price) : null };
 }
 
 /** Valor intrínseco central: mediana de los métodos disponibles (DCF base pesa doble).

@@ -23,7 +23,13 @@ function mk(n, { loss = false } = {}) {
   return { m: { symbol: 'TST', price: 100, tradeCur: 'USD', profile: { sector: 'Technology' }, years, last, T: { fcf: last.fcf, netIncome: last.netIncome }, prices, ratiosHist: years.map(() => ({ priceToEarningsRatio: 25 })), kmHist: years.map(() => ({ freeCashFlowYield: 0.04 })), pe: 15, marketCap: 500, X: (v) => v, growth: { rev1: 0.1, rev3: 0.1 }, scores: {} }, val: { composite: { value: 150, mos: 0.3 }, reliability: { level: 'media' } } };
 }
 
-test('cocodrilo: con 5 ejercicios la directiva se mide a 4 años y la empresa puede entrar', () => {
+test('cocodrilo: con 5 ejercicios la directiva se mide a 4 años y la empresa puede entrar (con tu confirmación)', async () => {
+  const mem = {}; globalThis.localStorage = { getItem: (k) => mem[k] ?? null, setItem: (k, v) => { mem[k] = v; } };
+  const { manualStore } = await import('../js/calc/methods.js');
+  const [p] = rankMethod('cocodrilo', [{ sym: 'TST', S: mk(5) }]);
+  assert.equal(p.res.verdict, 'vigilar'); // sin tu confirmación, «vigilar»
+  assert.match(p.res.horizon, /entiendes el negocio/);
+  manualStore.set('TST', 'entiendo', true);
   const [x] = rankMethod('cocodrilo', [{ sym: 'TST', S: mk(5) }]);
   assert.equal(x.res.checks.find((k) => k.t === 'Directiva que cuida al accionista').ok, true);
   assert.equal(x.res.verdict, 'entra');

@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, safeUrl, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=5cb10694';
-import { isNum } from '../../calc/finance.js?v=5cb10694';
-import { coverageTier } from '../../calc/reliability.js?v=5cb10694';
+import { esc, safeUrl, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=169485d7';
+import { isNum } from '../../calc/finance.js?v=169485d7';
+import { coverageTier } from '../../calc/reliability.js?v=169485d7';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -27,7 +27,7 @@ export function decisionCard(D, cur) {
     <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
       ${ax('1 · Calidad del negocio', Q.label, isNum(Q.score) ? `${Q.score}/100 (calidad, rentabilidad, foso y caja)` : 'sin datos suficientes')}
       ${ax('2 · Valoración', V.label, isNum(V.value) ? `Valor ${num(V.value)} ${esc(cur)} · precio ${num(V.price)} ${esc(cur)}<br><strong style="font-size:13px;color:var(--ink)">Precio máximo de compra: ${isNum(V.maxBuy) ? num(V.maxBuy) + ' ' + esc(cur) : '—'}</strong><br>margen exigido ${isNum(V.required) ? Math.round(V.required * 100) + ' %' : '—'} (${esc(V.requiredWhy.join('; '))})` : esc(V.reason || 'sin valoración fiable'))}
-      ${ax('3 · Potencial anual (5 años)', P ? (isNum(P.base) ? sp(P.base) : '—') : 'sin dato', P ? `pesimista ${sp(P.pesimista)} · base ${sp(P.base)} · optimista ${sp(P.optimista)}<br>solo mide que el precio cierre la distancia hasta el valor estimado en 5 años${P.dy ? `, con dividendo del ${(P.dy * 100).toFixed(1).replace('.', ',')} %` : ''}; ${esc(P.source)}` : 'sin valoración no hay potencial calculable')}
+      ${ax('3 · Potencial anual (5 años)', P ? (isNum(P.base) ? sp(P.base) : '—') : 'sin dato', P ? `pesimista ${sp(P.pesimista)} · base ${sp(P.base)} · optimista ${sp(P.optimista)}<br>solo mide que el precio cierre la distancia hasta el valor estimado en 5 años${P.dyUnknown ? ', sin incluir el dividendo (sin dato)' : P.dy ? `, con dividendo del ${(P.dy * 100).toFixed(1).replace('.', ',')} %` : ''}; ${esc(P.source)}` : 'sin valoración no hay potencial calculable')}
       ${ax('4 · Riesgo de pérdida permanente', R.label, R.reasons.length ? esc(R.reasons.join('; ')) : 'sin señales de riesgo en los datos (revisa los riesgos de negocio)')}
     </div>
     <p class="note">Fiabilidad de la valoración: <b>${esc(D.reliability || '—')}</b>. El precio máximo de compra es el valor central menos el margen exigido; el margen sube cuanto menos fiable es la valoración. El potencial no es una previsión: es lo que rentaría si el precio convergiera al valor estimado. No es una recomendación de inversión.</p>`);
@@ -66,7 +66,7 @@ export function render(el, S) {
       </div>
       ${relBox(val.reliability)}
       <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · ${comp.n} estimaciones en ${(comp.families || []).length} familias (una cifra por familia, DCF con doble peso)${comp.contrasted === false ? ' (sin DCF ni dividendos: no contrastada)' : ''}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
-    ${card('Señales de alerta', top.length ? top.map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('') + (alerts.length > 4 ? `<p class="note"><a href="#/c/${encodeURIComponent(m.symbol)}/riesgos">Ver las ${alerts.length} alertas</a></p>` : '') : '<p class="note">No se detectan anomalías en los últimos estados financieros.</p>')}
+    ${card('Señales de alerta', top.length ? top.map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('') + (alerts.length > 4 ? `<p class="note"><a href="#/c/${encodeURIComponent(m.symbol)}/riesgos">Ver las ${alerts.length} alertas</a></p>` : '') : (m.years.length >= 2 ? '<p class="note">No se detectan anomalías en los últimos estados financieros.</p>' : '<p class="note">Sin datos suficientes para buscar anomalías: hacen falta al menos dos ejercicios.</p>'))}
   </div>
   <div class="kpis" style="margin-bottom:14px">${K.map(([a, b]) => `<div class="kpi"><span>${a}</span><b>${b}</b></div>`).join('')}</div>
   <div class="grid g2">

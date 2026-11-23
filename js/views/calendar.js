@@ -1,8 +1,8 @@
 // Calendario de resultados y de dividendos, filtrable por tu seguimiento.
-import { data } from '../providers/index.js?v=5cb10694';
-import { store } from '../store.js?v=5cb10694';
-import { esc, card, num, big, date, unavailable, source } from '../ui/dom.js?v=5cb10694';
-import { logoHTML } from '../app.js?v=5cb10694';
+import { data } from '../providers/index.js?v=169485d7';
+import { store } from '../store.js?v=169485d7';
+import { esc, card, num, big, date, unavailable, source } from '../ui/dom.js?v=169485d7';
+import { logoHTML } from '../app.js?v=169485d7';
 
 const st = { kind: 'earnings', days: 14, mine: true, q: '' };
 

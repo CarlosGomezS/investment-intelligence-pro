@@ -40,9 +40,9 @@ export function ttm(quartersAsc, field) {
 
 /** Máxima caída desde máximos de una serie de precios. */
 export function maxDrawdown(closes) {
-  let peak = -Infinity, mdd = 0;
-  for (const c of closes) { if (!isNum(c)) continue; peak = Math.max(peak, c); mdd = Math.min(mdd, c / peak - 1); }
-  return closes.length ? mdd : null;
+  let peak = -Infinity, mdd = 0, n = 0;
+  for (const c of closes || []) { if (!isNum(c) || c <= 0) continue; n++; peak = Math.max(peak, c); mdd = Math.min(mdd, c / peak - 1); }
+  return n >= 2 ? mdd : null; // sin precios válidos no hay caída que medir (no es 0 %)
 }
 
 /** Volatilidad anualizada a partir de cierres diarios. */
@@ -96,7 +96,10 @@ export function deriveYear(y, taxFallback = 0.21) {
   const tax = div(i.incomeTaxExpense, i.incomeBeforeTax);
   // Impuesto real si se puede calcular; si no, el supuesto solo sirve para el ROIC y queda marcado (taxAssumed),
   // nunca como dato: taxRate queda null y no entra en medias ni en el WACC. En pérdidas no hay impuesto que restar.
-  const taxReal = isNum(tax) && tax >= 0 && tax < 0.6 ? tax : null;
+  // Con pérdidas antes de impuestos (o netas) el cociente impuesto/beneficio no es un tipo impositivo (un ingreso
+  // fiscal entre una pérdida da un «20 %» falso): no hay tipo real
+  const loss = (isNum(i.incomeBeforeTax) && i.incomeBeforeTax <= 0) || (isNum(i.netIncome) && i.netIncome <= 0);
+  const taxReal = !loss && isNum(tax) && tax >= 0 && tax < 0.6 ? tax : null;
   const t = taxReal ?? (isNum(ebit) && ebit <= 0 ? 0 : taxFallback);
   const taxAssumed = taxReal == null && isNum(ebit) && ebit > 0;
   // Deuda total: la publicada, o la suma de corto y largo plazo solo si se conocen las dos (con una sola se infravaloraría)
@@ -166,33 +169,34 @@ export function betaFrom(stockAsc, indexAsc) {
   return vi ? cov / vi : null;
 }
 
-/** Piotroski F-Score (9 pruebas) con los dos últimos ejercicios. */
-export function piotroski(a, b) {
-  if (!a || !b) return null;
-  const t = [
-    isNum(a.netIncome) ? a.netIncome > 0 : null, isNum(a.ocf) ? a.ocf > 0 : null, isNum(a.roa) && isNum(b.roa) ? a.roa > b.roa : null, isNum(a.ocf) && isNum(a.netIncome) ? a.ocf > a.netIncome : null,
-    isNum(a.longTermDebt) && isNum(b.longTermDebt) && isNum(a.assets) && isNum(b.assets) ? a.longTermDebt / a.assets <= b.longTermDebt / b.assets : null,
+/** Piotroski F-Score (9 pruebas) como en el artículo original (2000): ROA y rotación sobre los activos al INICIO del
+ * ejercicio; apalancamiento sobre los activos MEDIOS. a = último ejercicio, b = anterior, c = el previo a b
+ * (necesario para los denominadores de b; sin él, esas pruebas quedan sin dato). */
+function piotroskiTests(a, b, c) {
+  const pos = (v) => isNum(v) && v > 0;
+  const roaA = pos(b.assets) ? div(a.netIncome, b.assets) : null, roaB = c && pos(c.assets) ? div(b.netIncome, c.assets) : null;
+  const avgA = pos(a.assets) && pos(b.assets) ? (a.assets + b.assets) / 2 : null, avgB = c && pos(b.assets) && pos(c.assets) ? (b.assets + c.assets) / 2 : null;
+  const levA = isNum(a.longTermDebt) && avgA ? a.longTermDebt / avgA : null, levB = isNum(b.longTermDebt) && avgB ? b.longTermDebt / avgB : null;
+  const turnA = pos(b.assets) ? div(a.revenue, b.assets) : null, turnB = c && pos(c.assets) ? div(b.revenue, c.assets) : null;
+  return [
+    isNum(a.netIncome) ? a.netIncome > 0 : null, isNum(a.ocf) ? a.ocf > 0 : null, isNum(roaA) && isNum(roaB) ? roaA > roaB : null, isNum(a.ocf) && isNum(a.netIncome) ? a.ocf > a.netIncome : null,
+    isNum(levA) && isNum(levB) ? levA <= levB : null,
     isNum(a.currentRatio) && isNum(b.currentRatio) ? a.currentRatio > b.currentRatio : null,
     isNum(a.shares) && isNum(b.shares) ? a.shares <= b.shares * 1.005 : null,
     isNum(a.grossMargin) && isNum(b.grossMargin) ? a.grossMargin > b.grossMargin : null,
-    isNum(a.revenue) && isNum(b.revenue) && isNum(a.assets) && isNum(b.assets) ? a.revenue / a.assets > b.revenue / b.assets : null,
+    isNum(turnA) && isNum(turnB) ? turnA > turnB : null,
   ];
-  const d = piotroskiDetail(t);
-  return d.known === 9 ? d.pos : null; // con pruebas sin dato no hay F-Score: ver piotroskiRange
 }
 const piotroskiDetail = (t) => { const known = t.filter((x) => x !== null); return { pos: known.filter(Boolean).length, known: known.length }; };
-/** Rango posible del F-Score cuando faltan pruebas: mínimo = aprobadas; máximo = aprobadas + sin dato. */
-export function piotroskiRange(a, b) {
+export function piotroski(a, b, c) {
   if (!a || !b) return null;
-  const t = [
-    isNum(a.netIncome) ? a.netIncome > 0 : null, isNum(a.ocf) ? a.ocf > 0 : null, isNum(a.roa) && isNum(b.roa) ? a.roa > b.roa : null, isNum(a.ocf) && isNum(a.netIncome) ? a.ocf > a.netIncome : null,
-    isNum(a.longTermDebt) && isNum(b.longTermDebt) && isNum(a.assets) && isNum(b.assets) ? a.longTermDebt / a.assets <= b.longTermDebt / b.assets : null,
-    isNum(a.currentRatio) && isNum(b.currentRatio) ? a.currentRatio > b.currentRatio : null,
-    isNum(a.shares) && isNum(b.shares) ? a.shares <= b.shares * 1.005 : null,
-    isNum(a.grossMargin) && isNum(b.grossMargin) ? a.grossMargin > b.grossMargin : null,
-    isNum(a.revenue) && isNum(b.revenue) && isNum(a.assets) && isNum(b.assets) ? a.revenue / a.assets > b.revenue / b.assets : null,
-  ];
-  const d = piotroskiDetail(t);
+  const d = piotroskiDetail(piotroskiTests(a, b, c));
+  return d.known === 9 ? d.pos : null; // con pruebas sin dato no hay F-Score: ver piotroskiRange
+}
+/** Rango posible del F-Score cuando faltan pruebas: mínimo = aprobadas; máximo = aprobadas + sin dato. */
+export function piotroskiRange(a, b, c) {
+  if (!a || !b) return null;
+  const d = piotroskiDetail(piotroskiTests(a, b, c));
   return { min: d.pos, max: d.pos + (9 - d.known), known: d.known };
 }
 

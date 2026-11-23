@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=5cb10694';
-import { fmtB } from './alerts.js?v=5cb10694';
+import { isNum } from './finance.js?v=169485d7';
+import { fmtB } from './alerts.js?v=169485d7';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -50,13 +50,17 @@ function mean3(...v) { const x = v.filter(isNum); return x.length ? x.reduce((a,
 
 function growthQuality(m) {
   const Y = m.years.slice(-6); if (Y.length < 3) return '';
-  const acq = Y.reduce((a, y) => a + (y.acquisitions || 0), 0), rev = (Y[Y.length - 1].revenue || 0) - (Y[0].revenue || 0);
-  const debt = (Y[Y.length - 1].debt || 0) - (Y[0].debt || 0);
+  // Sin datos de adquisiciones, deuda o acciones no se afirma que el crecimiento sea orgánico
+  const acqY = Y.slice(1).map((y) => y.acquisitions), acq = acqY.some(isNum) ? acqY.filter(isNum).reduce((a, b) => a + b, 0) : null;
+  const rev = isNum(Y[Y.length - 1].revenue) && isNum(Y[0].revenue) ? Y[Y.length - 1].revenue - Y[0].revenue : null;
+  const debt = isNum(Y[Y.length - 1].debt) && isNum(Y[0].debt) ? Y[Y.length - 1].debt - Y[0].debt : null;
   const parts = [];
   if (acq > 0 && rev > 0 && acq > 0.5 * rev) parts.push(`las adquisiciones (${fmtB(acq)}) equivalen a más de la mitad del aumento de ventas, así que parte del crecimiento es comprado`);
   if (debt > 0 && rev > 0 && debt > rev) parts.push('la deuda ha crecido más que las ventas');
   if (isNum(m.growth.shares5) && m.growth.shares5 > 0.02) parts.push('se apoya en emisión de acciones');
-  return parts.length ? ' Ojo: ' + parts.join('; ') + '.' : ' El crecimiento parece mayoritariamente orgánico (pocas adquisiciones, sin dilución ni deuda creciente).';
+  if (parts.length) return ' Ojo: ' + parts.join('; ') + '.';
+  const miss = [!isNum(acq) && 'adquisiciones', !isNum(debt) && 'deuda', !isNum(m.growth.shares5) && 'número de acciones'].filter(Boolean);
+  return miss.length ? ` Faltan datos de ${miss.join(', ')} para saber si el crecimiento es orgánico.` : ' El crecimiento parece mayoritariamente orgánico (pocas adquisiciones, sin dilución ni deuda creciente).';
 }
 function badCase(m, val) {
   const s = val.dcf && val.dcf.scen ? val.dcf.scen.find((x) => x.id === 'pesimista') : null;
@@ -67,8 +71,10 @@ function goodCase(m, val) {
   return `Sostener un crecimiento del FCF de ${P(s ? s.growth : null)} anual con márgenes estables (escenario optimista: ${s && s.result && !s.result.error ? N(s.result.perShare) + ' ' + m.tradeCur : 'n/d'}), mantener el ROIC por encima del ${P(m.stats.roicAvg5)} mientras reinvierte, y que el mercado no reduzca el múltiplo.`;
 }
 function longTermFit(sc) {
-  const g = (k) => (sc.cats.find((c) => c.key === k) || {}).score ?? 50;
-  const s = (g('calidad') + g('rentabilidad') + g('moat') + g('estabilidad') + g('solidez')) / 5;
+  // Solo con los pilares que tienen nota (sin dato no vale 50); con menos de 3 de 5 no se opina
+  const sc5 = ['calidad', 'rentabilidad', 'moat', 'estabilidad', 'solidez'].map((k) => (sc.cats.find((c) => c.key === k) || {}).score).filter(isNum);
+  if (sc5.length < 3) return { v: 'sin datos suficientes', t: `Solo hay nota en ${sc5.length} de los 5 pilares de largo plazo (calidad, rentabilidad, foso, estabilidad y solidez).` };
+  const s = sc5.reduce((a, b) => a + b, 0) / sc5.length;
   if (s >= 70) return { v: 'sí', t: 'Calidad, rentabilidad y estabilidad compatibles con mantenerla muchos años; el precio de entrada decide la rentabilidad.' };
   if (s >= 55) return { v: 'con matices', t: 'Negocio aceptable, pero alguno de los pilares de largo plazo (foso, estabilidad o deuda) es mejorable.' };
   return { v: 'no parece', t: 'Los fundamentos de largo plazo son débiles o inestables.' };

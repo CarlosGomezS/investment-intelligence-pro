@@ -1,11 +1,11 @@
 // Ventajas competitivas (moat): indicadores cuantitativos que dejan huella en las cuentas
 // + evaluación cualitativa del usuario (factores que ningún proveedor mide), guardada y usada en el scoring.
-import { data } from '../../providers/index.js?v=5cb10694';
-import { fundamentals } from '../../ui/charts.js?v=5cb10694';
-import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=5cb10694';
-import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=5cb10694';
-import { store } from '../../store.js?v=5cb10694';
-import { extra } from '../company.js?v=5cb10694';
+import { data } from '../../providers/index.js?v=169485d7';
+import { fundamentals } from '../../ui/charts.js?v=169485d7';
+import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=169485d7';
+import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=169485d7';
+import { store } from '../../store.js?v=169485d7';
+import { extra } from '../company.js?v=169485d7';
 
 const FACTORS = [
   ['precios', 'Poder de fijación de precios', 'Puede subir precios sin perder clientes (márgenes brutos altos y estables lo sugieren).'],
@@ -52,7 +52,7 @@ export async function render(el, S, ctx) {
   const ok = Q.filter((q) => q[2] === true).length, n = Q.filter((q) => q[2] !== null).length;
   const user = store.moat(m.symbol), items = user.items || {};
   const uvals = Object.values(items).filter(isNum), uscore = uvals.length >= 4 ? (uvals.reduce((a, b) => a + b, 0) / (uvals.length * 2)) * 100 : null;
-  const verdict = n ? (ok / n >= 0.7 ? 'Los datos son coherentes con una ventaja competitiva amplia y sostenida.' : ok / n >= 0.45 ? 'Ventaja competitiva estrecha o parcial: algunos indicadores la respaldan y otros no.' : 'Los datos no muestran una ventaja competitiva clara.') : 'Sin datos suficientes.';
+  const verdict = n >= 4 ? (ok / n >= 0.7 ? 'Los datos son coherentes con una ventaja competitiva amplia y sostenida.' : ok / n >= 0.45 ? 'Ventaja competitiva estrecha o parcial: algunos indicadores la respaldan y otros no.' : 'Los datos no muestran una ventaja competitiva clara.') : `Sin datos suficientes: solo ${n} indicador${n === 1 ? '' : 'es'} con dato (hacen falta 4 para opinar).`;
   const threats = [];
   if (Q[0][2] === false) threats.push('Su rentabilidad no supera de forma estable el coste del capital: la competencia ya erosiona los márgenes.');
   if (Q[1][2] === false) threats.push('Margen bruto bajo o volátil: vulnerable a guerras de precios o a subidas de costes.');

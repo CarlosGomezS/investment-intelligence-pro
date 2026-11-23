@@ -23,8 +23,9 @@ test('5. una media de 5 años exige 5 datos', () => {
 test('4. Piotroski con pruebas sin dato no es un 9/9', () => {
   const a = { netIncome: 1, ocf: 2, roa: 0.1, assets: 10, longTermDebt: 1, currentRatio: 2, shares: 1, revenue: 5 };
   const b = { netIncome: 1, ocf: 1, roa: 0.05, assets: 10, longTermDebt: 2, currentRatio: 1, shares: 1, revenue: 4 };
-  assert.equal(piotroski(a, b), null); // faltan márgenes brutos
-  const rg = piotroskiRange(a, b); assert.equal(rg.known, 8); assert.equal(rg.max, rg.min + 1);
+  const c = { assets: 10 };
+  assert.equal(piotroski(a, b, c), null); // faltan márgenes brutos
+  const rg = piotroskiRange(a, b, c); assert.equal(rg.known, 8); assert.equal(rg.max, rg.min + 1);
 });
 test('8. errores con HTTP 200 se reconocen', async () => {
   // http.js depende del navegador (config): entorno mínimo para importarlo en Node

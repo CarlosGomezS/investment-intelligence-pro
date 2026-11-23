@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=5cb10694';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=5cb10694';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=169485d7';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=169485d7';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -201,7 +201,7 @@ export function buildModel(raw, fxRate = 1) {
   if (!Object.keys(change).length && prices.length > 2) { change = priceChanges(prices); derived.push('variaciones de precio'); }
   let scores = val(raw.scores) || {};
   // Con el balance copiado del año anterior, el F-Score regalaría puntos (deuda y liquidez «sin cambios»): no se calcula
-  if (!isNum(scores.piotroskiScore) && years.length >= 2 && !years[years.length - 1].balanceStale) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } else { const rg = piotroskiRange(years[years.length - 1], years[years.length - 2]); if (rg && rg.known >= 5) scores = { ...scores, piotroskiRange: rg }; } }
+  if (!isNum(scores.piotroskiScore) && years.length >= 2 && !years[years.length - 1].balanceStale) { const f = piotroski(years[years.length - 1], years[years.length - 2], years[years.length - 3]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } else { const rg = piotroskiRange(years[years.length - 1], years[years.length - 2], years[years.length - 3]); if (rg && rg.known >= 5) scores = { ...scores, piotroskiRange: rg }; } }
   if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) && isNum(fx) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
 
   // PER coherente con el resto del análisis: precio / BPA del mismo periodo que los estados (TTM o último ejercicio).
@@ -216,7 +216,7 @@ export function buildModel(raw, fxRate = 1) {
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
     market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaRaw, betaAssumed, betaCalc: isNum(betaCalc), costDebt, taxAvg, wacc: w },
     pe: peRatio, peProvider, periodLabel, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
-    stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('rc'), 5), roicMin5: Math.min(...series('rc').slice(-5).filter(isNum)), roicIsRoce: !!last.negCapital, gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
+    stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('rc'), 5), roicMin5: series('rc').slice(-5).filter(isNum).length ? Math.min(...series('rc').slice(-5).filter(isNum)) : null, roicIsRoce: !!last.negCapital, gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,
   };
 }

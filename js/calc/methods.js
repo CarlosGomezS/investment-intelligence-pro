@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=5cb10694';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=169485d7';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -86,8 +86,12 @@ export const METHODS = {
       const priceSc = isNum(mos) && c7 !== null ? lin(mos, -0.5, 0.35) * 100 : 0; // con valoración poco fiable el precio no suma
       const score = Math.round(0.7 * quality + 0.3 * priceSc);
       const qOk = c1 && [c2, c3, c4, c5, c6].filter(Boolean).length >= 4;
-      const verdict = fin || uF === false ? 'no' : qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
-      return { score: fin ? Math.min(score, 40) : uF === false ? Math.min(score, 20) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: 'años (largo plazo)' };
+      // «Entraría» exige TODOS los criterios con dato (uno sin dato no cuenta como el que se permite fallar) y tu
+      // confirmación del foso. Si falta algo, como mucho «vigilar».
+      const allKnown = [c1, c2, c3, c4, c5, c6, c7].every((c) => c !== null);
+      const verdict = fin || uF === false ? 'no' : qOk && c7 && allKnown && uF === true ? 'entra' : qOk ? 'vigilar' : 'no';
+      const pendB = qOk && c7 ? [!allKnown && 'criterios sin dato', uF !== true && 'tu confirmación del foso'].filter(Boolean) : [];
+      return { score: fin ? Math.min(score, 40) : uF === false ? Math.min(score, 20) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: pendB.length ? `cumple lo medible; para «Entraría» falta: ${pendB.join(' y ')}` : 'años (largo plazo)' };
     },
   },
 
@@ -184,7 +188,10 @@ export const METHODS = {
       const core = c1 && c2 && c3;
       // Caída con indicios de deterioro (ventas hundiéndose, pérdidas o foso dañado): no entra salvo que tú confirmes que es temporal
       const deterioro = panic && c6 === false && user.temporal !== true;
-      const verdict = fin || userNo ? 'no' : core && c4 && !deterioro ? 'entra' : core ? 'vigilar' : 'no';
+      // «Entraría» exige tus confirmaciones (entiendes el negocio y, si ha caído, que el problema es temporal)
+      const userOk = user.entiendo === true && (!panic || user.temporal === true);
+      const verdict = fin || userNo ? 'no' : core && c4 && !deterioro && userOk ? 'entra' : core ? 'vigilar' : 'no';
+      const pendC = core && c4 && !deterioro && !userOk ? [user.entiendo !== true && 'confirmar que entiendes el negocio', panic && user.temporal !== true && 'confirmar que el problema es temporal'].filter(Boolean) : [];
       // Entrada: precio al que volvería a su PER medio o a su rentabilidad FCF media (la más exigente)
       const lv = [];
       if (!slowed && isNum(pe) && isNum(peAvg)) lv.push(price * (peAvg / pe));
@@ -195,7 +202,7 @@ export const METHODS = {
         entry, entryNote: lv.length ? 'precio con el que vuelve a su PER medio y a su rentabilidad FCF media (el más bajo)' : 'valor intrínseco central (sin historia de múltiplos)',
         target: iv, targetNote: 'valor intrínseco central (referencia: Buffett no vende por objetivo)',
         stop: null, stopNote: 'sin stop de precio: se vende si el foso se rompe o el problema resulta permanente',
-        horizon: deterioro && core && c4 ? 'esperar: la caída muestra deterioro en los datos' : core && !c4 ? 'lista corta: esperar precio' : 'años (largo plazo)',
+        horizon: pendC.length ? `cumple los 4 factores; para «Entraría» falta: ${pendC.join(' y ')}` : deterioro && core && c4 ? 'esperar: la caída muestra deterioro en los datos' : core && !c4 ? 'lista corta: esperar precio' : 'años (largo plazo)',
         manualKeys: panic ? ['entiendo', 'temporal'] : ['entiendo'],
       };
     },
@@ -366,7 +373,7 @@ export const METHODS = {
       const score = isNum(pegy) ? Math.round(pegy <= 0.5 ? 100 : pegy <= 1 ? 100 - (pegy - 0.5) * 80 : Math.max(0, 60 - (pegy - 1) * 60)) : 0;
       // Sin dato de dividendo: sin PEGY no hay «entra»; si el PEG (sin dividendo, más exigente) ya es ≤ 1, «vigilar»
       const verdict = !okG ? 'no' : dyUnknown ? (pe / Math.min(g * 100, 30) <= 1 ? 'vigilar' : 'no') : pegy <= 1 ? 'entra' : pegy <= 1.5 ? 'vigilar' : 'no';
-      return { score, verdict, checks, entry: fair, entryNote: 'precio con PEGY = 1 (crecimiento limitado al 30 %)', target: fair, targetNote: 'precio justo (PEGY = 1)', stop: null, stopNote: 'sin stop de precio: se vende si cambia la historia', horizon: '1-5 años' };
+      return { score, verdict, checks, entry: fair, entryNote: dyUnknown ? 'precio con PEG = 1 (sin el dividendo, que no hay dato; crecimiento limitado al 30 %)' : 'precio con PEGY = 1 (crecimiento limitado al 30 %)', target: fair, targetNote: dyUnknown ? 'precio justo con PEG = 1 (sin dividendo)' : 'precio justo (PEGY = 1)', stop: null, stopNote: 'sin stop de precio: se vende si cambia la historia', horizon: '1-5 años' };
     },
   },
 

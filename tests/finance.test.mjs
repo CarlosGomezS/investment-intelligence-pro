@@ -97,7 +97,9 @@ test('cálculos propios: variaciones, beta, Piotroski y Altman', () => {
   const b = betaFrom(st, idx); assert.ok(b > 1.5 && b < 2.5, String(b));
   const a = { netIncome: 10, ocf: 15, roa: 0.1, longTermDebt: 10, assets: 100, currentRatio: 1.5, shares: 100, grossMargin: 0.5, revenue: 80 };
   const p0 = { netIncome: 8, ocf: 9, roa: 0.08, longTermDebt: 20, assets: 100, currentRatio: 1.2, shares: 101, grossMargin: 0.45, revenue: 70 };
-  assert.equal(piotroski(a, p0), 9);
+  const pp = { assets: 100 }; // ejercicio previo: activos de inicio de año de p0 (denominadores del artículo original)
+  assert.equal(piotroski(a, p0, pp), 9);
+  assert.equal(piotroski(a, p0), null); // sin el ejercicio previo, ROA y rotación de p0 quedan sin dato
   const z = altman({ assets: 100, currentAssets: 50, currentLiabilities: 30, retainedEarnings: 20, ebit: 15, liabilities: 50, revenue: 120 }, 200);
   assert.ok(Math.abs(z - (1.2 * 0.2 + 1.4 * 0.2 + 3.3 * 0.15 + 0.6 * 4 + 1.2)) < 1e-9);
 });

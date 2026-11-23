@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=5cb10694';
+import { isNum, div, mean } from './finance.js?v=169485d7';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -62,8 +62,9 @@ export const RATIOS = [
     cur: (m) => m.T.currentRatio ?? m.last.currentRatio ?? m.rTTM.currentRatioTTM, hist: (m) => histDerived(m.years, 'currentRatio'),
     interp: (v, _a, m) => v == null ? '—' : v < 1 && isNum(m.T.deferredRevenue) && isNum(m.T.currentLiabilities) && m.T.deferredRevenue / m.T.currentLiabilities > 0.3 ? `Por debajo de 1, pero el ${fx(m.T.deferredRevenue / m.T.currentLiabilities * 100, 0)} % del pasivo corriente son ingresos cobrados por adelantado (suscripciones), que no se pagan en efectivo: típico y sano en software.` : v < 1 ? 'Por debajo de 1: depende de generar caja o refinanciar para pagar el corto plazo.' : v > 3 ? 'Muy holgada (puede indicar caja ociosa).' : 'Holgura adecuada para el corto plazo.', alert: (v) => v < 0.8 && 'Liquidez corriente inferior a 0,8.' },
   { id: 'qr', label: 'Prueba ácida', group: 'Solvencia', fmt: 'n', better: 'band', formula: '(Activo corriente − inventario) / pasivo corriente',
-    cur: (m) => div(isNum(m.T.currentAssets) ? m.T.currentAssets - (m.T.inventory || 0) : null, m.T.currentLiabilities) ?? m.rTTM.quickRatioTTM,
-    hist: (m) => m.years.map((y) => ({ year: y.year, v: div(isNum(y.currentAssets) ? y.currentAssets - (y.inventory || 0) : null, y.currentLiabilities) })).filter((p) => isNum(p.v)),
+    // Sin dato de inventario no se resta 0 (inflaría la liquidez): se usa el ratio del proveedor o queda sin dato
+    cur: (m) => div(isNum(m.T.currentAssets) && isNum(m.T.inventory) ? m.T.currentAssets - m.T.inventory : null, m.T.currentLiabilities) ?? m.rTTM.quickRatioTTM ?? null,
+    hist: (m) => m.years.map((y) => ({ year: y.year, v: div(isNum(y.currentAssets) && isNum(y.inventory) ? y.currentAssets - y.inventory : null, y.currentLiabilities) })).filter((p) => isNum(p.v)),
     interp: (v) => v == null ? '—' : `${fx(v, 2)}: liquidez sin contar inventarios.`, alert: (v) => v < 0.5 && 'Prueba ácida inferior a 0,5.' },
   { id: 'de', label: 'Deuda / Patrimonio', group: 'Solvencia', fmt: 'n', better: 'low', formula: 'Deuda financiera total / patrimonio neto',
     cur: (m) => (isNum(m.T.equity) && m.T.equity > 0 ? m.T.debtToEquity : null), hist: (m) => histDerived(m.years, 'debtToEquity').filter((p) => p.v >= 0),
@@ -82,11 +83,11 @@ export const RATIOS = [
     interp: (v, _a, m) => v == null ? '—' : `${fx(v * 100, 1)} %${m.market.rf10 ? ` frente al ${fx(m.market.rf10 * 100, 2)} % del bono a 10 años: ${v > m.market.rf10 ? 'prima positiva' : 'el bono rinde más que el beneficio'}` : ''}.`, alert: () => false },
   { id: 'dy', label: 'Rentabilidad por dividendo', group: 'Rendimientos', fmt: 'pct', better: 'high', formula: 'Dividendos por acción últimos 12 meses / precio',
     cur: (m) => (isNum(m.dpsTTM) && m.price ? m.dpsTTM / m.price : null), hist: (m) => histFrom(m.ratiosHist, 'dividendYield').filter((h) => h.v < 0.25), // >25 % = dato sin ajustar a splits
-    interp: (v) => !v ? 'No reparte dividendo.' : `${fx(v * 100, 2)} % anual.`, alert: (v) => v > 0.09 && 'Dividendo superior al 9 %: el mercado puede estar descontando un recorte.' },
+    interp: (v, _a, m) => v == null ? (m && m.dpsTTM === 0 ? 'No reparte dividendo.' : 'Sin dato de dividendos.') : v === 0 ? 'No reparte dividendo.' : `${fx(v * 100, 2)} % anual.`, alert: (v) => v > 0.09 && 'Dividendo superior al 9 %: el mercado puede estar descontando un recorte.' },
   { id: 'payout', label: 'Payout', group: 'Rendimientos', fmt: 'pct', better: 'band', formula: 'Dividendos pagados / beneficio neto',
     // Con pérdidas el payout no existe (saldría negativo y parecería «sostenible»)
     cur: (m) => { const ni = m.T.netIncome ?? m.last.netIncome; return isNum(ni) && ni > 0 ? div(m.T.dividendsPaid ?? m.last.dividendsPaid, ni) : null; }, hist: (m) => m.years.map((y) => ({ year: y.year, v: y.netIncome > 0 ? div(y.dividendsPaid, y.netIncome) : null })).filter((p) => isNum(p.v) && p.v >= 0),
-    interp: (v, _a, m) => v == null && (m.T.dividendsPaid ?? m.last.dividendsPaid) > 0 && !((m.T.netIncome ?? m.last.netIncome) > 0) ? 'Paga dividendo teniendo pérdidas: no lo cubre el beneficio, insostenible si persiste.' : v == null || v === 0 ? 'Sin dividendos.' : v < 0.6 ? 'Payout sostenible.' : v < 0.9 ? 'Payout exigente.' : 'Reparte más de lo que gana: insostenible si persiste.', alert: (v) => v > 1 && 'Payout superior al 100 %.' },
+    interp: (v, _a, m) => v == null && (m.T.dividendsPaid ?? m.last.dividendsPaid) > 0 && !((m.T.netIncome ?? m.last.netIncome) > 0) ? 'Paga dividendo teniendo pérdidas: no lo cubre el beneficio, insostenible si persiste.' : v == null ? (m.dpsTTM === 0 ? 'Sin dividendos.' : 'Sin dato.') : v === 0 ? 'Sin dividendos.' : v < 0.6 ? 'Payout sostenible.' : v < 0.9 ? 'Payout exigente.' : 'Reparte más de lo que gana: insostenible si persiste.', alert: (v) => v > 1 && 'Payout superior al 100 %.' },
 ];
 
 export const fmtRatio = (v, f) => (!isNum(v) ? '—' : f === 'pct' ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %' : f === 'x' ? v.toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '×' : v.toLocaleString('es-ES', { maximumFractionDigits: 2, minimumFractionDigits: 2 }));

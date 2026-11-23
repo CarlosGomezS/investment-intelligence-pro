@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=5cb10694';
-import { alphavantage } from './alphavantage.js?v=5cb10694';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=5cb10694';
-import { twelvedata } from './twelvedata.js?v=5cb10694';
-import { roic } from './roic.js?v=5cb10694';
-import { sec, forgetSec } from './sec.js?v=5cb10694';
-import { esef, forgetEsef } from './esef.js?v=5cb10694';
-import { config } from '../config.js?v=5cb10694';
-import { ApiError, usage, queueDelay } from './http.js?v=5cb10694';
-import { setHint } from './hints.js?v=5cb10694';
+import { fmp } from './fmp.js?v=169485d7';
+import { alphavantage } from './alphavantage.js?v=169485d7';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=169485d7';
+import { twelvedata } from './twelvedata.js?v=169485d7';
+import { roic } from './roic.js?v=169485d7';
+import { sec, forgetSec } from './sec.js?v=169485d7';
+import { esef, forgetEsef } from './esef.js?v=169485d7';
+import { config } from '../config.js?v=169485d7';
+import { ApiError, usage, queueDelay } from './http.js?v=169485d7';
+import { setHint } from './hints.js?v=169485d7';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 

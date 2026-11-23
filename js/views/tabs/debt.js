@@ -1,8 +1,8 @@
 // Deuda y solvencia: estructura, vencimientos, coste, cobertura, apalancamiento, liquidez y riesgo de refinanciación.
-import { fundamentals } from '../../ui/charts.js?v=5cb10694';
-import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=5cb10694';
-import { isNum, div, lin, mean } from '../../calc/finance.js?v=5cb10694';
-import { gauge } from './overview.js?v=5cb10694';
+import { fundamentals } from '../../ui/charts.js?v=169485d7';
+import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=169485d7';
+import { isNum, div, lin, mean } from '../../calc/finance.js?v=169485d7';
+import { gauge } from './overview.js?v=169485d7';
 
 export function solvency(m) {
   const T = m.T, L = m.last;
@@ -30,11 +30,11 @@ export function render(el, S) {
     ${card('Puntuación de solvencia', `<div class="gauge">${gauge(sv.score)}<div class="verdict" style="color:${scoreColor(sv.score)}">${sv.score == null ? 'Sin datos' : sv.score >= 75 ? 'Solvencia muy sólida' : sv.score >= 55 ? 'Solvencia adecuada' : sv.score >= 40 ? 'Solvencia vigilable' : 'Solvencia débil'}</div><p class="note">Media ponderada de los ${sv.factors.filter((f) => f.score != null).length} factores disponibles (pesos en la tabla).</p></div>`)}
     ${card('Estructura de la deuda', `<div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><span>Deuda total</span><b>${big(T.debt ?? m.last.debt, cur)}</b></div><div class="kpi"><span>Deuda neta</span><b>${big(T.netDebt ?? m.last.netDebt, cur)}</b></div>
-      <div class="kpi"><span>Vence en &lt; 12 meses</span><b>${big(std, cur)}</b><small>${pct(div(std, (std || 0) + (ltd || 0)), 0)} del total</small></div><div class="kpi"><span>Vence en &gt; 12 meses</span><b>${big(ltd, cur)}</b></div>
+      <div class="kpi"><span>Vence en &lt; 12 meses</span><b>${big(std, cur)}</b><small>${isNum(std) && isNum(ltd) ? pct(div(std, std + ltd), 0) + ' del total' : 'porcentaje sin dato'}</small></div><div class="kpi"><span>Vence en &gt; 12 meses</span><b>${big(ltd, cur)}</b></div>
       <div class="kpi"><span>Caja e inversiones CP</span><b>${big(T.cash ?? m.last.cash, cur)}</b></div><div class="kpi"><span>Coste medio de la deuda</span><b>${pct(cod, 2)}</b><small>intereses / deuda, media 3a</small></div></div>
       <p class="note">El calendario detallado de vencimientos por año solo figura en las notas del informe anual${cik ? ` (<a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=10-K" target="_blank" rel="noopener">10-K en SEC EDGAR</a>, nota «Debt»)` : ''}; los proveedores de datos solo distinguen corto y largo plazo.</p>`)}
     ${card('Liquidez', `<div class="kpis" style="grid-template-columns:1fr 1fr">
-      <div class="kpi"><span>Liquidez corriente</span><b>${num(T.currentRatio ?? m.last.currentRatio, 2)}</b></div><div class="kpi"><span>Prueba ácida</span><b>${num(div(isNum(T.currentAssets) ? T.currentAssets - (T.inventory || 0) : null, T.currentLiabilities), 2)}</b></div>
+      <div class="kpi"><span>Liquidez corriente</span><b>${num(T.currentRatio ?? m.last.currentRatio, 2)}</b></div><div class="kpi"><span>Prueba ácida</span><b>${num(div(isNum(T.currentAssets) && isNum(T.inventory) ? T.currentAssets - T.inventory : null, T.currentLiabilities), 2)}</b></div>
       <div class="kpi"><span>Ratio de caja</span><b>${num(div(T.cash, T.currentLiabilities), 2)}</b></div><div class="kpi"><span>Capital circulante</span><b>${big(isNum(T.currentAssets) && isNum(T.currentLiabilities) ? T.currentAssets - T.currentLiabilities : null, cur)}</b></div></div>`)}
   </div>
   <div style="margin-top:14px">${card('Factores de la puntuación de solvencia', `<div class="tablewrap"><table><thead><tr><th class="l">Factor</th><th>Valor</th><th>Peso</th><th>Puntos</th><th class="l">Lectura</th></tr></thead><tbody>${sv.factors.map((f) => `<tr><td class="l">${esc(f.k)}</td><td>${isNum(f.v) ? f.d(f.v) : '—'}</td><td>${f.w} %</td><td style="color:${scoreColor(f.score)}"><b>${f.score ?? '—'}</b></td><td class="l">${isNum(f.v) ? esc(f.why(f.v)) : 'Dato no disponible: el factor se excluye y el resto se repondera.'}</td></tr>`).join('')}</tbody></table></div>`)}</div>

@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=5cb10694';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=169485d7';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';
@@ -15,7 +15,9 @@ export function detectAlerts(m) {
   if (isNum(rg) && rg < -0.1) add('alta', 'Ingresos', 'Caída brusca de ingresos', `Las ventas bajaron un ${pct(-rg)} en ${a.year} (de ${fmtB(b.revenue)} a ${fmtB(a.revenue)}).`);
   else if (isNum(rg) && rg < 0) add('media', 'Ingresos', 'Ingresos a la baja', `Las ventas cayeron un ${pct(-rg)} en ${a.year}.`);
 
-  const gm3 = mean(Y.slice(-4, -1).map((y) => y.grossMargin)), om3 = mean(Y.slice(-4, -1).map((y) => y.operatingMargin));
+  // Medias de los 3 años previos: exigen los 3 datos
+  const avg3 = (k) => { const v = Y.slice(-4, -1).map((y) => y[k]).filter(isNum); return v.length >= 3 ? mean(v) : null; };
+  const gm3 = avg3('grossMargin'), om3 = avg3('operatingMargin');
   if (isNum(a.grossMargin) && isNum(gm3) && a.grossMargin < gm3 - 0.03) add('media', 'Márgenes', 'Deterioro del margen bruto', `Margen bruto ${pct(a.grossMargin)} frente a una media de ${pct(gm3)} en los 3 años previos (${pp(a.grossMargin - gm3)}).`);
   if (isNum(a.operatingMargin) && isNum(om3) && a.operatingMargin < om3 - 0.03) add('media', 'Márgenes', 'Deterioro del margen operativo', `Margen operativo ${pct(a.operatingMargin)} frente a ${pct(om3)} de media (${pp(a.operatingMargin - om3)}).`);
 
@@ -31,7 +33,7 @@ export function detectAlerts(m) {
   if (isNum(s1) && s1 > 0.03) add('media', 'Accionistas', 'Dilución de acciones', `El número de acciones aumentó un ${pct(s1)} en el último año.`);
   else if (isNum(s5) && s5 > 0.02) add('media', 'Accionistas', 'Dilución sostenida', `Las acciones crecen un ${pct(s5)} anual en 5 años: tu parte de la empresa se reduce.`);
 
-  const roic3 = mean(Y.slice(-4, -1).map((y) => y.roic).filter(isNum));
+  const roic3 = avg3('roic');
   if (isNum(a.roic) && isNum(roic3) && Y.slice(-4).every((y) => !y.negCapital) && a.roic < roic3 - 0.05) add('media', 'Rentabilidad', 'Deterioro del ROIC', `ROIC ${pct(a.roic)} frente a ${pct(roic3)} de media previa.`);
 
   const ig = a.balanceStale ? null : gr(a.inventory, b.inventory);

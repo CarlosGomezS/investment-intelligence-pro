@@ -1,9 +1,9 @@
 // SEC EDGAR (oficial, gratuito, sin clave). Cubre empresas de EE. UU. y extranjeras registradas en la SEC
 // (20-F/40-F: ASML, TSMC, Santander, Novo Nordisk…). Requiere el Worker: la SEC no admite llamadas desde el navegador.
-import { getJSON } from './http.js?v=5cb10694';
-import { config } from '../config.js?v=5cb10694';
-import { toStatements } from './xbrl.js?v=5cb10694';
-import { hint } from './hints.js?v=5cb10694';
+import { getJSON } from './http.js?v=169485d7';
+import { config } from '../config.js?v=169485d7';
+import { toStatements } from './xbrl.js?v=169485d7';
+import { hint } from './hints.js?v=169485d7';
 
 const H = () => config.get().cacheHours;
 let tickers = null;

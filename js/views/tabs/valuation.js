@@ -1,10 +1,10 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=5cb10694';
-import { isNum } from '../../calc/finance.js?v=5cb10694';
-import { relBox } from './overview.js?v=5cb10694';
-import { store } from '../../store.js?v=5cb10694';
-import { loadPeers } from './peers.js?v=5cb10694';
-import { exportXLSX } from '../../export.js?v=5cb10694';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=169485d7';
+import { isNum } from '../../calc/finance.js?v=169485d7';
+import { relBox } from './overview.js?v=169485d7';
+import { store } from '../../store.js?v=169485d7';
+import { loadPeers } from './peers.js?v=169485d7';
+import { exportXLSX } from '../../export.js?v=169485d7';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -70,7 +70,7 @@ export async function render(el, S, ctx) {
     ${card('Valoración por múltiplos', `<div class="tablewrap"><table><thead><tr><th class="l">Método</th><th>Múltiplo</th><th>Precio implícito</th><th>vs precio</th><th class="l">Origen</th></tr></thead><tbody>${val.mult.map((r) => `<tr><td class="l">${esc(r.method)}</td><td>${isNum(r.multiple) ? num(r.multiple, 1) + '×' : '—'}</td><td><b>${num(r.value)}</b></td><td class="${cls(r.up)}">${sgnPct(r.up, 0)}</td><td class="l">${origin(r.origin)}${r.note ? `<br><span class="note">${esc(r.note)}</span>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="note">Múltiplo medio × métrica TTM. Para EV se resta la deuda neta y se divide entre las acciones. Se excluyen múltiplos negativos o superiores a 500.</p>`)}
     ${card('Descuento de dividendos (DDM, Gordon)', !S.raw.dividends.ok ? '<div class="empty">Tus fuentes no ofrecen el historial de dividendos de esta empresa, así que el DDM no se puede calcular.</div>' : !val.ddm.reason || val.ddm.applicable ? `<div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><span>Dividendo últimos 12 meses</span><b>${num(m.dpsTTM)} ${esc(cur)}</b></div><div class="kpi"><span>CAGR dividendo 5a</span><b>${pct(val.ddm.g5)}</b></div>
-      <div class="kpi"><span>Crecimiento aplicado</span><b>${pct(val.ddm.growth)}</b><small>min(CAGR 5a; ke − 1 p.p.; 8 %)</small></div><div class="kpi"><span>Coste del capital (ke)</span><b>${pct(val.ddm.ke, 2)}</b></div>
+      <div class="kpi"><span>Crecimiento aplicado</span><b>${pct(val.ddm.growth)}</b><small>${val.ddm.growthAssumed ? 'supuesto: 2 % (no hay 5 años de dividendos)' : 'min(CAGR 5a; ke − 1 p.p.; 8 %)'}</small></div><div class="kpi"><span>Coste del capital (ke)</span><b>${pct(val.ddm.ke, 2)}</b></div>
       <div class="kpi"><span>Valor DDM</span><b>${num(val.ddm.value)} ${esc(cur)}</b></div><div class="kpi"><span>vs precio</span><b class="${cls(val.ddm.up)}">${sgnPct(val.ddm.up, 0)}</b></div></div>${val.ddm.error ? `<p class="note">${esc(val.ddm.error)}</p>` : ''}${val.ddm.reason ? `<p class="note">${esc(val.ddm.reason)}</p>` : ''}` : `<div class="empty">${esc(val.ddm.reason)}</div>`)}
   </div>
   <p class="note noprint" style="margin-top:12px"><button class="btn sm" id="vx">Exportar valoración a Excel</button> Los supuestos que cambies se guardan para esta empresa en tu navegador.</p>`;

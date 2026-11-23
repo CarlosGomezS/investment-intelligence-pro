@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=5cb10694';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=169485d7';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -18,8 +18,10 @@ export function metricsFor(m, ctx) {
   const revDown = Y.slice(-10).map((y, i, a) => (i ? isNum(y.revenue) && isNum(a[i - 1].revenue) && y.revenue < a[i - 1].revenue : null)).filter((v) => v !== null);
   const niNeg = Y.slice(-10).filter((y) => isNum(y.netIncome)).map((y) => y.netIncome < 0);
   const closes = (ctx.prices || []).slice(-1260).map((p) => p.close);
-  const peAvg5 = mean(m.ratiosHist.slice(-5).map((r) => r.priceToEarningsRatio).filter((v) => isNum(v) && v > 0 && v < 300));
-  const eveAvg5 = mean(m.kmHist.slice(-5).map((r) => r.evToEBITDA).filter((v) => isNum(v) && v > 0 && v < 300));
+  // Medias de 5 años con 5 datos (si no, «sin dato»)
+  const avgN = (arr, n) => { const v = arr.filter((x) => isNum(x) && x > 0 && x < 300); return v.length >= n ? mean(v) : null; };
+  const peAvg5 = avgN(m.ratiosHist.slice(-5).map((r) => r.priceToEarningsRatio), 5);
+  const eveAvg5 = avgN(m.kmHist.slice(-5).map((r) => r.evToEBITDA), 5);
   const eve = isNum(T.ebitda) && T.ebitda > 0 ? div(m.ev, m.X(T.ebitda)) : null;
   const fcfy = div(m.X(T.fcf), m.marketCap);
   // Métricas de historia: con pocos años no se puntúan (2 de 2 años con FCF positivo no son 10 años de estabilidad)
@@ -27,7 +29,7 @@ export function metricsFor(m, ctx) {
   const enough = (arr, n = MINY) => arr.filter(isNum).length >= n;
   const gmStd = enough(s('grossMargin').slice(-10)) ? stdev(s('grossMargin').slice(-10).filter(isNum)) : null;
   const roicStd = enough(s('rc').slice(-10)) ? stdev(s('rc').slice(-10).filter(isNum)) : null;
-  const roicAvg5 = enough(s('rc').slice(-5), 3) ? mean(s('rc').slice(-5).filter(isNum)) : null;
+  const roicAvg5 = enough(s('rc').slice(-5), 5) ? mean(s('rc').slice(-5).filter(isNum)) : null; // «media 5 años» = 5 datos
   const ratioY = (arr) => (arr.length >= MINY ? arr.filter(Boolean).length / arr.length : null);
   // Variaciones año a año: 5 ejercicios dan 4 variaciones
   const ratioV = (arr) => (arr.length >= MINY - 1 ? arr.filter(Boolean).length / arr.length : null);

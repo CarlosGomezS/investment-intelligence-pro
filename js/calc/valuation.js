@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=5cb10694';
+import { isNum, div, mean, median, cagr } from './finance.js?v=169485d7';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -106,6 +106,7 @@ export function analystGrowth(estimatesAsc, lastRevenue, lastYear) {
 }
 
 export { mean };
-export const ratioAvg = (rows, field, n) => mean(rows.slice(-n).map((r) => r[field]).filter((v) => isNum(v) && v > 0 && v < 500));
-export const ev = (marketCap, netDebt) => (isNum(marketCap) ? marketCap + (isNum(netDebt) ? netDebt : 0) : null);
+// Media de N años: exige N datos válidos (una «media de 5 años» con 1 dato no lo es)
+export const ratioAvg = (rows, field, n) => { const v = (rows || []).slice(-n).map((r) => r[field]).filter((x) => isNum(x) && x > 0 && x < 500); return v.length >= n ? mean(v) : null; };
+export const ev = (marketCap, netDebt) => (isNum(marketCap) && isNum(netDebt) ? marketCap + netDebt : null); // deuda neta desconocida = EV desconocido
 export { div };

@@ -1,8 +1,8 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=5cb10694';
-import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=5cb10694';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=5cb10694';
+import { fundamentals } from '../../ui/charts.js?v=169485d7';
+import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=169485d7';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=169485d7';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;
@@ -16,26 +16,29 @@ export function render(el, S) {
   const labels = Y.map((y) => y.year);
   const first = Y[Math.max(0, Y.length - 6)], last = Y[Y.length - 1];
   const win = Y.slice(-6);
-  const acq = sum(win.slice(1).map((y) => y.acquisitions)), revInc = isNum(last.revenue) && isNum(first.revenue) ? last.revenue - first.revenue : null;
+  // Sumas solo con algún dato: sin ninguno es «sin dato», no 0
+  const sumK = (xs) => (xs.some(isNum) ? sum(xs) : null);
+  const acq = sumK(win.slice(1).map((y) => y.acquisitions)), revInc = isNum(last.revenue) && isNum(first.revenue) ? last.revenue - first.revenue : null;
   const gwInc = isNum(last.goodwill) && isNum(first.goodwill) ? last.goodwill - first.goodwill : null;
   const debtInc = isNum(last.debt) && isNum(first.debt) ? last.debt - first.debt : null;
   const shG = cagrN(sg('shares'), Math.min(5, Y.length - 1));
-  const buy = sum(win.slice(1).map((y) => y.buybacks)), iss = sum(win.slice(1).map((y) => y.issuance)), sbc = sum(win.slice(1).map((y) => y.sbc));
+  const buy = sumK(win.slice(1).map((y) => y.buybacks)), iss = sumK(win.slice(1).map((y) => y.issuance)), sbc = sumK(win.slice(1).map((y) => y.sbc));
   const assetTurn = Y.map((y) => div(y.revenue, y.assets));
   const revStd = stdev(yoy(s('revenue')).slice(-10).filter(isNum));
   const fcfPos = Y.slice(-10).filter((y) => isNum(y.fcf));
   const checks = [
-    { ok: !(isNum(acq) && isNum(revInc) && revInc > 0 && acq > 0.5 * revInc), t: isNum(acq) && acq > 0 ? `Adquisiciones de ${big(acq, cur)} en ${win.length - 1} años frente a un aumento de ventas de ${big(revInc, cur)} (${isNum(revInc) && revInc > 0 ? pct(acq / revInc, 0) : '—'}).` : 'Sin adquisiciones relevantes en el periodo según el estado de flujos.' },
-    { ok: !(isNum(gwInc) && isNum(revInc) && gwInc > 0.3 * Math.max(revInc, 1)), t: `Fondo de comercio: ${big(first.goodwill, cur)} → ${big(last.goodwill, cur)}.` },
-    { ok: !(isNum(debtInc) && isNum(revInc) && debtInc > Math.max(revInc, 0)), t: `Deuda: ${big(first.debt, cur)} → ${big(last.debt, cur)} (ventas ${big(first.revenue, cur)} → ${big(last.revenue, cur)}).` },
-    { ok: !(isNum(shG) && shG > 0.01), t: `Acciones: ${sgnPct(shG)} anual. Recompras ${big(buy, cur)}, emisiones ${big(iss, cur)}, pagos en acciones ${big(sbc, cur)} en el periodo.` },
+    { ok: isNum(acq) && isNum(revInc) ? !(revInc > 0 && acq > 0.5 * revInc) : null, t: !isNum(acq) ? 'Sin dato de adquisiciones en el estado de flujos: no se puede saber si parte del crecimiento es comprado.' : acq > 0 ? `Adquisiciones de ${big(acq, cur)} en ${win.length - 1} años frente a un aumento de ventas de ${big(revInc, cur)} (${isNum(revInc) && revInc > 0 ? pct(acq / revInc, 0) : '—'}).` : 'Sin adquisiciones relevantes en el periodo según el estado de flujos.' },
+    { ok: isNum(gwInc) && isNum(revInc) ? !(gwInc > 0.3 * Math.max(revInc, 1)) : null, opt: true, t: `Fondo de comercio: ${big(first.goodwill, cur)} → ${big(last.goodwill, cur)}.` },
+    { ok: isNum(debtInc) && isNum(revInc) ? !(debtInc > Math.max(revInc, 0)) : null, t: `Deuda: ${big(first.debt, cur)} → ${big(last.debt, cur)} (ventas ${big(first.revenue, cur)} → ${big(last.revenue, cur)}).` },
+    { ok: isNum(shG) ? !(shG > 0.01) : null, t: `Acciones: ${sgnPct(shG)} anual. Recompras ${big(buy, cur)}, emisiones ${big(iss, cur)}, pagos en acciones ${big(sbc, cur)} en el periodo.` },
   ];
   // Si las ventas no crecen, no hay «crecimiento de calidad» que diagnosticar
   checks.unshift({ ok: isNum(revInc) && revInc > 0, t: isNum(revInc) ? `Ventas: ${big(first.revenue, cur)} → ${big(last.revenue, cur)} (${revInc > 0 ? 'crecen' : 'se reducen'}).` : 'Sin ventas comparables.' });
-  const real = checks.filter((c) => c.ok).length;
+  const real = checks.filter((c) => c.ok === true).length;
+  const unknown = checks.slice(1).filter((c) => c.ok === null && !c.opt).length; // adquisiciones, deuda o acciones sin dato
   el.innerHTML = `
-  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${!checks[0].ok ? 'Las ventas no crecen en el periodo: el negocio se está reduciendo o está estancado.' : real === 5 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 4 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
-    ${checks.map((c) => `<div class="alert-row"><span class="pill ${c.ok ? 'baja' : 'media'}" style="${c.ok ? 'color:var(--pos)' : ''}">${c.ok ? 'OK' : 'Ojo'}</span><div><p style="margin:0">${esc(c.t)}</p></div></div>`).join('')}`)}
+  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${!checks[0].ok ? 'Las ventas no crecen en el periodo: el negocio se está reduciendo o está estancado.' : unknown ? 'Las ventas crecen, pero faltan datos (adquisiciones, deuda o acciones) para saber si el crecimiento es orgánico.' : real === 5 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 4 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
+    ${checks.map((c) => `<div class="alert-row"><span class="pill ${c.ok === true ? 'baja' : c.ok === null ? '' : 'media'}" style="${c.ok === true ? 'color:var(--pos)' : ''}">${c.ok === true ? 'OK' : c.ok === null ? 'Sin dato' : 'Ojo'}</span><div><p style="margin:0">${esc(c.t)}</p></div></div>`).join('')}`)}
   <div class="grid g2" style="margin-top:14px">
     ${card('Tasas de crecimiento anual compuesto (CAGR)', table('cagrT', [{ k: 'l', label: 'Magnitud', align: 'left' }, ...H.map((h) => ({ k: String(h), label: h + (h === 1 ? ' año' : ' años'), f: (v) => `<span class="${cls(v)}">${pct(v)}</span>` }))], rows) + '<p class="note">«—»: no hay suficientes años o el valor inicial/final no es positivo (el CAGR no se puede calcular).</p>')}
     ${card('Estabilidad y generación de caja', `<div class="kpis" style="grid-template-columns:1fr 1fr">
