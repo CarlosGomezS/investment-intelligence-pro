@@ -1,9 +1,9 @@
 // Panel principal: mercados, alertas activadas, seguimiento, próximos resultados y accesos rápidos.
-import { data } from '../providers/index.js?v=ed7bffe0';
-import { store } from '../store.js?v=ed7bffe0';
-import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=ed7bffe0';
-import { logoHTML } from '../app.js?v=ed7bffe0';
-import { checkAlerts } from './watchlist.js?v=ed7bffe0';
+import { data } from '../providers/index.js?v=f598cc18';
+import { store } from '../store.js?v=f598cc18';
+import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=f598cc18';
+import { logoHTML } from '../app.js?v=f598cc18';
+import { checkAlerts } from './watchlist.js?v=f598cc18';
 
 const MARKETS = [['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35']];
 const IDEAS = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['GOOGL', 'Alphabet'], ['AMZN', 'Amazon'], ['META', 'Meta'], ['V', 'Visa'], ['KO', 'Coca-Cola'], ['JNJ', 'Johnson & Johnson'], ['ASML', 'ASML'], ['NVO', 'Novo Nordisk'], ['SAN.MC', 'Banco Santander'], ['ITX.MC', 'Inditex']];

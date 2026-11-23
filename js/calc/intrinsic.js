@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=ed7bffe0';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=ed7bffe0';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=f598cc18';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=f598cc18';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);

@@ -1,13 +1,13 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS } from '../config.js?v=ed7bffe0';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=ed7bffe0';
-import { fmp } from '../providers/fmp.js?v=ed7bffe0';
-import { alphavantage } from '../providers/alphavantage.js?v=ed7bffe0';
-import { finnhub } from '../providers/finnhub.js?v=ed7bffe0';
-import { twelvedata } from '../providers/twelvedata.js?v=ed7bffe0';
-import { roic } from '../providers/roic.js?v=ed7bffe0';
-import { store } from '../store.js?v=ed7bffe0';
-import { esc, card, toast } from '../ui/dom.js?v=ed7bffe0';
+import { config, KEYS } from '../config.js?v=f598cc18';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=f598cc18';
+import { fmp } from '../providers/fmp.js?v=f598cc18';
+import { alphavantage } from '../providers/alphavantage.js?v=f598cc18';
+import { finnhub } from '../providers/finnhub.js?v=f598cc18';
+import { twelvedata } from '../providers/twelvedata.js?v=f598cc18';
+import { roic } from '../providers/roic.js?v=f598cc18';
+import { store } from '../store.js?v=f598cc18';
+import { esc, card, toast } from '../ui/dom.js?v=f598cc18';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -19,10 +19,14 @@ const SRC = [
 
 export function render(view, _p, _q, firstRun) {
   const c = config.get(), u = usage();
+  const GH = (typeof window !== 'undefined' && window.__IIP_KEYS) || {};
+  const NAMES = { fmpKey: 'FMP', finnhubKey: 'Finnhub', tdKey: 'Twelve Data', roicKey: 'ROIC.AI', avKey: 'Alpha Vantage' };
+  const nGH = Object.keys(NAMES).filter((k) => GH[k]).length;
   view.innerHTML = `${firstRun ? `<section class="hero" style="margin-bottom:14px"><h1>Configura tus fuentes de datos</h1><p>Cuantas más claves gratuitas añadas, más empresas cubres y menos te afectan los límites diarios: la app reparte las consultas entre todas y usa cada una solo para lo que mejor hace. Basta con una para empezar. Se guardan solo en este navegador.</p></section>` : '<h1 style="font-size:22px;margin-bottom:14px">Ajustes</h1>'}
   <div class="grid g2">
     ${card('Fuentes de datos gratuitas', `<form id="kf" class="stack-y">
-      ${SRC.map((s) => `<div><label class="f"><span><b style="color:var(--ink)">${s.label}</b> · ${s.free} · <a href="${s.link}" target="_blank" rel="noopener">conseguir clave</a></span><input class="in" id="k_${s.id}" type="password" autocomplete="off" value="${esc(c[KEYS[s.id]] || '')}" placeholder="API key"></label><p class="note" style="margin:3px 0 0">${s.role}</p></div>`).join('')}
+      <div class="note" style="padding:8px 10px;border-radius:8px;border:1px solid var(--line);${nGH ? 'color:var(--pos)' : 'color:var(--warn)'}">${nGH ? `✓ Claves de GitHub activas: ${nGH} de 5 (${Object.keys(GH).filter((k) => GH[k] && k !== 'proxyUrl').map((k) => NAMES[k] || k).join(', ')}). No hace falta escribirlas aquí: la app ya las usa.` : 'Esta página no ha recibido claves de GitHub. Recarga la página; si sigue así, revisa que los secretos se llamen FMP_KEY, FINNHUB_KEY, TD_KEY, ROIC_KEY y AV_KEY y que la última publicación (Actions) terminó en verde.'}</div>
+      ${SRC.map((s) => `<div><label class="f"><span><b style="color:var(--ink)">${s.label}</b> · ${s.free} · <a href="${s.link}" target="_blank" rel="noopener">conseguir clave</a></span><input class="in" id="k_${s.id}" type="password" autocomplete="off" value="${esc(c[KEYS[s.id]] || '')}" placeholder="API key"></label><p class="note" style="margin:3px 0 0">${GH[KEYS[s.id]] ? '<b style="color:var(--pos)">✓ Cargada desde GitHub (secretos)</b> · ' : ''}${s.role}</p></div>`).join('')}
       <div><label class="f"><span><b style="color:var(--ink)">Backend proxy (Cloudflare Worker)</b> · gratis · activa SEC EDGAR y ESEF</span><input class="in" id="px" value="${esc(c.proxyUrl)}" placeholder="https://iip-proxy.tu-usuario.workers.dev"></label>
       <p class="note" style="margin:3px 0 0">Con el Worker se añaden dos fuentes oficiales sin límite diario: <b>SEC EDGAR</b> (estados de todas las empresas registradas en EE. UU., incluidas extranjeras como ASML, TSMC o Santander) y <b>filings.xbrl.org</b> (cuentas anuales ESEF de cotizadas europeas). Además guarda las claves en el servidor y cachea las respuestas. Instrucciones en el README del repositorio.</p></div>
       <p class="note" style="margin:0">filings.xbrl.org se intenta también sin Worker; si tu navegador lo bloquea, se necesita el Worker.</p>
@@ -61,7 +65,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js?v=ed7bffe0');
+      const { sec } = await import('../providers/sec.js?v=f598cc18');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;
