@@ -1,11 +1,11 @@
 // Ventajas competitivas (moat): indicadores cuantitativos que dejan huella en las cuentas
 // + evaluación cualitativa del usuario (factores que ningún proveedor mide), guardada y usada en el scoring.
-import { data } from '../../providers/index.js?v=38c5f79f';
-import { fundamentals } from '../../ui/charts.js?v=38c5f79f';
-import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=38c5f79f';
-import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=38c5f79f';
-import { store } from '../../store.js?v=38c5f79f';
-import { extra } from '../company.js?v=38c5f79f';
+import { data } from '../../providers/index.js?v=b4276095';
+import { fundamentals } from '../../ui/charts.js?v=b4276095';
+import { esc, card, pct, big, num, unavailable, source, toast } from '../../ui/dom.js?v=b4276095';
+import { isNum, div, mean, stdev, cagrN } from '../../calc/finance.js?v=b4276095';
+import { store } from '../../store.js?v=b4276095';
+import { extra } from '../company.js?v=b4276095';
 
 const FACTORS = [
   ['precios', 'Poder de fijación de precios', 'Puede subir precios sin perder clientes (márgenes brutos altos y estables lo sugieren).'],

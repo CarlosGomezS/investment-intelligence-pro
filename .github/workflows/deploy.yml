@@ -84,6 +84,19 @@ jobs:
           echo "url=${U}" >> "$GITHUB_OUTPUT"
           if [ -z "$U" ]; then echo "No se obtuvo la dirección del Worker: se detiene la publicación para no exponer las claves"; exit 1; fi
           echo "Worker publicado en $U"
+      - name: Prueba en vivo del Worker (SEC, Europa y proveedores)
+        if: steps.url.outputs.url != ''
+        continue-on-error: true
+        env:
+          U: ${{ steps.url.outputs.url }}
+        run: |
+          sleep 5
+          t() { R="$(curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' -w '\n%{http_code}' "$U/$2")"; C="$(echo "$R" | tail -1)"; B="$(echo "$R" | sed '$d')"; echo "$1 → HTTP $C · $(echo "$B" | jq -r "$3" 2>/dev/null | head -c 160)"; }
+          t "SEC EDGAR (cuentas de Apple)" "sec/api/xbrl/companyfacts/CIK0000320193.json" '"\(.entityName) · \(.facts["us-gaap"] | length) conceptos contables"'
+          t "Europa ESEF (filings.xbrl.org)" "esef/api/filings?page%5Bsize%5D=1" '"\(.data | length) informe(s) recibido(s)"'
+          t "FMP (perfil de Apple)" "fmp/profile?symbol=AAPL" 'if type=="array" then .[0].companyName else (.error // ."Error Message" // .) end'
+          t "Finnhub (perfil de Apple)" "finnhub/stock/profile2?symbol=AAPL" '.name // .error'
+          t "Twelve Data (cotización de Apple)" "td/quote?symbol=AAPL" '.close // .message'
       - name: Modo
         env:
           U: ${{ steps.url.outputs.url }}
