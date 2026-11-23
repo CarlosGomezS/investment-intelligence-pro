@@ -39,6 +39,25 @@ jobs:
         run: |
           if [ -n "$CF_TOKEN" ] && [ -z "$CF_ACCOUNT" ]; then echo "::error::Falta CLOUDFLARE_ACCOUNT_ID (solo hay CLOUDFLARE_API_TOKEN). No se publica para no exponer las claves."; exit 1; fi
           if [ -z "$CF_TOKEN" ] && [ -n "$CF_ACCOUNT" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN (solo hay CLOUDFLARE_ACCOUNT_ID). No se publica para no exponer las claves."; exit 1; fi
+      - name: Diagnóstico de Cloudflare (sin mostrar secretos)
+        if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
+        run: |
+          set -u
+          T="$(printf '%s' "$CF_TOKEN" | tr -d '[:space:]')"; A="$(printf '%s' "$CF_ACCOUNT" | tr -d '[:space:]')"
+          [ "$T" != "$CF_TOKEN" ] && echo "::warning::El token tenía espacios o saltos de línea al pegarlo."
+          [ "$A" != "$CF_ACCOUNT" ] && echo "::warning::El Account ID tenía espacios o saltos de línea al pegarlo."
+          echo "Longitud del Account ID: ${#A} caracteres (debe ser 32)"
+          V="$(curl -s -H "Authorization: Bearer $T" https://api.cloudflare.com/client/v4/user/tokens/verify)"
+          echo "Token: $(echo "$V" | jq -r 'if .success then "válido, estado " + .result.status else "NO válido: " + ([.errors[]?.message] | join("; ")) end')"
+          L="$(curl -s -H "Authorization: Bearer $T" 'https://api.cloudflare.com/client/v4/accounts?per_page=50')"
+          N="$(echo "$L" | jq -r '.result | length // 0')"
+          echo "Cuentas que este token puede ver: $N"
+          echo "$L" | jq -r '.result[]? | "  - " + .name + " (ID que empieza por " + (.id[0:6]) + "…)"'
+          if echo "$L" | jq -e --arg a "$A" '.result[]? | select(.id == $a)' >/dev/null; then echo "El Account ID guardado COINCIDE con una cuenta del token."; else echo "::error::El Account ID guardado NO coincide con ninguna cuenta que el token pueda ver. Copia el ID de la lista de arriba (Workers & Pages → Account ID) o crea el token con Account Resources = Include → tu cuenta."; fi
+          S="$(curl -s -H "Authorization: Bearer $T" "https://api.cloudflare.com/client/v4/accounts/$A/workers/subdomain")"
+          echo "Subdominio workers.dev: $(echo "$S" | jq -r 'if .success then (.result.subdomain // "sin crear") else "no accesible: " + ([.errors[]?.message] | join("; ")) end')"
+          P="$(curl -s -H "Authorization: Bearer $T" "https://api.cloudflare.com/client/v4/accounts/$A/workers/scripts")"
+          echo "Permiso para listar Workers: $(echo "$P" | jq -r 'if .success then "sí" else "NO: " + ([.errors[]?.message] | join("; ")) end')"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         if: env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
