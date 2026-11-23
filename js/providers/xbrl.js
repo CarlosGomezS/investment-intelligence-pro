@@ -84,6 +84,8 @@ export function toStatements(facts, symbol, maxYears = 15) {
   for (const f of facts) {
     const v = n(f.val); if (v == null || !Number.isFinite(v)) continue;
     if (mainUnit && money(f.unit) && f.unit !== mainUnit) continue;
+    // Importes por acción (USD/shares, TWD/shares…): solo los de la moneda principal
+    if (mainUnit && /\//.test(String(f.unit)) && !/^pure/i.test(String(f.unit)) && String(f.unit).split('/')[0] !== mainUnit) continue;
     const isFlow = !!f.start;
     if (isFlow) { const d = days(f.start, f.end); if (d < 330 || d > 400) continue; }
     if (!by.has(f.concept)) by.set(f.concept, new Map());
@@ -120,12 +122,15 @@ export function toStatements(facts, symbol, maxYears = 15) {
     // Deuda a corto: el total si se publica; si no, la suma de sus partes (vencimientos a corto + préstamos + pagarés)
     r.shortTermDebt = r.debtCurrentTotal != null ? r.debtCurrentTotal : [r.ltdCurrent, r.stBorrowings, r.commercialPaper].some((x) => x != null) ? (r.ltdCurrent || 0) + (r.stBorrowings || 0) + (r.commercialPaper || 0) : null;
     // Deuda a largo: la no corriente; si solo hay el total US-GAAP (que incluye la parte a corto), se le resta esa parte
-    if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = r.longTermDebtTotal - (r.ltdCurrent || 0);
+    // Si no se publica la parte a corto por separado, se resta la deuda corriente total (que la incluye) para no contarla dos veces
+    if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = Math.max(0, r.longTermDebtTotal - (r.ltdCurrent ?? r.debtCurrentTotal ?? 0));
     // Arrendamientos (NIIF 16 / ASC 842): son deuda a efectos de apalancamiento
     const lease = [r.leaseCurrent, r.leaseNoncurrent, r.financeLease].some((x) => x != null) ? (r.leaseCurrent || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0) : null;
     r.capitalLeaseObligations = lease;
-    const debt = (r.shortTermDebt || 0) + (r.longTermDebt || 0) + (lease || 0);
-    r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null && lease == null ? null : debt;
+    // Arrendamientos a corto con la deuda a corto y el resto con la de largo (cuentan en liquidez y en Graham)
+    if (r.leaseCurrent != null) r.shortTermDebt = (r.shortTermDebt || 0) + r.leaseCurrent;
+    if (r.leaseNoncurrent != null || r.financeLease != null) r.longTermDebt = (r.longTermDebt || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0);
+    r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null ? null : (r.shortTermDebt || 0) + (r.longTermDebt || 0);
     r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null ? r.cashAndCashEquivalents + (r.shortTermInvestments || 0) : null;
     r.netDebt = r.totalDebt != null ? r.totalDebt - (r.cashAndShortTermInvestments || 0) : null;
     return r;

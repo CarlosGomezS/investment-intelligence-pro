@@ -101,7 +101,7 @@ export function deriveYear(y, taxFallback = 0.21) {
     roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null, taxRate: t,
     negCapital: isNum(invested) && invested <= 0,
     // Rentabilidad del capital usada en puntuación y foso: ROIC; si el capital invertido es negativo, ROCE
-    rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : div(ebit, capEmployed),
+    rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null,
     // Denominadores negativos invierten el signo: sin EBITDA positivo el ratio no tiene sentido (se marca aparte)
     netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda) : null,
     ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && (b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : 0)) > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
@@ -187,6 +187,27 @@ export function splitAdjustRows(rows, splitsAdj) {
   });
 }
 
+/**
+ * Ajuste por fecha (trimestres): factor = splits posteriores a la fecha de la fila. Solo se aplica si la fila está
+ * realmente sin ajustar (sus acciones × factor se parecen a las de la fila más reciente); así no se ajusta dos veces
+ * lo que la fuente ya da ajustado.
+ */
+export function splitAdjustRowsByDate(rows, splits) {
+  const sp = (splits || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0);
+  if (!sp.length || !rows.length) return rows;
+  const shOf = (r) => r.weightedAverageShsOutDil ?? r.weightedAverageShsOut;
+  const ref = shOf(rows[rows.length - 1]);
+  return rows.map((r) => {
+    const f = sp.filter((s) => String(s.date) > String(r.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
+    if (f === 1 || !isNum(shOf(r)) || !isNum(ref)) return r;
+    const ratio = (shOf(r) * f) / ref; if (!(ratio > 0.5 && ratio < 2)) return r; // ya venía ajustada
+    const o = { ...r, _splitAdj: f };
+    for (const k of SHARE_F) if (isNum(o[k])) o[k] *= f;
+    for (const k of PERSHARE_F) if (isNum(o[k])) o[k] /= f;
+    return o;
+  });
+}
+
 export function adjustSplits(years, knownSplits = null) {
   const COMMON = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
   const found = [];
@@ -198,15 +219,23 @@ export function adjustSplits(years, knownSplits = null) {
     if (!isNum(a.shares) || !isNum(b.shares) || b.shares <= 0) continue;
     const r = a.shares / b.shares;
     let f = null;
-    for (const c of COMMON) { if (Math.abs(r / c - 1) < 0.12) f = c; else if (Math.abs(r * c - 1) < 0.12) f = 1 / c; }
+    if (known) {
+      // Con la lista real: el salto debe coincidir con los splits posteriores al año anterior, acumulados en orden.
+      // Cubre el caso de mezclar años ya ajustados (FMP) con años antiguos sin ajustar (SEC/Finnhub): el salto
+      // entre ambos es el producto de TODOS los splits posteriores, aunque ocurrieran años después.
+      const from = String(b.date || b.year);
+      const after = known.filter((s) => s.date > from).sort((x, y) => x.date.localeCompare(y.date));
+      let acc = 1;
+      for (const s of after) { acc *= s.f; if (Math.abs(r / acc - 1) < 0.12) { f = acc; break; } }
+    } else {
+      for (const c of COMMON) { if (Math.abs(r / c - 1) < 0.12) f = c; else if (Math.abs(r * c - 1) < 0.12) f = 1 / c; }
+    }
     if (!f) continue;
     // Confirmación: el beneficio neto no cambia en esa proporción (si cambiara, sería otra cosa)
     const ni = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
     if (Math.abs(ni / f - 1) < 0.25 && f !== 1) continue;
     if (known) {
-      const from = String(b.date || b.year), to = String(a.date || `${a.year}-12-31`);
-      const k = known.filter((s) => s.date > from && s.date <= to).reduce((x, s) => x * s.f, 1);
-      if (!(Math.abs(k / f - 1) < 0.15)) continue; // no hubo split ese año: es una ampliación de capital (dilución real)
+      // (con lista: si ningún producto de splits encaja, f ya es null y no se ajusta: es dilución real)
     } else if (isNum(a.issuance) && a.issuance > 0 && isNum(a.equity) && a.equity > 0 && a.issuance > 0.2 * a.equity) {
       continue; // emitió acciones por un importe relevante: el salto de acciones es dilución, no un split
     }

@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=7feadaa0';
+import { isNum, div, mean, median, cagr } from './finance.js?v=cf3615ab';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -59,7 +59,8 @@ export function impliedByEV(metric, multiple, netDebt, shares) {
   return (metric * multiple - netDebt) / shares;
 }
 
-export const marginOfSafety = (intrinsic, price) => (isNum(intrinsic) && intrinsic > 0 && isNum(price) ? (intrinsic - price) / intrinsic : null);
+// Valor 0 (la deuda supera al valor de la empresa): margen −100 %, no «sin dato»
+export const marginOfSafety = (intrinsic, price) => (isNum(intrinsic) && isNum(price) ? (intrinsic > 0 ? (intrinsic - price) / intrinsic : intrinsic === 0 && price > 0 ? -1 : null) : null);
 export const upside = (intrinsic, price) => (isNum(intrinsic) && isNum(price) && price > 0 ? intrinsic / price - 1 : null);
 
 /** Escenarios estándar a partir del caso base (supuestos documentados en la interfaz). */

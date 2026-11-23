@@ -1,10 +1,10 @@
 // Ratios financieros: valor actual, evolución, medias 5/10 años, comparación sectorial, interpretación y alertas.
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, card, pct, num } from '../../ui/dom.js?v=7feadaa0';
-import { fmtRatio } from '../../calc/ratios.js?v=7feadaa0';
-import { isNum, median } from '../../calc/finance.js?v=7feadaa0';
-import { loadPeers } from './peers.js?v=7feadaa0';
-import { exportCSV } from '../../export.js?v=7feadaa0';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, card, pct, num } from '../../ui/dom.js?v=cf3615ab';
+import { fmtRatio } from '../../calc/ratios.js?v=cf3615ab';
+import { isNum, median } from '../../calc/finance.js?v=cf3615ab';
+import { loadPeers } from './peers.js?v=cf3615ab';
+import { exportCSV } from '../../export.js?v=cf3615ab';
 
 const PEER_KEY = { pe: 'pe', evebitda: 'evEbitda', roe: 'roe', roic: 'roic', gm: 'grossMargin', om: 'opMargin', nm: 'netMargin', de: 'de', nde: 'ndEbitda', fcfy: 'fcfYield' };
 let selected = 'pe';
@@ -27,7 +27,7 @@ export async function render(el, S) {
   let peers = null; try { peers = await loadPeers(S); } catch {}
   const pr = peers && peers.rows ? peers.rows.filter((r) => !r.self) : [];
   const groups = [...new Set(S.ratios.map((r) => r.group))];
-  const pm = (r) => (PEER_KEY[r.id] && pr.length ? median(pr.map((p) => p[PEER_KEY[r.id]]).filter((v) => isNum(v) && (r.fmt !== 'x' || v > 0))) : null);
+  const pm = (r) => (PEER_KEY[r.id] && pr.length ? median(pr.map((p) => p[PEER_KEY[r.id]]).filter((v) => isNum(v) && (r.fmt !== 'x' || v > 0 || r.id === 'nde'))) : null);
   const ttmNote = S.m.ttmIsReal ? 'Valores actuales: últimos doce meses (TTM).' : 'El proveedor no ofrece TTM con tu plan: el valor actual es el del último ejercicio cerrado.';
   const insights = joint(S);
   el.innerHTML = `${insights.length ? card('Lectura conjunta', `<ul style="margin:0;padding-left:18px">${insights.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join('')}</ul>`) + '<div style="height:14px"></div>' : ''}

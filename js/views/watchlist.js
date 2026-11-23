@@ -1,10 +1,10 @@
 // Seguimiento: listas (favoritos y personalizadas), alertas de valoración, historial y análisis guardados.
-import { data } from '../providers/index.js?v=7feadaa0';
-import { store } from '../store.js?v=7feadaa0';
-import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=7feadaa0';
-import { logoHTML } from '../app.js?v=7feadaa0';
-import { exportCSV } from '../export.js?v=7feadaa0';
-import { isNum } from '../calc/finance.js?v=7feadaa0';
+import { data } from '../providers/index.js?v=cf3615ab';
+import { store } from '../store.js?v=cf3615ab';
+import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=cf3615ab';
+import { logoHTML } from '../app.js?v=cf3615ab';
+import { exportCSV } from '../export.js?v=cf3615ab';
+import { isNum } from '../calc/finance.js?v=cf3615ab';
 
 export async function checkAlerts() {
   const A = store.alerts(), out = [];
@@ -14,8 +14,14 @@ export async function checkAlerts() {
       const p = q.price, hits = [];
       if (isNum(a.below) && p <= a.below) hits.push(`precio ${num(p)} ≤ ${num(a.below)}`);
       if (isNum(a.above) && p >= a.above) hits.push(`precio ${num(p)} ≥ ${num(a.above)}`);
-      if (isNum(a.mos) && isNum(a.intrinsic) && (a.intrinsic - p) / a.intrinsic >= a.mos) hits.push(`margen de seguridad ${pct((a.intrinsic - p) / a.intrinsic, 0)} ≥ ${pct(a.mos, 0)}`);
-      if (isNum(a.pe) && isNum(q.pe) && q.pe > 0 && q.pe <= a.pe) hits.push(`PER ${num(q.pe, 1)} ≤ ${num(a.pe, 1)}`);
+      // Margen de seguridad frente al valor calculado al guardar la alerta (se indica su fecha; si tiene más de 90 días, no salta)
+      const age = a.at ? (Date.now() - a.at) / 864e5 : 0;
+      if (isNum(a.mos) && isNum(a.intrinsic) && a.intrinsic > 0 && age <= 90 && (a.intrinsic - p) / a.intrinsic >= a.mos) hits.push(`margen de seguridad ${pct((a.intrinsic - p) / a.intrinsic, 0)} ≥ ${pct(a.mos, 0)} (valor calculado el ${new Date(a.at).toLocaleDateString('es-ES')})`);
+      if (isNum(a.mos) && isNum(a.intrinsic) && age > 90) hits.push('valor intrínseco de hace más de 90 días: abre la ficha y vuelve a guardar la alerta');
+      // PER: la cotización de Finnhub/Twelve Data no lo trae; se toma de los ratios actuales
+      let pe = q.pe;
+      if (isNum(a.pe) && !isNum(pe)) { try { const rt = (await data.ratiosTTM(sym)).data || {}; pe = rt.priceToEarningsRatioTTM; } catch {} }
+      if (isNum(a.pe) && isNum(pe) && pe > 0 && pe <= a.pe) hits.push(`PER ${num(pe, 1)} ≤ ${num(a.pe, 1)}`);
       out.push({ sym, name: a.name, price: p, hits, a });
     } catch { out.push({ sym, name: a.name, error: true, a }); }
   }));

@@ -1,10 +1,10 @@
 // filings.xbrl.org: informes anuales oficiales en formato ESEF (IFRS) de empresas cotizadas europeas.
 // Gratuito y sin clave. Se localiza la entidad por nombre (y país si se conoce) y se leen los hechos xBRL-JSON
 // de los últimos informes. Cada informe trae el ejercicio y el anterior. Solo datos anuales.
-import { getJSON } from './http.js?v=7feadaa0';
-import { config } from '../config.js?v=7feadaa0';
-import { toStatements } from './xbrl.js?v=7feadaa0';
-import { hint } from './hints.js?v=7feadaa0';
+import { getJSON } from './http.js?v=cf3615ab';
+import { config } from '../config.js?v=cf3615ab';
+import { toStatements } from './xbrl.js?v=cf3615ab';
+import { hint } from './hints.js?v=cf3615ab';
 
 const H = () => config.get().cacheHours;
 const GENERIC = /^(banco|bank|group|grupo|holding|holdings|international|industria|industrie|societe|sociedad|compania|company|corporation|anonima|aktiengesellschaft|limited|public|europe|european|global|the)$/i;
@@ -63,6 +63,7 @@ async function load(sym) {
 }
 
 const memo = new Map();
+export const forgetEsef = (sym) => memo.delete(sym);
 const statements = (sym) => { if (!memo.has(sym)) memo.set(sym, load(sym).catch((e) => { memo.delete(sym); throw e; })); return memo.get(sym); };
 const wrap = (sel) => async (sym) => { const { st, entity, meta } = await statements(sym); return { data: st[sel], source: `filings.xbrl.org · ${entity || 'ESEF'}`, endpoint: 'ESEF xBRL-JSON', fetchedAt: meta.fetchedAt, cached: meta.cached }; };
 

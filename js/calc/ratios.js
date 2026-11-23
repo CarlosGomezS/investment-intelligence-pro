@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=7feadaa0';
+import { isNum, div, mean } from './finance.js?v=cf3615ab';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -84,8 +84,9 @@ export const RATIOS = [
     cur: (m) => (isNum(m.dpsTTM) && m.price ? m.dpsTTM / m.price : null), hist: (m) => histFrom(m.ratiosHist, 'dividendYield').filter((h) => h.v < 0.25), // >25 % = dato sin ajustar a splits
     interp: (v) => !v ? 'No reparte dividendo.' : `${fx(v * 100, 2)} % anual.`, alert: (v) => v > 0.09 && 'Dividendo superior al 9 %: el mercado puede estar descontando un recorte.' },
   { id: 'payout', label: 'Payout', group: 'Rendimientos', fmt: 'pct', better: 'band', formula: 'Dividendos pagados / beneficio neto',
-    cur: (m) => div(m.T.dividendsPaid ?? m.last.dividendsPaid, m.T.netIncome ?? m.last.netIncome), hist: (m) => m.years.map((y) => ({ year: y.year, v: div(y.dividendsPaid, y.netIncome) })).filter((p) => isNum(p.v) && p.v >= 0),
-    interp: (v) => v == null || v === 0 ? 'Sin dividendos.' : v < 0.6 ? 'Payout sostenible.' : v < 0.9 ? 'Payout exigente.' : 'Reparte más de lo que gana: insostenible si persiste.', alert: (v) => v > 1 && 'Payout superior al 100 %.' },
+    // Con pérdidas el payout no existe (saldría negativo y parecería «sostenible»)
+    cur: (m) => { const ni = m.T.netIncome ?? m.last.netIncome; return isNum(ni) && ni > 0 ? div(m.T.dividendsPaid ?? m.last.dividendsPaid, ni) : null; }, hist: (m) => m.years.map((y) => ({ year: y.year, v: y.netIncome > 0 ? div(y.dividendsPaid, y.netIncome) : null })).filter((p) => isNum(p.v) && p.v >= 0),
+    interp: (v, _a, m) => v == null && (m.T.dividendsPaid ?? m.last.dividendsPaid) > 0 && !((m.T.netIncome ?? m.last.netIncome) > 0) ? 'Paga dividendo teniendo pérdidas: no lo cubre el beneficio, insostenible si persiste.' : v == null || v === 0 ? 'Sin dividendos.' : v < 0.6 ? 'Payout sostenible.' : v < 0.9 ? 'Payout exigente.' : 'Reparte más de lo que gana: insostenible si persiste.', alert: (v) => v > 1 && 'Payout superior al 100 %.' },
 ];
 
 export const fmtRatio = (v, f) => (!isNum(v) ? '—' : f === 'pct' ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' %' : f === 'x' ? v.toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + '×' : v.toLocaleString('es-ES', { maximumFractionDigits: 2, minimumFractionDigits: 2 }));

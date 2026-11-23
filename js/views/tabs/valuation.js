@@ -1,9 +1,9 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=7feadaa0';
-import { isNum } from '../../calc/finance.js?v=7feadaa0';
-import { store } from '../../store.js?v=7feadaa0';
-import { loadPeers } from './peers.js?v=7feadaa0';
-import { exportXLSX } from '../../export.js?v=7feadaa0';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=cf3615ab';
+import { isNum } from '../../calc/finance.js?v=cf3615ab';
+import { store } from '../../store.js?v=cf3615ab';
+import { loadPeers } from './peers.js?v=cf3615ab';
+import { exportXLSX } from '../../export.js?v=cf3615ab';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -44,7 +44,7 @@ export async function render(el, S, ctx) {
       ${inp('erp', 'Prima de riesgo del mercado', P(I.erp), d.erp.origin, '0.01')}
       ${inp('kd', 'Coste de la deuda (antes de impuestos)', P(I.costDebt), d.costDebt.origin, '0.01')}
       ${inp('wo', 'WACC manual (vacío = calculado)', isNum(I.waccOverride) ? P(I.waccOverride) : '', 'supuesto', '0.01')}
-      <div class="f" style="align-self:end"><div class="row"><button class="btn pri" type="submit">Recalcular</button><button class="btn" type="button" id="reset">Restaurar</button></div></div>
+      <div class="f" style="align-self:end"><div class="row"><button class="btn pri" type="submit">Recalcular</button><button class="btn" type="button" id="reset">Restaurar</button></div></div>${(() => { const sv = store.assumptions(m.symbol); const ks = sv ? Object.entries(sv).filter(([k, v]) => k !== 'at' && v != null).map(([k]) => k) : []; return ks.length ? `<p class="note warn" style="grid-column:1/-1">Estás usando supuestos propios (${esc(ks.join(', '))})${sv.at ? ` guardados el ${new Date(sv.at).toLocaleDateString('es-ES')}` : ''}. El resto se recalcula con datos actuales. «Restaurar» vuelve a los valores por defecto.</p>` : ''; })()}
     </form>
     ${d.growth.parts && d.growth.parts.length ? `<p class="note">Crecimiento sugerido = mediana de: ${d.growth.parts.map(([k, v]) => `${esc(k)} ${pct(v)}`).join(' · ')}${isNum(d.growth.capped) ? `, limitada a ${pct(d.growth.capped)} (el mayor de: crecimiento del último año, CAGR 10a y previsión de analistas) para no extrapolar rebotes de años anómalos` : ''}, acotada entre −10 % y 30 %.</p>` : ''}
     <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
@@ -78,7 +78,15 @@ export async function render(el, S, ctx) {
   const num_ = (id) => { const v = el.querySelector('#' + id).value; return v === '' ? null : Number(v); };
   f.onsubmit = (e) => {
     e.preventDefault();
-    const a = { fcf0: num_('fcf0'), growth: num_('growth') / 100, years: Number(el.querySelector('#years').value), terminalGrowth: num_('tg') / 100, rf: num_('rf') / 100, beta: num_('beta'), erp: num_('erp') / 100, costDebt: isNum(num_('kd')) ? num_('kd') / 100 : null, waccOverride: isNum(num_('wo')) ? num_('wo') / 100 : null };
+    // Campo vacío = valor por defecto (no 0 %). Solo se guarda lo que el usuario ha cambiado: lo demás se
+    // recalcula siempre con datos actuales (FCF, bono, prima…), así no se congela una valoración antigua.
+    const pc = (id) => (isNum(num_(id)) ? num_(id) / 100 : null);
+    const same = (v, def, tol) => !isNum(v) || (isNum(def) && Math.abs(v - def) <= tol);
+    const keep = (v, def, tol) => (same(v, def, tol) ? null : v);
+    const g = pc('growth');
+    if (isNum(g) && g <= -0.99) { toast('El crecimiento no puede ser −100 % o menor'); return; }
+    const a = { fcf0: keep(num_('fcf0'), d.fcfBase.value, Math.max(1, Math.abs(d.fcfBase.value || 0) * 0.001)), growth: keep(g, d.growth.value, 0.0006), years: Number(el.querySelector('#years').value) === d.years.value ? null : Number(el.querySelector('#years').value), terminalGrowth: keep(pc('tg'), d.terminalGrowth.value, 0.0006), rf: keep(pc('rf'), d.rf.value, 0.0006), beta: keep(num_('beta'), d.beta.value, 0.006), erp: keep(pc('erp'), d.erp.value, 0.0006), costDebt: keep(pc('kd'), d.costDebt.value, 0.0006), waccOverride: pc('wo'), at: Date.now() };
+    if (isNum(a.terminalGrowth) && a.terminalGrowth >= 0.06) { toast('Un crecimiento perpetuo ≥ 6 % no es realista'); return; }
     store.setAssumptions(m.symbol, a); ctx.recompute(); render(el, S, ctx); toast('Valoración recalculada');
   };
   el.querySelector('#years').onchange = () => f.requestSubmit();

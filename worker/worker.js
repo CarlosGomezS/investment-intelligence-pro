@@ -39,7 +39,7 @@ export default {
 
     const [, provider, ...rest] = url.pathname.split('/');
     const path = rest.join('/');
-    if (!/^[A-Za-z0-9\-\/._%]*$/.test(path)) return json({ error: 'Ruta no válida' }, 400, H);
+    if (!/^[A-Za-z0-9\-\/._%]*$/.test(path) || /(^|\/)\.\.(\/|$)|%2e%2e/i.test(path)) return json({ error: 'Ruta no válida' }, 400, H);
     const params = new URLSearchParams(url.search);
     for (const k2 of ['apikey', 'token']) params.delete(k2);
     let upstream, init = {};
@@ -54,15 +54,20 @@ export default {
       if (U.ua) init = { headers: { 'User-Agent': env.SEC_USER_AGENT || 'InvestmentIntelligencePro contacto@example.com' } };
     } else return json({ error: 'Proveedor desconocido' }, 404, H);
 
-    const ttl = (TTL.find(([re]) => re.test(path)) || [0, 86400])[1];
+    // Alpha Vantage lleva el tipo de dato en ?function=, no en la ruta
+    const what = provider === 'av' ? `${path} ${url.searchParams.get('function') || ''}`.toLowerCase() : path;
+    const ttl = provider === 'av' && /global_quote|intraday/.test(what) ? 300 : (TTL.find(([re]) => re.test(what)) || [0, 86400])[1];
     const pub = new URLSearchParams(url.search); pub.delete('apikey'); pub.delete('token');
     const cacheKey = new Request(`https://cache.iip/${provider}/${path}?${pub}`);
     const cache = caches.default;
     let res = await cache.match(cacheKey);
     if (!res) {
       const r = await fetch(upstream, init);
-      res = new Response(r.body, { status: r.status, headers: { 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${ttl}` } });
-      if (r.ok) ctx.waitUntil(cache.put(cacheKey, res.clone()));
+      const text = await r.text();
+      res = new Response(text, { status: r.status, headers: { 'Content-Type': r.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${ttl}` } });
+      // Varias fuentes devuelven errores (límite, plan, clave) con HTTP 200: esos no se guardan en caché
+      const isErr = /"(Error Message|Information|Note)"\s*:|"status"\s*:\s*"error"|"error"\s*:|Limit Reach|Premium Query|don't have access/i.test(text.slice(0, 600));
+      if (r.ok && !isErr && text.length > 2) ctx.waitUntil(cache.put(cacheKey, res.clone()));
     }
     const out = new Response(res.body, res);
     for (const [a, b] of Object.entries(H)) out.headers.set(a, b);

@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=7feadaa0';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=cf3615ab';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -28,7 +28,8 @@ export function metricsFor(m, ctx) {
   const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
   // Paso de beneficios (o FCF) a pérdidas: el CAGR no se puede calcular, pero no es «sin dato»: puntúa 0
-  const toLoss = (k) => { const v = s(k).filter(isNum); const n = v.length; return n >= 2 && v[n - 1] <= 0 && v.slice(0, -1).some((x) => x > 0); };
+  // También pérdidas crónicas (último dato ≤ 0, aunque nunca hubiera beneficio): puntúa 0, no se excluye
+  const toLoss = (k) => { const v = s(k).filter(isNum); return v.length >= 1 && v[v.length - 1] <= 0; };
   const eps5 = isNum(m.growth.eps5) ? m.growth.eps5 : toLoss('eps') ? -1 : null;
   const fcf5 = isNum(cagrN(s('fcf'), 5)) ? cagrN(s('fcf'), 5) : toLoss('fcf') ? -1 : null;
   // Si el crecimiento se ha frenado, compararse con sus múltiplos de antes no dice nada (misma regla que la valoración)

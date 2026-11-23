@@ -1,16 +1,16 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=7feadaa0';
-import { fxRate } from '../providers/fxrate.js?v=7feadaa0';
-import { buildModel } from '../calc/model.js?v=7feadaa0';
-import { evaluateRatios } from '../calc/ratios.js?v=7feadaa0';
-import { detectAlerts } from '../calc/alerts.js?v=7feadaa0';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=7feadaa0';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=7feadaa0';
-import { buildReport } from '../calc/report.js?v=7feadaa0';
-import { store } from '../store.js?v=7feadaa0';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=7feadaa0';
-import { logoHTML, countryOf } from '../app.js?v=7feadaa0';
-import { isNum } from '../calc/finance.js?v=7feadaa0';
+import { data, gather, forget } from '../providers/index.js?v=cf3615ab';
+import { fxRate } from '../providers/fxrate.js?v=cf3615ab';
+import { buildModel } from '../calc/model.js?v=cf3615ab';
+import { evaluateRatios } from '../calc/ratios.js?v=cf3615ab';
+import { detectAlerts } from '../calc/alerts.js?v=cf3615ab';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=cf3615ab';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=cf3615ab';
+import { buildReport } from '../calc/report.js?v=cf3615ab';
+import { store } from '../store.js?v=cf3615ab';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=cf3615ab';
+import { logoHTML, countryOf } from '../app.js?v=cf3615ab';
+import { isNum } from '../calc/finance.js?v=cf3615ab';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -18,10 +18,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=7feadaa0'), grafico: () => import('./tabs/chart.js?v=7feadaa0'), estados: () => import('./tabs/statements.js?v=7feadaa0'), ratios: () => import('./tabs/ratios.js?v=7feadaa0'),
-  crecimiento: () => import('./tabs/growth.js?v=7feadaa0'), deuda: () => import('./tabs/debt.js?v=7feadaa0'), valoracion: () => import('./tabs/valuation.js?v=7feadaa0'), dividendos: () => import('./tabs/dividends.js?v=7feadaa0'),
-  competidores: () => import('./tabs/peers.js?v=7feadaa0'), moat: () => import('./tabs/moat.js?v=7feadaa0'), noticias: () => import('./tabs/news.js?v=7feadaa0'), analistas: () => import('./tabs/analysts.js?v=7feadaa0'),
-  riesgos: () => import('./tabs/risks.js?v=7feadaa0'), scoring: () => import('./tabs/scoring.js?v=7feadaa0'), informe: () => import('./tabs/report.js?v=7feadaa0'), simulador: () => import('./tabs/simulator.js?v=7feadaa0'),
+  resumen: () => import('./tabs/overview.js?v=cf3615ab'), grafico: () => import('./tabs/chart.js?v=cf3615ab'), estados: () => import('./tabs/statements.js?v=cf3615ab'), ratios: () => import('./tabs/ratios.js?v=cf3615ab'),
+  crecimiento: () => import('./tabs/growth.js?v=cf3615ab'), deuda: () => import('./tabs/debt.js?v=cf3615ab'), valoracion: () => import('./tabs/valuation.js?v=cf3615ab'), dividendos: () => import('./tabs/dividends.js?v=cf3615ab'),
+  competidores: () => import('./tabs/peers.js?v=cf3615ab'), moat: () => import('./tabs/moat.js?v=cf3615ab'), noticias: () => import('./tabs/news.js?v=cf3615ab'), analistas: () => import('./tabs/analysts.js?v=cf3615ab'),
+  riesgos: () => import('./tabs/risks.js?v=cf3615ab'), scoring: () => import('./tabs/scoring.js?v=cf3615ab'), informe: () => import('./tabs/report.js?v=cf3615ab'), simulador: () => import('./tabs/simulator.js?v=cf3615ab'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -72,8 +72,10 @@ async function load(sym, onProgress, late) {
 // Sin cotización directa: se usa el último cierre del histórico (indicado como tal)
 // Tipo de cambio estados → cotización. Si falla, null: la valoración no se calcula (no se supone 1).
 export async function fxFor(raw) {
-  const rep = raw.income && raw.income.ok && raw.income.data[0] ? raw.income.data[0].reportedCurrency : null;
-  const trade = raw.profile && raw.profile.ok ? raw.profile.data.currency : null;
+  // Moneda de los estados: la del ejercicio más reciente; de cotización: la del perfil o, si no la trae, la de la cotización
+  const inc = raw.income && raw.income.ok ? [...(raw.income.data || [])].sort((a, b) => String(b.date || b.fiscalYear).localeCompare(String(a.date || a.fiscalYear))) : [];
+  const rep = inc[0] ? inc[0].reportedCurrency : null;
+  const trade = (raw.profile && raw.profile.ok && raw.profile.data.currency) || (raw.quote && raw.quote.ok && raw.quote.data && raw.quote.data.currency) || 'USD'; // mismo valor por defecto que el modelo
   if (!rep || !trade || rep === trade) return 1;
   const r = await fxRate(rep, trade);
   raw.fx = r.rate ? r.res : { ok: false, error: r.error };
@@ -143,7 +145,7 @@ function header(S) {
         <select class="in" id="dlsel" style="width:auto;height:28px;font-size:12px" aria-label="Descargar todo"><option value="">⬇ Descargar todo…</option><option value="xlsx">Excel (todas las hojas)</option><option value="csv">CSV (ZIP, un archivo por bloque)</option><option value="txt">Informe completo TXT</option><option value="json">Datos en bruto JSON</option><option value="copy">Copiar informe al portapapeles</option></select>
       </div>
     </div>
-    <div class="px"><b>${num(m.price, 2)} <small class="mute" style="font-size:14px">${esc(m.tradeCur)}</small></b><span class="${cls(ch)}">${sgnPct(isNum(ch) ? ch / 100 : null, 2)} hoy</span><div class="note">${datetime(upd)}</div></div>
+    <div class="px"><b>${num(m.price, 2)} <small class="mute" style="font-size:14px">${esc(m.tradeCur)}</small></b><span class="${cls(ch)}">${sgnPct(isNum(ch) ? ch / 100 : null, 2)} hoy</span><div class="note">${datetime(upd)}${S.raw.quote && S.raw.quote.stale ? ' · <b class="warn">precio en caché, no actualizado</b>' : ''}</div></div>
   </div>
   ${m.repCur !== m.tradeCur ? `<div class="empty" style="margin-bottom:12px">Los estados financieros están en <b>${esc(m.repCur)}</b> y la acción cotiza en <b>${esc(m.tradeCur)}</b>. ${isNum(m.fx) ? `Para ratios y valoración se convierten al tipo ${esc(m.repCur)}/${esc(m.tradeCur)} = ${num(m.fx, 4)}${S.raw.fx && S.raw.fx.ok ? ` (${datetime(S.raw.fx.fetchedAt)})` : ''}.` : '<b class="neg">No se pudo obtener el tipo de cambio:</b> la valoración, el PER y todo lo que cruza precio con cuentas queda sin calcular para no darte cifras falsas. Pulsa «Actualizar» en unos minutos.'}</div>` : ''}`;
 }
@@ -173,7 +175,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=7feadaa0').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=cf3615ab').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -209,14 +211,14 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=7feadaa0');
+      const { exportAll } = await import('../exportall.js?v=cf3615ab');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=7feadaa0');
-    await clearCache(m.symbol); cache.delete(m.symbol); // solo esta empresa view.dataset.loaded = '';
+    const { clearCache } = await import('../providers/http.js?v=cf3615ab');
+    await clearCache(m.symbol); forget(m.symbol); cache.delete(m.symbol); view.dataset.loaded = ''; // solo esta empresa
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);
   };

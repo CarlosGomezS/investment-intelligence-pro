@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=7feadaa0';
-import { alphavantage } from './alphavantage.js?v=7feadaa0';
-import { finnhub } from './finnhub.js?v=7feadaa0';
-import { twelvedata } from './twelvedata.js?v=7feadaa0';
-import { roic } from './roic.js?v=7feadaa0';
-import { sec } from './sec.js?v=7feadaa0';
-import { esef } from './esef.js?v=7feadaa0';
-import { config } from '../config.js?v=7feadaa0';
-import { ApiError, usage, queueDelay } from './http.js?v=7feadaa0';
-import { setHint } from './hints.js?v=7feadaa0';
+import { fmp } from './fmp.js?v=cf3615ab';
+import { alphavantage } from './alphavantage.js?v=cf3615ab';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=cf3615ab';
+import { twelvedata } from './twelvedata.js?v=cf3615ab';
+import { roic } from './roic.js?v=cf3615ab';
+import { sec, forgetSec } from './sec.js?v=cf3615ab';
+import { esef, forgetEsef } from './esef.js?v=cf3615ab';
+import { config } from '../config.js?v=cf3615ab';
+import { ApiError, usage, queueDelay } from './http.js?v=cf3615ab';
+import { setHint } from './hints.js?v=cf3615ab';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -171,6 +171,8 @@ data.search = search;
 data.profileLite = (sym) => run('profile', [sym]); // sin completar con otras fuentes (competidores, screener)
 /** Igual que data[method] pero con otro orden de fuentes (p. ej. análisis masivo: Finnhub primero para no gastar FMP). */
 data.via = (order, method, ...args) => run(method, args, order);
+/** Olvida los datos en memoria de una empresa (botón «Actualizar»). La caché del Worker, si lo usas, expira sola. */
+export function forget(sym) { forgetFinnhub(sym); forgetSec(sym); forgetEsef(sym); delete blocked[`fmp:${sym}`]; }
 
 /** Perfil combinado: se toma el mejor y se completan los campos que falten con las demás fuentes. */
 const PROFILE_FIELDS = ['description', 'beta', 'range', 'sector', 'industry', 'ceo', 'website', 'currency', 'country', 'exchange', 'marketCap', 'sharesOutstanding', 'fullTimeEmployees', 'ipoDate', 'isin', 'cik'];

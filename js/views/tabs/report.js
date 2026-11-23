@@ -1,8 +1,8 @@
 // Informe final: 13 preguntas, conclusión razonada, argumentos a favor y en contra, exportación a PDF.
-import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=7feadaa0';
-import { store } from '../../store.js?v=7feadaa0';
-import { gauge } from './overview.js?v=7feadaa0';
-import { printReport } from '../../export.js?v=7feadaa0';
+import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=cf3615ab';
+import { store } from '../../store.js?v=cf3615ab';
+import { gauge } from './overview.js?v=cf3615ab';
+import { printReport } from '../../export.js?v=cf3615ab';
 
 export function render(el, S) {
   const { m, rep, sc, val } = S, c = val.composite;
@@ -12,7 +12,7 @@ export function render(el, S) {
     ${card('Conclusión', `<div class="gauge">${gauge(rep.total)}<div class="verdict" style="color:${scoreColor(rep.total)}">${esc(rep.conclusion)}</div></div>
       <div class="kpis" style="grid-template-columns:1fr 1fr;margin-top:10px"><div class="kpi"><span>Precio</span><b>${num(m.price)} ${esc(m.tradeCur)}</b></div><div class="kpi"><span>Valor intrínseco</span><b>${num(c.value)}</b></div><div class="kpi"><span>Margen de seguridad</span><b class="${cls(c.mos)}">${pct(c.mos, 0)}</b></div><div class="kpi"><span>Calidad (media)</span><b>${rep.quality != null ? Math.round(rep.quality) : '—'}/100</b></div></div>`)}
     ${card('Argumentos a favor', rep.pros.length ? `<ul style="margin:0;padding-left:18px">${rep.pros.map((p) => `<li style="margin:5px 0">${esc(p)}</li>`).join('')}${isNum(c.mos) && c.mos > 0.15 ? `<li>Cotiza un ${pct(c.mos, 0)} por debajo de su valor estimado.</li>` : ''}</ul>` : '<p class="note">Ninguna categoría destaca por encima de 70/100.</p>')}
-    ${card('Argumentos en contra', rep.cons.length ? `<ul style="margin:0;padding-left:18px">${rep.cons.map((p) => `<li style="margin:5px 0">${esc(p)}</li>`).join('')}${isNum(c.mos) && c.mos < 0 ? `<li>El precio supera en un ${pct(-c.up, 0)} el valor estimado.</li>` : ''}</ul>` : '<p class="note">Ninguna categoría por debajo de 45/100 ni alertas graves.</p>')}
+    ${card('Argumentos en contra', rep.cons.length ? `<ul style="margin:0;padding-left:18px">${rep.cons.map((p) => `<li style="margin:5px 0">${esc(p)}</li>`).join('')}${isNum(c.mos) && c.mos < 0 ? `<li>${c.value === 0 ? 'El valor estimado del capital es 0: la deuda supera al valor de la empresa.' : `El precio supera en un ${pct(m.price / c.value - 1, 0)} el valor estimado.`}</li>` : ''}</ul>` : '<p class="note">Ninguna categoría por debajo de 45/100 ni alertas graves.</p>')}
   </div>
   <div style="margin-top:14px">${card(`¿Merece la pena comprar ${esc(m.profile.companyName || m.symbol)}?`, rep.questions.map((q, i) => `<div class="qa"><h4><span>${i + 1}. ${esc(q.question)}</span>${q.verdict ? `<span style="color:${scoreColor(q.score)}">${esc(q.verdict)}</span>` : ''}</h4><p>${q.text}</p></div>`).join(''))}</div>
   <div class="grid g2" style="margin-top:14px">

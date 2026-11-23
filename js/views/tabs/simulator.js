@@ -1,10 +1,10 @@
 // Simulador: rentabilidad histórica con/sin reinversión de dividendos frente al S&P 500 y proyección a 5-10 años.
-import { data } from '../../providers/index.js?v=7feadaa0';
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, mean } from '../../calc/finance.js?v=7feadaa0';
-import { historical, forward } from '../../calc/simulate.js?v=7feadaa0';
-import { extra } from '../company.js?v=7feadaa0';
+import { data } from '../../providers/index.js?v=cf3615ab';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, mean } from '../../calc/finance.js?v=cf3615ab';
+import { historical, forward } from '../../calc/simulate.js?v=cf3615ab';
+import { extra } from '../company.js?v=cf3615ab';
 
 export async function render(el, S) {
   const m = S.m, cur = m.tradeCur;
@@ -36,12 +36,15 @@ export async function render(el, S) {
   const run = () => {
     const v = (id) => Number(el.querySelector('#' + id).value);
     const p = { price: m.price, eps, epsGrowth: v('sg') / 100, exitPE: v('sp'), payout: v('spo') / 100, years: v('sy'), drip: el.querySelector('#sd').value === '1', amount: v('sa') };
+    if (!(p.exitPE > 0) || !(p.years >= 1) || !(p.amount > 0) || p.epsGrowth <= -0.99) { el.querySelector('#sres').innerHTML = '<div class="empty">Revisa los supuestos: PER de salida y años mayores que 0, y crecimiento mayor que −99 %.</div>'; return; }
     const r = forward(p);
     if (!r) { el.querySelector('#sres').innerHTML = '<div class="empty">Se necesita un BPA positivo para proyectar.</div>'; return; }
-    const pes = forward({ ...p, epsGrowth: p.epsGrowth * 0.5, exitPE: p.exitPE * 0.8 }), opt = forward({ ...p, epsGrowth: p.epsGrowth * 1.5, exitPE: p.exitPE * 1.1 });
+    const gP = p.epsGrowth - Math.abs(p.epsGrowth) * 0.5, gO = p.epsGrowth + Math.abs(p.epsGrowth) * 0.5; // ordenados también con crecimiento negativo
+    const pes = forward({ ...p, epsGrowth: gP, exitPE: p.exitPE * 0.8 }), opt = forward({ ...p, epsGrowth: gO, exitPE: p.exitPE * 1.1 });
+    if (!pes || !opt) return;
     el.querySelector('#sres').innerHTML = `<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><span>Valor final</span><b>${big(r.final, cur)}</b></div><div class="kpi"><span>Rentabilidad anual</span><b class="${cls(r.cagr)}">${sgnPct(r.cagr)}</b></div><div class="kpi"><span>Multiplicador</span><b>${num(r.multiple, 2)}×</b></div></div>
       <p class="note">BPA actual ${num(eps)} · PER actual ${num(m.price / eps, 1)}× → ${num(p.exitPE, 1)}× al final. El PER converge linealmente. Es una proyección con tus supuestos, no una previsión.</p>`;
-    el.querySelector('#sscen').innerHTML = `<table class="dense" style="margin-top:10px"><thead><tr><th class="l">Escenario</th><th>Crec. BPA</th><th>PER salida</th><th>Valor final</th><th>Anual</th></tr></thead><tbody>${[['Pesimista', p.epsGrowth * 0.5, p.exitPE * 0.8, pes], ['Base', p.epsGrowth, p.exitPE, r], ['Optimista', p.epsGrowth * 1.5, p.exitPE * 1.1, opt]].map(([l, g, pe, x]) => `<tr><td class="l">${l}</td><td>${pct(g)}</td><td>${num(pe, 1)}×</td><td>${big(x.final)}</td><td class="${cls(x.cagr)}">${sgnPct(x.cagr)}</td></tr>`).join('')}</tbody></table>`;
+    el.querySelector('#sscen').innerHTML = `<table class="dense" style="margin-top:10px"><thead><tr><th class="l">Escenario</th><th>Crec. BPA</th><th>PER salida</th><th>Valor final</th><th>Anual</th></tr></thead><tbody>${[['Pesimista', gP, p.exitPE * 0.8, pes], ['Base', p.epsGrowth, p.exitPE, r], ['Optimista', gO, p.exitPE * 1.1, opt]].map(([l, g, pe, x]) => `<tr><td class="l">${l}</td><td>${pct(g)}</td><td>${num(pe, 1)}×</td><td>${big(x.final)}</td><td class="${cls(x.cagr)}">${sgnPct(x.cagr)}</td></tr>`).join('')}</tbody></table>`;
     fundamentals('sc1', r.rows.map((x) => 'Año ' + x.t), [{ label: 'Pesimista', data: pes.rows.map((x) => x.value), type: 'line', dash: [4, 3] }, { label: 'Base', data: r.rows.map((x) => x.value), type: 'line' }, { label: 'Optimista', data: opt.rows.map((x) => x.value), type: 'line', dash: [4, 3] }]);
   };
   el.querySelector('#sf').oninput = run; run();

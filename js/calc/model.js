@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=7feadaa0';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=7feadaa0';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=cf3615ab';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=cf3615ab';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -36,7 +36,12 @@ export function buildModel(raw, fxRate = 1) {
   const T = ttmYear && isNum(ttmYear.revenue) ? ttmYear : last;
   const ttmIsReal = !!(ttmYear && isNum(ttmYear.revenue));
 
-  const shares = quote.sharesOutstanding ?? profile.sharesOutstanding ?? (isNum(profile.marketCap) && isNum(price) && price > 0 ? profile.marketCap / price : null) ?? last.shares;
+  // Capitalización del proveedor: en bolsas que cotizan en subunidades (peniques…) puede venir en la unidad principal
+  let mcProv = quote.marketCap ?? profile.marketCap;
+  if (isNum(mcProv) && isNum(price) && price > 0 && /^(GBp|GBX|ILA|ZAc|ZAC)$/.test(tradeCur) && isNum(last.shares) && last.shares > 0) {
+    const r = mcProv / price / last.shares; if (r > 0.005 && r < 0.02) mcProv *= 100; // salía 100 veces menor: estaba en libras
+  }
+  const shares = quote.sharesOutstanding ?? profile.sharesOutstanding ?? (isNum(mcProv) && isNum(price) && price > 0 ? mcProv / price : null) ?? last.shares;
   // Split posterior al último ejercicio (p. ej. ejecutado este año): las acciones actuales son k veces las del último
   // informe. Se ajustan acciones y BPA de todos los años (y del TTM si viene sin ajustar) para que PER y múltiplos cuadren.
   {
@@ -44,11 +49,21 @@ export function buildModel(raw, fxRate = 1) {
     const COMMON = [2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50];
     const near = (r) => COMMON.find((c) => Math.abs(r / c - 1) < 0.12) || (() => { const c = COMMON.find((k) => Math.abs(r * k - 1) < 0.12); return c ? 1 / c : null; })();
     const fix = (y, f) => { if (isNum(y.shares)) y.shares *= f; if (isNum(y.eps)) y.eps /= f; if (isNum(y.fcfPerShare)) y.fcfPerShare /= f; };
-    const f = isNum(shares) && isNum(last.shares) && last.shares > 0 && shares !== last.shares ? near(shares / last.shares) : null;
+    let f = isNum(shares) && isNum(last.shares) && last.shares > 0 && shares !== last.shares ? near(shares / last.shares) : null;
+    // Con la lista real de splits: un factor > 1 tiene que corresponder a splits posteriores al último cierre
+    // (si no, es una ampliación de capital o un desajuste de clases de acciones: no se toca). Un factor < 1 sin
+    // contrasplit solo se acepta en ADR (1 ADR = k acciones ordinarias), donde la moneda de cuentas y cotización difiere.
+    const known = raw.splits && raw.splits.ok ? (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0) : null;
+    if (f && known) {
+      const k = known.filter((s) => String(s.date) > String(last.date || last.year)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
+      const adr = profile.isAdr || repCur !== tradeCur;
+      if (!(Math.abs(k / f - 1) < 0.12) && !(f < 1 && adr)) f = null;
+    } else if (f && f > 1 && !known && isNum(last.issuance) && last.issuance > 0) f = null; // sin lista y con emisiones: prudencia
     if (f) { years.forEach((y) => fix(y, f)); splitsAdj.push({ year: String(Number(last.year) + 1), factor: f, recent: true }); }
     if (ttmYear && ttmYear !== last && isNum(ttmYear.shares) && isNum(shares)) { const g = near(shares / ttmYear.shares); if (g) fix(ttmYear, g); }
   }
-  const marketCap = quote.marketCap ?? profile.marketCap ?? (isNum(shares) && isNum(price) ? shares * price : null);
+  // En vivo: acciones × precio actual (la capitalización del perfil puede tener días de antigüedad)
+  const marketCap = isNum(shares) && isNum(price) && price > 0 ? shares * price : mcProv ?? null;
   // Deuda neta: si el último balance no ha llegado, la del último balance disponible (nunca se supone 0 sin decirlo)
   const ndYear = [...years].reverse().find((y) => isNum(y.netDebt));
   const ndRep = isNum(T.netDebt) ? T.netDebt : ndYear ? ndYear.netDebt : null;
@@ -79,6 +94,7 @@ export function buildModel(raw, fxRate = 1) {
   const splitList = (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.denominator > 0 && s.numerator > 0 && s.numerator !== s.denominator); // splits y contrasplits
   const divs = asc(val(raw.dividends) || []).filter((d) => isNum(d.adjDividend ?? d.dividend)).map((d) => {
     if (isNum(d.adjDividend) && d.adjDividend !== d.dividend) return d;
+    if (raw.dividends && /Alpha Vantage/.test(raw.dividends.source || '')) return d; // Alpha Vantage ya da los dividendos ajustados
     const f = splitList.filter((s) => String(s.date) > String(d.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
     return f !== 1 ? { ...d, adjDividend: d.dividend / f } : d;
   });

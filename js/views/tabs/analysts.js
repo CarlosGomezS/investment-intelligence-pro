@@ -1,9 +1,9 @@
 // Analistas e insiders: estimaciones, precios objetivo, recomendaciones y su evolución, operaciones de directivos y participación institucional.
-import { data } from '../../providers/index.js?v=7feadaa0';
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, card, num, pct, big, date, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, asc } from '../../calc/finance.js?v=7feadaa0';
-import { extra } from '../company.js?v=7feadaa0';
+import { data } from '../../providers/index.js?v=cf3615ab';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, card, num, pct, big, date, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, asc } from '../../calc/finance.js?v=cf3615ab';
+import { extra } from '../company.js?v=cf3615ab';
 
 const TX = { 'P-Purchase': 'Compra', 'S-Sale': 'Venta', 'A-Award': 'Concesión', 'M-Exempt': 'Ejercicio de opciones', 'F-InKind': 'Retención fiscal', 'G-Gift': 'Donación', 'D-Return': 'Devolución', 'C-Conversion': 'Conversión', 'J-Other': 'Otra' };
 

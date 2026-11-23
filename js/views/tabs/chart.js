@@ -1,10 +1,10 @@
 // Cotización interactiva: rangos de 1 día a máximo, escala lineal/log, rentabilidad acumulada,
 // comparación con índices, volumen y marcas de dividendos y splits.
-import { data } from '../../providers/index.js?v=7feadaa0';
-import { priceChart, PALETTE } from '../../ui/charts.js?v=7feadaa0';
-import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=7feadaa0';
-import { extra } from '../company.js?v=7feadaa0';
+import { data } from '../../providers/index.js?v=cf3615ab';
+import { priceChart, PALETTE } from '../../ui/charts.js?v=cf3615ab';
+import { esc, num, pct, sgnPct, cls, card, unavailable, source, table } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=cf3615ab';
+import { extra } from '../company.js?v=cf3615ab';
 
 const RANGES = [['1D', 1], ['1S', 7], ['1M', 30], ['3M', 91], ['6M', 182], ['1A', 365], ['5A', 1826], ['10A', 3652], ['Máx', 0]];
 const INDEXES = [['', 'Sin comparar'], ['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^DJI', 'Dow Jones'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35'], ['^GDAXI', 'DAX'], ['^FTSE', 'FTSE 100'], ['^N225', 'Nikkei 225'], ['URTH', 'MSCI World (ETF)']];
@@ -77,8 +77,14 @@ export async function render(el, S) {
     const rows = [];
     let idxData = null;
     if (st.idx) { try { idxData = (await extra(S, 'idx' + st.idx, () => data.index(st.idx, '1980-01-01'))).data; } catch {} }
-    const ret = (arr, days) => { if (!arr || !arr.length) return null; const cut = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10); const a = arr.filter((p) => p.date >= cut); return a.length > 2 ? a[a.length - 1].close / a[0].close - 1 : null; };
-    for (const [k, d] of RANGES.slice(2, 8)) { const r = ret(prices, d), i = ret(idxData, d); rows.push({ k, r, i, diff: isNum(r) && isNum(i) ? r - i : null, ann: d >= 365 && isNum(r) ? (1 + r) ** (365 / d) - 1 : null }); }
+    // Si la serie no cubre todo el periodo (salida a bolsa reciente, fuente corta), no se muestra como si lo cubriera
+    const win = (arr, days) => { if (!arr || !arr.length) return null; const cut = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10); const a = arr.filter((p) => p.date >= cut); return a.length > 2 ? a : null; };
+    for (const [k, d] of RANGES.slice(2, 8)) {
+      const a = win(prices, d); const covered = a && (new Date(a[a.length - 1].date) - new Date(a[0].date)) / 864e5 >= d * 0.9;
+      const r = a && covered ? a[a.length - 1].close / a[0].close - 1 : null;
+      const ia = covered ? (idxData || []).filter((p) => p.date >= a[0].date) : null; const i = ia && ia.length > 2 ? ia[ia.length - 1].close / ia[0].close - 1 : null;
+      rows.push({ k: covered || !a ? k : `${k} (historia insuficiente)`, r, i, diff: isNum(r) && isNum(i) ? r - i : null, ann: d >= 365 && isNum(r) ? (1 + r) ** (365 / d) - 1 : null });
+    }
     const all = prices.length > 2 ? prices[prices.length - 1].close / prices[0].close - 1 : null;
     rows.push({ k: `Máx. (desde ${prices[0].date.slice(0, 4)})`, r: all, i: null, diff: null, ann: isNum(all) ? (1 + all) ** (365 / ((Date.now() - new Date(prices[0].date)) / 864e5)) - 1 : null });
     el.querySelector('#perf').innerHTML = card('Rentabilidad acumulada', table('perf', [

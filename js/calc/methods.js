@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=7feadaa0';
+import { isNum, mean, stdev, median } from './finance.js?v=cf3615ab';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -90,8 +90,9 @@ export const METHODS = {
       const { m, Y, s, price } = base(S);
       const X = m.X;
       const rev = X(m.last.revenue);
-      const usd = m.tradeCur === 'USD';
-      const g1 = isNum(rev) && usd ? rev >= 7.7e8 : null; // el umbral está en dólares
+      const usdR = m.tradeCur === 'USD' ? 1 : S.usdRate; // tipo a dólares (lo descarga Métodos)
+      const usd = isNum(usdR);
+      const g1 = isNum(rev) && usd ? rev * usdR >= 7.7e8 : null; // el umbral está en dólares
       const cr = m.last.currentRatio, wc = isNum(m.last.currentAssets) && isNum(m.last.currentLiabilities) ? m.last.currentAssets - m.last.currentLiabilities : null;
       const ltd = m.last.longTermDebt;
       const g2 = isNum(cr) && isNum(wc) && isNum(ltd) ? cr >= 2 && ltd <= wc : isNum(cr) && cr < 2 ? false : null; // sin dato de deuda a largo no se aprueba
@@ -111,7 +112,7 @@ export const METHODS = {
       const g7 = isNum(pb) ? pb <= 1.5 || (isNum(pe3) && pe3 * pb <= 22.5) : null;
       const gnum = isNum(eps3) && eps3 > 0 && isNum(bvps) && bvps > 0 ? Math.sqrt(22.5 * eps3 * bvps) : null;
       const checks = [
-        C('Tamaño adecuado', g1, `ventas ${isNum(rev) ? (rev / 1e9).toFixed(1).replace('.', ',') + ' mil M ' + m.tradeCur : 'sin dato'}${!usd ? ' (umbral en USD: no comparable sin convertir)' : ''}`, this.rules[0]),
+        C('Tamaño adecuado', g1, `ventas ${isNum(rev) ? (rev / 1e9).toFixed(1).replace('.', ',') + ' mil M ' + m.tradeCur : 'sin dato'}${!usd ? ' (sin tipo de cambio a USD: no se puede comparar)' : m.tradeCur !== 'USD' ? ` ≈ ${(rev * usdR / 1e9).toFixed(1).replace('.', ',')} mil M USD` : ''}`, this.rules[0]),
         C('Situación financiera fuerte', g2, `liquidez ${nS(cr, 2)} · deuda LP ${isNum(ltd) && isNum(wc) ? (ltd <= wc ? '≤' : '>') + ' capital circulante' : 'sin dato'}`, this.rules[1]),
         C('Beneficios estables 10 años', g3, `${ni.filter((v) => v > 0).length} de ${ni.length} años con beneficio${ni.length < 10 ? ' (tus fuentes no dan 10 años)' : ''}`, this.rules[2]),
         C('Historial de dividendos', g4, `${dp.filter((v) => v > 0).length} de ${dpAll.length} años con dividendo informado${dpAll.length > dp.length ? ` (${dpAll.length - dp.length} sin dato)` : ''} · Graham pide 20`, this.rules[3]),

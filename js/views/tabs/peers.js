@@ -1,10 +1,10 @@
 // Competidores: detección automática (FMP stock-peers), lista editable, tabla comparativa, gráficos y ganador por pilar.
-import { data, gather } from '../../providers/index.js?v=7feadaa0';
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, div, asc, median } from '../../calc/finance.js?v=7feadaa0';
-import { store } from '../../store.js?v=7feadaa0';
-import { logoHTML } from '../../app.js?v=7feadaa0';
+import { data, gather } from '../../providers/index.js?v=cf3615ab';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, div, asc, median } from '../../calc/finance.js?v=cf3615ab';
+import { store } from '../../store.js?v=cf3615ab';
+import { logoHTML } from '../../app.js?v=cf3615ab';
 
 async function peerRow(sym) {
   const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), inc: () => data.income(sym, 'annual', 4) }, 15000);
@@ -17,7 +17,8 @@ async function peerRow(sym) {
     revenue: L.revenue, growth1: div(L.revenue, P.revenue) != null ? L.revenue / P.revenue - 1 : null, growth3: n >= 2 && F.revenue > 0 && L.revenue > 0 ? (L.revenue / F.revenue) ** (1 / n) - 1 : null,
     netIncome: L.netIncome, grossMargin: rt.grossProfitMarginTTM ?? div(L.grossProfit, L.revenue), opMargin: rt.operatingProfitMarginTTM ?? div(L.operatingIncome, L.revenue),
     netMargin: rt.netProfitMarginTTM ?? div(L.netIncome, L.revenue), roic: km.returnOnInvestedCapitalTTM, roe: km.returnOnEquityTTM, de: rt.debtToEquityRatioTTM,
-    ndEbitda: km.netDebtToEBITDATTM, pe: rt.priceToEarningsRatioTTM, evEbitda: km.evToEBITDATTM, fcfYield: km.freeCashFlowYieldTTM,
+    // Deuda neta/EBITDA negativa con márgenes negativos = EBITDA negativo, no caja neta: no se usa
+    ndEbitda: isNum(km.netDebtToEBITDATTM) && km.netDebtToEBITDATTM < 0 && !((rt.operatingProfitMarginTTM ?? div(L.operatingIncome, L.revenue)) > 0) ? null : km.netDebtToEBITDATTM, pe: rt.priceToEarningsRatioTTM, evEbitda: km.evToEBITDATTM, fcfYield: km.freeCashFlowYieldTTM,
     fcf: isNum(km.freeCashFlowYieldTTM) && isNum(p.marketCap) ? km.freeCashFlowYieldTTM * p.marketCap : null, _prov: [r.p, r.rt, r.km, r.inc].filter((x) => x.ok),
   };
 }
@@ -42,10 +43,10 @@ export async function loadPeers(S, force) {
 }
 
 const COLS = [
-  ['marketCap', 'Capitalización', (v) => big(v), 'high'], ['revenue', 'Ingresos', (v) => big(v), 'high'], ['growth1', 'Crec. ventas 1a', (v) => pct(v), 'high'], ['growth3', 'Crec. ventas 3a (anual)', (v) => pct(v), 'high'],
-  ['netIncome', 'Beneficio neto', (v) => big(v), 'high'], ['grossMargin', 'Margen bruto', (v) => pct(v), 'high'], ['opMargin', 'Margen operativo', (v) => pct(v), 'high'], ['netMargin', 'Margen neto', (v) => pct(v), 'high'],
+  ['marketCap', 'Capitalización', (v, r) => big(v, r && r.currency), 'high'], ['revenue', 'Ingresos', (v, r) => big(v, r && r.currency), 'high'], ['growth1', 'Crec. ventas 1a', (v) => pct(v), 'high'], ['growth3', 'Crec. ventas 3a (anual)', (v) => pct(v), 'high'],
+  ['netIncome', 'Beneficio neto', (v, r) => big(v, r && r.currency), 'high'], ['grossMargin', 'Margen bruto', (v) => pct(v), 'high'], ['opMargin', 'Margen operativo', (v) => pct(v), 'high'], ['netMargin', 'Margen neto', (v) => pct(v), 'high'],
   ['roic', 'ROIC', (v) => pct(v), 'high'], ['roe', 'ROE', (v) => pct(v), 'high'], ['de', 'Deuda/Patrimonio', (v) => num(v, 2), 'low'], ['ndEbitda', 'Deuda neta/EBITDA', (v) => mult(v), 'low'],
-  ['pe', 'PER', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['evEbitda', 'EV/EBITDA', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['fcf', 'FCF', (v) => big(v), 'high'], ['fcfYield', 'Rent. FCF', (v) => pct(v), 'high'],
+  ['pe', 'PER', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['evEbitda', 'EV/EBITDA', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['fcf', 'FCF', (v, r) => big(v, r && r.currency), 'high'], ['fcfYield', 'Rent. FCF', (v) => pct(v), 'high'],
 ];
 
 function rankScore(rows, keys) {
@@ -74,9 +75,11 @@ export async function render(el, S, ctx) {
     ['Valoración (más barata)', [['pe', 'low'], ['evEbitda', 'low'], ['fcfYield', 'high']]],
   ];
   const winners = pillars.map(([lab, keys]) => { const s = rankScore(rows, keys); let bi = -1, bv = -1; s.forEach((v, i) => { if (isNum(v) && v > bv) { bv = v; bi = i; } }); return { lab, w: rows[bi], s }; });
-  const med = Object.fromEntries(COLS.map(([k]) => [k, median(rows.filter((r) => !r.self).map((r) => r[k]))]));
+  // Misma limpieza que la valoración: múltiplos ≤ 0 o > 200 no cuentan
+  const okV = (k, v) => isNum(v) && (!['pe', 'evEbitda'].includes(k) || (v > 0 && v < 200));
+  const med = Object.fromEntries(COLS.map(([k]) => [k, median(rows.filter((r) => !r.self).map((r) => r[k]).filter((v) => okV(k, v)))]));
   el.innerHTML = `${card(`Comparativa con competidores${P.auto ? ' (detectados automáticamente)' : ' (lista personalizada)'}`, `<div class="tablewrap fixed"><table id="peerT" class="dense"><thead><tr><th class="l">Empresa</th>${COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>
-      ${rows.map((r) => `<tr${r.self ? ' style="background:color-mix(in srgb,var(--acc) 9%,transparent)"' : ''}><td class="l"><a href="#/c/${encodeURIComponent(r.symbol)}/resumen" style="display:flex;gap:8px;align-items:center">${logoHTML(r.symbol, 22)}<span><b>${esc(r.symbol)}</b><br><small class="mute">${esc((r.name || '').slice(0, 28))}</small></span></a></td>${COLS.map(([k, , f]) => `<td>${f(r[k])}</td>`).join('')}</tr>`).join('')}
+      ${rows.map((r) => `<tr${r.self ? ' style="background:color-mix(in srgb,var(--acc) 9%,transparent)"' : ''}><td class="l"><a href="#/c/${encodeURIComponent(r.symbol)}/resumen" style="display:flex;gap:8px;align-items:center">${logoHTML(r.symbol, 22)}<span><b>${esc(r.symbol)}</b><br><small class="mute">${esc((r.name || '').slice(0, 28))}</small></span></a></td>${COLS.map(([k, , f]) => `<td>${f(r[k], r)}</td>`).join('')}</tr>`).join('')}
       <tr class="tot"><td class="l">Mediana competidores</td>${COLS.map(([k, , f]) => `<td>${f(med[k])}</td>`).join('')}</tr></tbody></table></div>${curNote}
       ${P.failed && P.failed.length ? `<p class="note">Sin datos para: ${P.failed.map((f) => esc(f.symbol)).join(', ')} (${esc(P.failed[0].error && P.failed[0].error.message || '')}).</p>` : ''}${source(P.prov, ...(rows[1] && rows[1]._prov || []))}`)}
     <div class="grid g4" style="margin:14px 0">${winners.map((w) => card(w.lab, w.w ? `<div style="display:flex;gap:10px;align-items:center">${logoHTML(w.w.symbol, 34)}<div><b>${esc(w.w.symbol)}</b><div class="note">${esc(w.w.name || '')}</div></div></div><p class="note">Mejor percentil medio del grupo en: ${pillars.find((p) => p[0] === w.lab)[1].map(([k]) => COLS.find((c) => c[0] === k)[1]).join(', ')}.</p>` : '<p class="note">Datos insuficientes.</p>')).join('')}</div>

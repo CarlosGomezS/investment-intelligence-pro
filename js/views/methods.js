@@ -1,15 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=7feadaa0';
-import { compute, fxFor } from './company.js?v=7feadaa0';
-import { METHODS, rankMethod } from '../calc/methods.js?v=7feadaa0';
-import { alligator } from '../calc/alligator.js?v=7feadaa0';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=7feadaa0';
-import { logoHTML } from '../app.js?v=7feadaa0';
-import { isNum } from '../calc/finance.js?v=7feadaa0';
-import { store } from '../store.js?v=7feadaa0';
-import { exportCSV } from '../export.js?v=7feadaa0';
+import { data } from '../providers/index.js?v=cf3615ab';
+import { compute, fxFor } from './company.js?v=cf3615ab';
+import { METHODS, rankMethod } from '../calc/methods.js?v=cf3615ab';
+import { fxRate } from '../providers/fxrate.js?v=cf3615ab';
+import { alligator } from '../calc/alligator.js?v=cf3615ab';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=cf3615ab';
+import { logoHTML } from '../app.js?v=cf3615ab';
+import { isNum } from '../calc/finance.js?v=cf3615ab';
+import { store } from '../store.js?v=cf3615ab';
+import { exportCSV } from '../export.js?v=cf3615ab';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -17,7 +18,7 @@ const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA
   'HON', 'IBM', 'CAT', 'UPS', 'LOW', 'SBUX', 'BKNG', 'GILD', 'ADP', 'MDLZ', 'MO', 'PM', 'ISRG', 'VRTX', 'ZTS', 'SPGI', 'DE', 'MMM', 'CL', 'HSY'];
 
 // Análisis masivo: Finnhub primero (60/min, sin tope diario) para no gastar la cuota diaria de FMP.
-const VIA = { profile: ['finnhub', 'fmp', 'roic'], quote: ['finnhub', 'td', 'fmp'], st: ['finnhub', 'fmp', 'sec', 'roic'], ttm: ['finnhub', 'fmp'], px: ['fmp', 'td', 'roic', 'av'] }; // precios: 1 petición por empresa (también sirven para el cocodrilo)
+const VIA = { profile: ['finnhub', 'fmp', 'roic'], quote: ['finnhub', 'td', 'fmp'], st: ['finnhub', 'fmp', 'sec', 'roic'], ttm: ['finnhub', 'fmp'], px: ['td', 'fmp', 'roic', 'av'] }; // precios: Twelve Data primero; si su cola por minuto se alarga, pasa a FMP (no se gasta FMP de más)
 const results = new Map(); // símbolo → { sym, S } | { sym, error }
 let state = { method: 'buffett', universe: 'grandes', n: 40, manual: '', running: false, done: 0, total: 0, techs: new Map() };
 const SAVE = 'iip.methods.v1';
@@ -25,6 +26,8 @@ const SAVE = 'iip.methods.v1';
 const wrap = (p) => p.then((v) => ({ ok: true, ...v }), (e) => ({ ok: false, error: e }));
 const KEYS = ['quote', 'priceChange', 'income', 'balance', 'cashflow', 'incomeTTM', 'balanceTTM', 'cashflowTTM', 'ratios', 'keyMetrics', 'ratiosTTM', 'keyMetricsTTM', 'scores', 'estimates', 'priceTarget', 'gradesConsensus', 'dcf', 'dividends', 'splits', 'earnings', 'treasury', 'riskPremium', 'prices', 'spy', 'profile'];
 
+const usdCache = new Map();
+function usdRate(cur) { if (!usdCache.has(cur)) usdCache.set(cur, fxRate(cur, 'USD').then((r) => r.rate)); return usdCache.get(cur); }
 let shared = null; // bono a 10 años y prima de riesgo: una sola descarga para todas
 async function sharedMarket() {
   if (!shared) shared = Promise.all([wrap(data.treasury(new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10))), wrap(data.riskPremium())]);
@@ -46,7 +49,11 @@ async function analyzeOne(sym) {
   if (!income.ok || !quote.ok) throw Object.assign(new Error(!quote.ok ? 'sin cotización' : 'sin estados financieros en tus fuentes gratuitas'), { code: 'not_found' });
   const fx = await fxFor(raw); // moneda de los estados ≠ moneda de cotización (ADR, Londres en peniques…)
   if (fx === null) throw new Error('sin tipo de cambio entre la moneda de sus cuentas y la de cotización');
-  const S = compute({ sym, raw, fx, noSaved: true });
+  let S = compute({ sym, raw, fx, noSaved: true });
+  // Si aparece un salto de acciones (posible split), se descarga la lista real de splits y se recalcula con ella
+  if ((S.m.splitsAdj || []).length) { raw.splits = await lim(wrap(data.splits(sym)), 15000); if (raw.splits.ok) S = compute({ sym, raw, fx, noSaved: true }); }
+  // Tipo de cambio a USD para los umbrales en dólares (tamaño de Graham)
+  if (S.m.tradeCur && S.m.tradeCur !== 'USD') { const u = await usdRate(S.m.tradeCur); S.usdRate = u; } else S.usdRate = 1;
   if (S.m.profile.isEtf || S.m.profile.isFund) throw new Error('es un ETF o fondo');
   if (!isNum(S.m.price)) throw new Error('sin precio');
   return S;

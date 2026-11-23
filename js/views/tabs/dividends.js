@@ -1,8 +1,8 @@
 // Dividendos: historial completo, DPA anual, rentabilidad histórica, crecimiento, payout, continuidad, recortes y próximas fechas.
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, div, cagrN } from '../../calc/finance.js?v=7feadaa0';
-import { exportCSV } from '../../export.js?v=7feadaa0';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, div, cagrN } from '../../calc/finance.js?v=cf3615ab';
+import { exportCSV } from '../../export.js?v=cf3615ab';
 
 export function render(el, S) {
   const m = S.m, cur = m.tradeCur, d = m.dpsSeries, all = m.divs;
@@ -16,7 +16,8 @@ export function render(el, S) {
   let streak = 0; for (let y = maxY; yearsSet.has(y); y--) streak++;
   let inc = 0; for (let i = d.length - 1; i > 0 && d[i].dps >= d[i - 1].dps * 0.999; i--) inc++;
   const gaps = []; for (let y = Math.min(...yearsSet); y < maxY; y++) if (!yearsSet.has(y)) gaps.push(y);
-  const pYears = m.years.slice(-10).map((y) => ({ year: y.year, ni: div(y.dividendsPaid, y.netIncome), fcf: div(y.dividendsPaid, y.fcf) }));
+  // Con beneficio o FCF ≤ 0 la cobertura no es un porcentaje: se marca como no cubierta (uncov)
+  const pYears = m.years.slice(-10).map((y) => ({ year: y.year, ni: y.netIncome > 0 ? div(y.dividendsPaid, y.netIncome) : null, fcf: y.fcf > 0 ? div(y.dividendsPaid, y.fcf) : null, uncovNi: y.dividendsPaid > 0 && !(y.netIncome > 0), uncovFcf: y.dividendsPaid > 0 && !(y.fcf > 0) }));
   const lastP = pYears[pYears.length - 1] || {};
   // rentabilidad por dividendo histórica: DPA del año / cierre medio del año
   const px = m.priceData || [];
@@ -26,14 +27,14 @@ export function render(el, S) {
   el.innerHTML = `<div class="kpis" style="margin-bottom:14px">
       <div class="kpi"><span>Dividendo últimos 12 meses</span><b>${num(m.dpsTTM, 3)} ${esc(cur)}</b></div><div class="kpi"><span>Rentabilidad actual</span><b>${pct(m.dpsTTM / m.price, 2)}</b></div>
       <div class="kpi"><span>CAGR 3 años</span><b>${pct(cagrN(vals, 3))}</b></div><div class="kpi"><span>CAGR 5 años</span><b>${pct(cagrN(vals, 5))}</b></div><div class="kpi"><span>CAGR 10 años</span><b>${pct(cagrN(vals, 10))}</b></div>
-      <div class="kpi"><span>Payout sobre beneficio</span><b>${pct(lastP.ni, 0)}</b></div><div class="kpi"><span>Payout sobre FCF</span><b>${pct(lastP.fcf, 0)}</b></div>
+      <div class="kpi"><span>Payout sobre beneficio</span><b>${lastP.uncovNi ? 'con pérdidas' : pct(lastP.ni, 0)}</b></div><div class="kpi"><span>Payout sobre FCF</span><b>${lastP.uncovFcf ? 'FCF negativo' : pct(lastP.fcf, 0)}</b></div>
       <div class="kpi"><span>Años seguidos pagando</span><b>${streak}</b></div><div class="kpi"><span>Años seguidos subiéndolo</span><b>${inc}</b></div><div class="kpi"><span>Frecuencia</span><b>${esc(freq || '—')}</b></div>
     </div>
     <div class="grid g2">
       ${card('Próximas fechas', upcoming.length ? table('upd', [{ k: 'declarationDate', label: 'Anuncio', f: date, align: 'left' }, { k: 'date', label: 'Ex-dividendo', f: date }, { k: 'recordDate', label: 'Registro', f: date }, { k: 'paymentDate', label: 'Pago', f: date }, { k: 'dividend', label: 'Importe', f: (v) => num(v, 4) }], upcoming) : '<p class="note">No hay fechas anunciadas pendientes. Las fechas se publican cuando el consejo aprueba el dividendo.</p>')}
       ${card('Continuidad, recortes y suspensiones', `<div class="alert-row"><span class="pill ${cuts.length ? 'media' : 'baja'}">${cuts.length ? 'Recortes' : 'OK'}</span><div><p>${cuts.length ? `Años con dividendo anual inferior al anterior: ${cuts.join(', ')}.` : 'Sin recortes del dividendo anual en el historial disponible.'}</p></div></div>
         <div class="alert-row"><span class="pill ${gaps.length ? 'alta' : 'baja'}">${gaps.length ? 'Suspensión' : 'OK'}</span><div><p>${gaps.length ? `Años sin dividendo: ${gaps.join(', ')}.` : `Pagos ininterrumpidos desde ${Math.min(...yearsSet)}.`}</p></div></div>
-        <div class="alert-row"><span class="pill ${isNum(lastP.fcf) && lastP.fcf > 0.9 ? 'alta' : 'baja'}">Cobertura</span><div><p>${isNum(lastP.fcf) ? `El dividendo consume el ${pct(lastP.fcf, 0)} del flujo de caja libre ${lastP.fcf > 0.9 ? ': poco margen para mantenerlo si la caja cae.' : '.'}` : 'Sin datos de FCF.'}</p></div></div>
+        <div class="alert-row"><span class="pill ${lastP.uncovFcf || (isNum(lastP.fcf) && lastP.fcf > 0.9) ? 'alta' : 'baja'}">Cobertura</span><div><p>${lastP.uncovFcf ? 'Paga dividendo con flujo de caja libre negativo: lo financia con caja o deuda. Insostenible si persiste.' : isNum(lastP.fcf) ? `El dividendo consume el ${pct(lastP.fcf, 0)} del flujo de caja libre ${lastP.fcf > 0.9 ? ': poco margen para mantenerlo si la caja cae.' : '.'}` : 'Sin datos de FCF.'}</p></div></div>
         <p class="note">El año en curso se excluye del cálculo anual por estar incompleto. Importes ajustados por splits.</p>`)}
       ${card('Dividendo por acción anual', '<div class="chart"><canvas id="dv1"></canvas></div>')}
       ${card('Rentabilidad por dividendo histórica', '<div class="chart"><canvas id="dv2"></canvas></div><p class="note">DPA del año / precio medio de cierre del año.</p>')}

@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=7feadaa0';
-import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=7feadaa0';
-import { isNum, div, asc, splitAdjustRows } from '../../calc/finance.js?v=7feadaa0';
-import { extra } from '../company.js?v=7feadaa0';
-import { exportCSV, exportXLSX } from '../../export.js?v=7feadaa0';
+import { data } from '../../providers/index.js?v=cf3615ab';
+import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=cf3615ab';
+import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=cf3615ab';
+import { extra } from '../company.js?v=cf3615ab';
+import { exportCSV, exportXLSX } from '../../export.js?v=cf3615ab';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -39,6 +39,9 @@ function rollingTTM(qAsc, defs, isStock) {
   const out = [];
   for (let i = 3; i < qAsc.length; i++) {
     const w = qAsc.slice(i - 3, i + 1), r = { date: qAsc[i].date, fiscalYear: qAsc[i].fiscalYear, period: 'TTM ' + (qAsc[i].period || '') };
+    // Solo 4 trimestres consecutivos (unos 9 meses entre el primer y el último cierre); con huecos no es un TTM
+    const span = (new Date(w[3].date) - new Date(w[0].date)) / 864e5;
+    if (!(span > 240 && span < 310)) continue;
     for (const k of Object.keys(qAsc[i])) {
       if (typeof qAsc[i][k] !== 'number') continue;
       r[k] = isStock || /eps|Shs|shares/i.test(k) ? qAsc[i][k] : (w.every((x) => isNum(x[k])) ? w.reduce((a, x) => a + x[k], 0) : null);
@@ -62,7 +65,7 @@ async function rowsFor(S, stmt, period) {
   }
   try {
     const q = await extra(S, 'q' + stmt, () => data[stmt](S.sym, 'quarter', 44));
-    const rows = asc(q.data);
+    const rows = splitAdjustRowsByDate(asc(q.data), S.raw.splits && S.raw.splits.ok ? S.raw.splits.data : null);
     if (period === 'quarter') return { rows, prov: [q] };
     return { rows: rollingTTM(rows, DEFS[stmt], DEFS[stmt].stock), prov: [q], note: 'TTM móvil calculado sumando los cuatro trimestres previos de cada fecha (balance: dato a cierre de trimestre).' };
   } catch (e) { return { error: e }; }
@@ -85,7 +88,7 @@ export async function render(el, S) {
     if (res.error) { body.innerHTML = unavailable(`${D.title} (${st.period === 'annual' ? 'anual' : st.period === 'quarter' ? 'trimestral' : 'TTM'})`, res.error) + (st.period !== 'annual' ? '<p class="note">Los estados trimestrales requieren el plan de pago de FMP o una clave de Alpha Vantage.</p>' : ''); return; }
     const rows = res.rows.slice(st.period === 'annual' ? -16 : -20);
     const cols = rows.map((r) => (r._ttm ? 'TTM' : label(r, st.period)));
-    const lag = st.period === 'quarter' ? 4 : 1;
+    const lag = st.period === 'annual' ? 1 : 4; // trimestral y TTM móvil: frente al mismo periodo del año anterior
     const fmt = (v, kind) => (kind === 'pct' ? pct(v) : kind === 'ps' ? num(v, 2) : big(v));
     const tr = D.rows.map(([lab, f, kind]) => {
       const vals = rows.map((r) => get(r, f));
