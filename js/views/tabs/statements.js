@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=e06fb4a0';
-import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=e06fb4a0';
-import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=e06fb4a0';
-import { extra } from '../company.js?v=e06fb4a0';
-import { exportCSV, exportXLSX } from '../../export.js?v=e06fb4a0';
+import { data } from '../../providers/index.js?v=cc3b3e4a';
+import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=cc3b3e4a';
+import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=cc3b3e4a';
+import { extra } from '../company.js?v=cc3b3e4a';
+import { exportCSV, exportXLSX } from '../../export.js?v=cc3b3e4a';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -61,7 +61,7 @@ async function rowsFor(S, stmt, period) {
     if (!r.ok) return { error: r.error };
     const rows = splitAdjustRows(asc(r.data), S.m.splitsAdj);
     const ttm = S.raw[stmt + 'TTM'];
-    if (ttm && ttm.ok && ttm.data) { const [t] = splitAdjustRowsByDate([{ ...ttm.data, fiscalYear: 'TTM' }], S.raw.splits && S.raw.splits.ok ? S.raw.splits.data : null, S.m.shares); /* TTM con el mismo ajuste de splits */ rows.push({ ...t, _ttm: true }); }
+    if (ttm && ttm.ok && ttm.data) { const [t] = splitAdjustRowsByDate([{ ...ttm.data, date: ttm.data.date || (rows.length ? rows[rows.length - 1].date : null), fiscalYear: 'TTM' }], S.raw.splits && S.raw.splits.ok ? S.raw.splits.data : null, S.m.shares); /* TTM con el mismo ajuste de splits */ rows.push({ ...t, _ttm: true }); }
     const adj = rows.some((x) => x._splitAdj);
     return { rows, prov: [r, ttm && ttm.ok ? ttm : null], note: adj ? 'Acciones y BPA de los años anteriores a cada split detectado están ajustados al número de acciones actual (comparables entre años). Los importes no cambian.' : '' };
   }
@@ -95,7 +95,9 @@ export async function render(el, S) {
     const tr = D.rows.map(([lab, f, kind]) => {
       const vals = rows.map((r) => get(r, f));
       const cells = vals.map((v, i) => {
-        const base = rows[i]._ttm ? null : vals[i - lag];
+        // Periodo comparable: el de hace un año por FECHA (330-400 días); si falta un trimestre no se compara con otro
+        const j = i - lag, ok = j >= 0 && (!rows[i].date || !rows[j].date || Math.abs((new Date(rows[i].date) - new Date(rows[j].date)) / 864e5 - 365) < 35);
+        const base = rows[i]._ttm || !ok ? null : vals[j];
         const g = kind !== 'pct' && isNum(v) && isNum(base) && base !== 0 ? (v - base) / Math.abs(base) : null;
         return `<td>${fmt(v, kind)}${isNum(g) ? `<span class="yo ${cls(g)}">${sgnPct(g, 0)}</span>` : ''}</td>`;
       }).join('');

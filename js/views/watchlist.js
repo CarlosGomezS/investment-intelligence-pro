@@ -1,10 +1,10 @@
 // Seguimiento: listas (favoritos y personalizadas), alertas de valoración, historial y análisis guardados.
-import { data } from '../providers/index.js?v=e06fb4a0';
-import { store } from '../store.js?v=e06fb4a0';
-import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=e06fb4a0';
-import { logoHTML } from '../app.js?v=e06fb4a0';
-import { exportCSV } from '../export.js?v=e06fb4a0';
-import { isNum } from '../calc/finance.js?v=e06fb4a0';
+import { data } from '../providers/index.js?v=cc3b3e4a';
+import { store } from '../store.js?v=cc3b3e4a';
+import { esc, card, num, pct, sgnPct, cls, datetime, toast } from '../ui/dom.js?v=cc3b3e4a';
+import { logoHTML } from '../app.js?v=cc3b3e4a';
+import { exportCSV } from '../export.js?v=cc3b3e4a';
+import { isNum } from '../calc/finance.js?v=cc3b3e4a';
 
 export async function checkAlerts() {
   const A = store.alerts(), out = [];
@@ -12,6 +12,9 @@ export async function checkAlerts() {
     try {
       const q = (await data.quote(sym)).data; if (!q) return;
       const p = q.price, hits = [];
+      // Si el precio se ha multiplicado o dividido por 2 o más desde que guardaste la alerta, probablemente hubo un split:
+      // los niveles guardados ya no valen y no se dispara nada
+      if (isNum(a.ref) && a.ref > 0 && (p / a.ref < 0.5 || p / a.ref > 2)) { out.push({ sym, name: a.name, price: p, hits: [], stale: 'el precio ha cambiado mucho desde que guardaste la alerta (¿split?): revísala en la ficha', a }); return; }
       if (isNum(a.below) && p <= a.below) hits.push(`precio ${num(p)} ≤ ${num(a.below)}`);
       if (isNum(a.above) && p >= a.above) hits.push(`precio ${num(p)} ≥ ${num(a.above)}`);
       // Margen de seguridad frente al valor calculado al guardar la alerta (se indica su fecha; si tiene más de 90 días, no salta)

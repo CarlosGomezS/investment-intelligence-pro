@@ -1,8 +1,8 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
-import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=e06fb4a0';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=e06fb4a0';
+import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
+import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=cc3b3e4a';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=cc3b3e4a';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;
@@ -28,9 +28,11 @@ export function render(el, S) {
     { ok: !(isNum(debtInc) && isNum(revInc) && debtInc > Math.max(revInc, 0)), t: `Deuda: ${big(first.debt, cur)} → ${big(last.debt, cur)} (ventas ${big(first.revenue, cur)} → ${big(last.revenue, cur)}).` },
     { ok: !(isNum(shG) && shG > 0.01), t: `Acciones: ${sgnPct(shG)} anual. Recompras ${big(buy, cur)}, emisiones ${big(iss, cur)}, pagos en acciones ${big(sbc, cur)} en el periodo.` },
   ];
+  // Si las ventas no crecen, no hay «crecimiento de calidad» que diagnosticar
+  checks.unshift({ ok: isNum(revInc) && revInc > 0, t: isNum(revInc) ? `Ventas: ${big(first.revenue, cur)} → ${big(last.revenue, cur)} (${revInc > 0 ? 'crecen' : 'se reducen'}).` : 'Sin ventas comparables.' });
   const real = checks.filter((c) => c.ok).length;
   el.innerHTML = `
-  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${real === 4 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 3 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
+  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${!checks[0].ok ? 'Las ventas no crecen en el periodo: el negocio se está reduciendo o está estancado.' : real === 5 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 4 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
     ${checks.map((c) => `<div class="alert-row"><span class="pill ${c.ok ? 'baja' : 'media'}" style="${c.ok ? 'color:var(--pos)' : ''}">${c.ok ? 'OK' : 'Ojo'}</span><div><p style="margin:0">${esc(c.t)}</p></div></div>`).join('')}`)}
   <div class="grid g2" style="margin-top:14px">
     ${card('Tasas de crecimiento anual compuesto (CAGR)', table('cagrT', [{ k: 'l', label: 'Magnitud', align: 'left' }, ...H.map((h) => ({ k: String(h), label: h + (h === 1 ? ' año' : ' años'), f: (v) => `<span class="${cls(v)}">${pct(v)}</span>` }))], rows) + '<p class="note">«—»: no hay suficientes años o el valor inicial/final no es positivo (el CAGR no se puede calcular).</p>')}
@@ -39,7 +41,7 @@ export function render(el, S) {
       <div class="kpi"><span>Años con caída de ventas</span><b>${yoy(s('revenue')).slice(-10).filter((v) => isNum(v) && v < 0).length} de ${Math.min(10, Y.length - 1)}</b></div>
       <div class="kpi"><span>Años con FCF positivo</span><b>${fcfPos.filter((y) => y.fcf > 0).length} de ${fcfPos.length}</b></div>
       <div class="kpi"><span>FCF acumulado ${esc(win[0].year)}–${esc(last.year)}</span><b>${big(sum(win.map((y) => y.fcf)), cur)}</b></div>
-      <div class="kpi"><span>Conversión FCF/beneficio (media 5a)</span><b>${num(div(sum(win.map((y) => y.fcf)), sum(win.map((y) => y.netIncome))), 2)}×</b></div>
+      <div class="kpi"><span>Conversión FCF/beneficio (media 5a)</span><b>${(() => { const ni = sum(win.map((y) => y.netIncome)); return ni > 0 ? num(div(sum(win.map((y) => y.fcf)), ni), 2) + '×' : 'con pérdidas: no aplica'; })()}</b></div>
       <div class="kpi"><span>Rotación de activos (último)</span><b>${num(assetTurn[assetTurn.length - 1], 2)}×</b></div></div>`)}
   </div>
   <div class="grid g2" style="margin-top:14px">

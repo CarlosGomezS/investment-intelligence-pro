@@ -1,8 +1,8 @@
 // Alertas y riesgos: anomalías detectadas en las cuentas, riesgo de mercado y alertas de valoración del usuario.
-import { esc, card, pct, num, toast } from '../../ui/dom.js?v=e06fb4a0';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=e06fb4a0';
-import { store } from '../../store.js?v=e06fb4a0';
-import { solvency } from './debt.js?v=e06fb4a0';
+import { esc, card, pct, num, toast } from '../../ui/dom.js?v=cc3b3e4a';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=cc3b3e4a';
+import { store } from '../../store.js?v=cc3b3e4a';
+import { solvency } from './debt.js?v=cc3b3e4a';
 
 export function render(el, S) {
   const { m, alerts } = S;
@@ -28,6 +28,6 @@ export function render(el, S) {
         <p class="note">Ahora: precio ${num(m.price)} · margen de seguridad ${pct(S.val.composite.mos, 0)} · PER ${num(m.pe, 1)}. El margen de seguridad usa el último valor intrínseco calculado para esta empresa.</p>`)}
     </div>`;
   const v = (id) => { const x = el.querySelector('#' + id).value; return x === '' ? null : Number(x); };
-  el.querySelector('#alF').onsubmit = (e) => { e.preventDefault(); store.setAlert(m.symbol, { below: v('alP'), above: v('alU'), mos: isNum(v('alM')) ? v('alM') / 100 : null, pe: v('alE'), intrinsic: S.val.composite.value, name: m.profile.companyName, at: Date.now() }); toast('Alerta guardada'); };
+  el.querySelector('#alF').onsubmit = (e) => { e.preventDefault(); store.setAlert(m.symbol, { below: v('alP'), above: v('alU'), mos: isNum(v('alM')) ? v('alM') / 100 : null, pe: v('alE'), intrinsic: S.val.composite.value, ref: m.price, name: m.profile.companyName, at: Date.now() }); /* ref: precio al guardar, para detectar splits */ toast('Alerta guardada'); };
   el.querySelector('#alX').onclick = () => { store.setAlert(m.symbol, null); render(el, S); toast('Alerta eliminada'); };
 }

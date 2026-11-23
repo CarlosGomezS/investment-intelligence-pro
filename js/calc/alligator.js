@@ -5,7 +5,7 @@
 //   Fractal inferior: vela cuyo mínimo es menor que el de las dos anteriores y las dos siguientes (superior: al revés).
 // Uso de Williams: solo se opera cuando el cocodrilo «come» (líneas separadas y ordenadas); entrada al romper el
 // fractal por encima de los dientes, stop tras el fractal contrario y salida cuando las líneas vuelven a juntarse.
-import { isNum } from './finance.js?v=e06fb4a0';
+import { isNum } from './finance.js?v=cc3b3e4a';
 
 export function smma(values, n) {
   const out = new Array(values.length).fill(null);
@@ -42,7 +42,7 @@ export function alligator(rows) {
   else if (lips < teeth && teeth < jaw && spread > 0.005) state = 'come a la baja';
   else state = 'dormido';
   const { up, down } = fractals(bars);
-  const lastUp = up.length ? up[up.length - 1] : null;
+  const lastUp = up.length && up[up.length - 1].i >= n - 63 ? up[up.length - 1] : null; // misma antigüedad máxima que el stop (3 meses)
   // Stop: el fractal inferior más reciente bajo el precio, solo de los últimos 3 meses (un soporte de hace un año no sirve)
   const lastDown = [...down].reverse().find((f) => f.price < close && f.i >= n - 63) || null;
   // Entrada de Williams: rotura del último fractal superior, solo con el cocodrilo comiendo al alza y si aún no se ha roto

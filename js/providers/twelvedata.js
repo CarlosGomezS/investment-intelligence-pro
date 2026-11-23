@@ -1,7 +1,7 @@
 // Twelve Data (gratis: 800 créditos/día, 8/minuto; cotizaciones de EE. UU. y divisas).
 // Se usa para cotización, histórico de precios y tipos de cambio.
-import { getJSON } from './http.js?v=e06fb4a0';
-import { config } from '../config.js?v=e06fb4a0';
+import { getJSON } from './http.js?v=cc3b3e4a';
+import { config } from '../config.js?v=cc3b3e4a';
 
 const H = () => config.get().cacheHours;
 const q = (path, params, ttl, v) => getJSON('td', path, params, ttl, v);

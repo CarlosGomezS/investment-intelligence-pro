@@ -44,7 +44,7 @@ export const MAP = {
     ltdCurrent: [...G('LongTermDebtCurrent'), ...I('CurrentPortionOfLongtermBorrowings')],
     stBorrowings: [...G('ShortTermBorrowings')],
     commercialPaper: [...G('CommercialPaper')],
-    longTermDebt: [...G('LongTermDebtNoncurrent'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    longTermDebt: [...G('LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligations'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
     longTermDebtTotal: [...G('LongTermDebt')], // en US-GAAP incluye la parte a corto
     leaseCurrent: [...G('OperatingLeaseLiabilityCurrent'), ...I('CurrentLeaseLiabilities')],
     leaseNoncurrent: [...G('OperatingLeaseLiabilityNoncurrent'), ...I('NoncurrentLeaseLiabilities')],
@@ -102,7 +102,7 @@ export function toStatements(facts, symbol, maxYears = 15) {
   const ends = [...new Set(anchorFlows)].sort().reverse().slice(0, maxYears);
   const bEnds = [...new Set(anchorBal)].filter((e) => ends.some((x) => Math.abs(days(x, e)) < 15)).sort().reverse().slice(0, maxYears);
   const near = (m, end) => { if (m.has(end)) return m.get(end); for (const [e, f] of m) if (Math.abs(days(e, end)) < 15) return f; return null; };
-  const cur = (fs) => { for (const f of fs) if (f && f.unit && !/shares|pure/i.test(String(f.unit))) return String(f.unit).replace(/^iso4217:/, ''); return null; };
+  const cur = (fs) => { for (const f of fs) if (f && f.unit && !/shares|pure|\//i.test(String(f.unit))) return String(f.unit).trim().replace(/^iso4217:/i, '').toUpperCase(); return null; };
   const mk = (sec, list) => list.map((end) => {
     const row = { date: end, symbol, fiscalYear: end.slice(0, 4), period: 'FY' }, used = [];
     for (const [k, cands] of Object.entries(MAP[sec])) { const f = near(pick(cands), end); row[k] = f ? f.val : null; if (f) used.push(f); }

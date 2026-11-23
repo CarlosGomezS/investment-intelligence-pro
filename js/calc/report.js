@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=e06fb4a0';
-import { fmtB } from './alerts.js?v=e06fb4a0';
+import { isNum } from './finance.js?v=cc3b3e4a';
+import { fmtB } from './alerts.js?v=cc3b3e4a';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -39,6 +39,8 @@ export function buildReport(m, sc, val, alerts) {
   else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad, con riesgos graves que vigilar';
   else if (qual >= 60) conclusion = 'Empresa de calidad, pero sobrevalorada';
   else conclusion = 'Empresa mediocre o con riesgos elevados';
+  // Bancos, aseguradoras, REIT y eléctricas: el DCF de caja libre y la puntuación estándar no les aplican bien
+  if (/financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i.test(`${m.profile.sector || ''} ${m.profile.industry || ''}`)) conclusion += ' (aviso: es financiera, inmobiliaria o eléctrica; el DCF y la puntuación estándar no se aplican bien a este sector)';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);
   const cons = sc.cats.filter((x) => x.score != null && x.score < 60).map((x) => `${x.label} solo ${x.score}/100`).concat(alerts.filter((a) => a.sev !== 'baja').map((a) => a.title));
   if (!m.ttmIsReal) cons.push(`Análisis con datos del ${m.periodLabel}, sin los últimos trimestres`);

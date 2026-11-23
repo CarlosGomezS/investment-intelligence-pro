@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=e06fb4a0';
+import { isNum, mean, stdev, median } from './finance.js?v=cc3b3e4a';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -178,7 +178,8 @@ export const METHODS = {
         C('Clasificación conjunta', isNum(g.pos) ? g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) : null, isNum(g.pos) ? `puesto ${g.pos} de ${g.n}` : 'no clasificada', this.rules[3]),
       ];
       const score = isNum(g.pos) ? (g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 100) : 0;
-      const verdict = !g.excluded && isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
+      const ebitPos = isNum(g.ey) && g.ey > 0;
+      const verdict = !g.excluded && ebitPos && isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : ebitPos && isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de clasificación, no de precio objetivo)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
   },
@@ -244,8 +245,9 @@ export const METHODS = {
         C('F-Score ≥ 8', isNum(f) ? f >= 8 : null, isNum(f) ? `${f}/9` : 'sin dato', this.rules[2]),
       ];
       if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: varias pruebas del F-Score (liquidez, margen bruto) no se leen igual', 'Compruébala en su ficha.'));
-      const score = isNum(f) ? Math.round((f / 9) * (p.cheap ? 100 : 60)) : 0;
-      const verdict = p.cheap && f >= 8 ? 'entra' : f >= 8 || (p.cheap && f >= 6) ? 'vigilar' : 'no';
+      const score = isNum(f) ? Math.min(FIN.test(base(S).sector) ? 40 : 100, Math.round((f / 9) * (p.cheap ? 100 : 60))) : 0;
+      const finP = FIN.test(base(S).sector);
+      const verdict = finP ? 'no' : p.cheap && f >= 8 ? 'entra' : f >= 8 || (p.cheap && f >= 6) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de selección)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
   },

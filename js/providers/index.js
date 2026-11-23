@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=e06fb4a0';
-import { alphavantage } from './alphavantage.js?v=e06fb4a0';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=e06fb4a0';
-import { twelvedata } from './twelvedata.js?v=e06fb4a0';
-import { roic } from './roic.js?v=e06fb4a0';
-import { sec, forgetSec } from './sec.js?v=e06fb4a0';
-import { esef, forgetEsef } from './esef.js?v=e06fb4a0';
-import { config } from '../config.js?v=e06fb4a0';
-import { ApiError, usage, queueDelay } from './http.js?v=e06fb4a0';
-import { setHint } from './hints.js?v=e06fb4a0';
+import { fmp } from './fmp.js?v=cc3b3e4a';
+import { alphavantage } from './alphavantage.js?v=cc3b3e4a';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=cc3b3e4a';
+import { twelvedata } from './twelvedata.js?v=cc3b3e4a';
+import { roic } from './roic.js?v=cc3b3e4a';
+import { sec, forgetSec } from './sec.js?v=cc3b3e4a';
+import { esef, forgetEsef } from './esef.js?v=cc3b3e4a';
+import { config } from '../config.js?v=cc3b3e4a';
+import { ApiError, usage, queueDelay } from './http.js?v=cc3b3e4a';
+import { setHint } from './hints.js?v=cc3b3e4a';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -83,10 +83,12 @@ async function complete(method, args, base, rest) {
       // «2024» al ejercicio que cierra en enero de 2025 y otras «2025»
       const endOf = (x) => (x.date ? new Date(x.date).getTime() : null);
       for (const o of r.data) {
+        if (o.reportedCurrency && o.reportedCurrency !== cur) continue; // moneda comprobada fila a fila
         const eo = endOf(o);
         const mine = rows.find((x) => (eo && endOf(x) ? Math.abs(endOf(x) - eo) < 45 * 864e5 : fyOf(x) === fyOf(o)));
         if (!mine) { rows.push({ ...o, _from: id }); added = true; continue; }
-        for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null) { mine[k] = v; added = true; }
+        // Dentro de una fila ya existente no se mezclan acciones ni BPA de otra fuente (pueden ir sin ajustar a splits)
+        for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null && !/eps|Shs|shares/i.test(k)) { mine[k] = v; added = true; }
       }
       if (added) used.push(id);
     } catch (e) { /* la fuente secundaria no aporta: se sigue con lo que hay */ }

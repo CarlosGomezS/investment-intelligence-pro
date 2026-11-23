@@ -1,19 +1,23 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=e06fb4a0';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=e06fb4a0';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=cc3b3e4a';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=cc3b3e4a';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
   // FCF a la empresa para descontar al WACC: FCF − pagos en acciones (son un coste real que diluye) + intereses
   // pagados después de impuestos (el flujo operativo ya los restó; la deuda se descuenta luego con la deuda neta).
-  const unlev = (y) => (isNum(y.fcf) ? y.fcf - (isNum(y.sbc) ? y.sbc : 0) + (isNum(y.interestExpense) ? y.interestExpense * (1 - (isNum(y.taxRate) ? y.taxRate : 0.21)) : 0) : null);
+  // Ajuste por intereses solo con normas de EE. UU. (US-GAAP obliga a incluirlos en el flujo operativo); con NIIF
+  // muchas empresas los llevan a financiación y sumarlos inflaría el flujo. Los intereses cobrados por la caja se
+  // restan, porque la caja ya se suma aparte al restar la deuda neta.
+  const usGaap = /^(US|USA|United States)$/i.test(m.profile.country || '') || (!m.profile.country && m.repCur === 'USD');
+  const unlev = (y) => { if (!isNum(y.fcf)) return null; const t = isNum(y.taxRate) ? y.taxRate : 0.21; let v = y.fcf - (isNum(y.sbc) ? y.sbc : 0); if (usGaap) v += ((y.interestExpense || 0) - (y.interestIncome || 0)) * (1 - t); return v; };
   const fcfTTM = unlev(m.T);
   const fcf3 = lastAvg(m.years.map(unlev), 3);
   const g = suggestGrowth({ fcfCagr5: cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
-    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio'} − pagos en acciones + intereses × (1 − impuesto)`, alt: m.X(fcf3) },
+    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio'} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}`, alt: m.X(fcf3) },
     growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts, capped: g.capped },
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },

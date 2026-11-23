@@ -69,7 +69,12 @@ export function buildAnnual(income, balance, cash) {
   const key = (r) => String(r.fiscalYear || String(r.date).slice(0, 4));
   const t = (r) => (r && r.date ? new Date(r.date).getTime() : null);
   const map = new Map();
-  for (const r of asc(income)) { const k = key(r); map.set(k, { year: k, i: r }); }
+  // Si dos ejercicios distintos comparten etiqueta (fuentes que numeran distinto los cierres de enero), todos se
+  // etiquetan por el año de su fecha de cierre para que ninguno pise a otro
+  const inc = asc(income);
+  const clash = inc.some((r, i) => inc.some((o, j) => j !== i && key(o) === key(r) && t(o) && t(r) && Math.abs(t(o) - t(r)) >= 45 * 864e5));
+  const k0 = (r) => (clash && r.date ? String(r.date).slice(0, 4) : key(r));
+  for (const r of inc) { const k = k0(r); if (!map.has(k)) map.set(k, { year: k, i: r }); }
   const rowsI = [...map.values()];
   for (const [name, rows] of [['b', balance], ['c', cash]]) for (const r of asc(rows)) {
     const tr = t(r);
@@ -105,7 +110,7 @@ export function deriveYear(y, taxFallback = 0.21) {
     capex: c.capitalExpenditure, debt, cash, netDebt: b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), equity: b.totalStockholdersEquity,
     assets: b.totalAssets, inventory: b.inventory, receivables: b.netReceivables ?? b.accountsReceivables, deferredRevenue: b.deferredRevenue ?? null, goodwill: b.goodwill, ppe: b.propertyPlantEquipmentNet ?? null, retainedEarnings: b.retainedEarnings ?? null, liabilities: b.totalLiabilities ?? (isNum(b.totalAssets) && isNum(b.totalStockholdersEquity) ? b.totalAssets - b.totalStockholdersEquity : null),
     currentAssets: b.totalCurrentAssets, currentLiabilities: b.totalCurrentLiabilities, shortTermDebt: b.shortTermDebt, longTermDebt: b.longTermDebt,
-    interestExpense: isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, dividendsPaid: isNum(c.commonDividendsPaid) ? Math.abs(c.commonDividendsPaid) : (isNum(c.netDividendsPaid) ? Math.abs(c.netDividendsPaid) : null),
+    interestExpense: isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, interestIncome: isNum(i.interestIncome) ? Math.abs(i.interestIncome) : null, dividendsPaid: isNum(c.commonDividendsPaid) ? Math.abs(c.commonDividendsPaid) : (isNum(c.netDividendsPaid) ? Math.abs(c.netDividendsPaid) : null),
     buybacks: isNum(c.commonStockRepurchased) ? Math.abs(c.commonStockRepurchased) : null, issuance: c.commonStockIssuance ?? null,
     acquisitions: isNum(c.acquisitionsNet) ? Math.abs(c.acquisitionsNet) : null, sbc: c.stockBasedCompensation ?? null, rnd: i.researchAndDevelopmentExpenses,
     grossMargin: div(i.grossProfit, i.revenue), operatingMargin: div(i.operatingIncome, i.revenue), netMargin: div(i.netIncome, i.revenue),
@@ -241,8 +246,15 @@ export function adjustSplits(years, knownSplits = null) {
       if (inside.length && near(r, kIn)) { f = kIn; used = inside; }
       // 2) Años de fuentes distintas (p. ej. SEC reexpresada a medias junto a FMP ajustada): el salto es el producto
       //    de los splits POSTERIORES más recientes que una tiene y la otra no (productos desde el más reciente hacia atrás).
-      else if ((a.src || '') !== (b.src || '')) {
-        const after = known.filter((s) => s.date > from);
+      else {
+        // Fuentes distintas, o la misma SEC: cada 10-K reexpresa los 3 ejercicios anteriores, así que el salto puede
+        // aparecer hasta ~3 años ANTES del split. En la misma fuente solo se aceptan splits de esa ventana y si el
+        // beneficio no saltó en la misma proporción (si saltara, sería otra cosa).
+        const same = (a.src || '') === (b.src || '');
+        const aT = Date.parse(a.date || `${a.year}-12-31`);
+        const niR = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
+        const after = known.filter((s) => s.date > from && (!same || (Date.parse(s.date) > aT && Date.parse(s.date) - aT < 3.6 * 365 * 864e5)));
+        if (same && Math.abs(niR / r - 1) < 0.25) after.length = 0;
         let acc = 1; const run = [];
         for (let j = after.length - 1; j >= 0; j--) { acc *= after[j].f; run.push(after[j]); if (near(r, acc)) { f = acc; used = [...run]; break; } }
       }

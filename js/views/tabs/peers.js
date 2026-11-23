@@ -1,10 +1,10 @@
 // Competidores: detección automática (FMP stock-peers), lista editable, tabla comparativa, gráficos y ganador por pilar.
-import { data, gather } from '../../providers/index.js?v=e06fb4a0';
-import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
-import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=e06fb4a0';
-import { isNum, div, asc, median } from '../../calc/finance.js?v=e06fb4a0';
-import { store } from '../../store.js?v=e06fb4a0';
-import { logoHTML } from '../../app.js?v=e06fb4a0';
+import { data, gather } from '../../providers/index.js?v=cc3b3e4a';
+import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
+import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=cc3b3e4a';
+import { isNum, div, asc, median } from '../../calc/finance.js?v=cc3b3e4a';
+import { store } from '../../store.js?v=cc3b3e4a';
+import { logoHTML } from '../../app.js?v=cc3b3e4a';
 
 async function peerRow(sym) {
   const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), inc: () => data.income(sym, 'annual', 4) }, 15000);
@@ -77,7 +77,10 @@ export async function render(el, S, ctx) {
   const winners = pillars.map(([lab, keys]) => { const s = rankScore(rows, keys); let bi = -1, bv = -1; s.forEach((v, i) => { if (isNum(v) && v > bv) { bv = v; bi = i; } }); return { lab, w: rows[bi], s }; });
   // Misma limpieza que la valoración: múltiplos ≤ 0 o > 200 no cuentan
   const okV = (k, v) => isNum(v) && (!['pe', 'evEbitda'].includes(k) || (v > 0 && v < 200));
-  const med = Object.fromEntries(COLS.map(([k]) => [k, median(rows.filter((r) => !r.self).map((r) => r[k]).filter((v) => okV(k, v)))]));
+  // Cifras absolutas: solo hay mediana si todos los competidores usan la misma moneda (no se mezclan USD con EUR)
+  const ABS = { marketCap: 'tcur', fcf: 'tcur', revenue: 'currency', netIncome: 'currency' };
+  const sameCur = (k) => !ABS[k] || new Set(rows.filter((r) => !r.self).map((r) => r[ABS[k]])).size <= 1;
+  const med = Object.fromEntries(COLS.map(([k]) => [k, sameCur(k) ? median(rows.filter((r) => !r.self).map((r) => r[k]).filter((v) => okV(k, v))) : null]));
   el.innerHTML = `${card(`Comparativa con competidores${P.auto ? ' (detectados automáticamente)' : ' (lista personalizada)'}`, `<div class="tablewrap fixed"><table id="peerT" class="dense"><thead><tr><th class="l">Empresa</th>${COLS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>
       ${rows.map((r) => `<tr${r.self ? ' style="background:color-mix(in srgb,var(--acc) 9%,transparent)"' : ''}><td class="l"><a href="#/c/${encodeURIComponent(r.symbol)}/resumen" style="display:flex;gap:8px;align-items:center">${logoHTML(r.symbol, 22)}<span><b>${esc(r.symbol)}</b><br><small class="mute">${esc((r.name || '').slice(0, 28))}</small></span></a></td>${COLS.map(([k, , f]) => `<td>${f(r[k], r)}</td>`).join('')}</tr>`).join('')}
       <tr class="tot"><td class="l">Mediana competidores</td>${COLS.map(([k, , f]) => `<td>${f(med[k])}</td>`).join('')}</tr></tbody></table></div>${curNote}

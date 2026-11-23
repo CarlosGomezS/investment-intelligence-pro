@@ -47,3 +47,8 @@ test('simulador: todas las columnas desde la misma fecha', () => {
   const d = (x, y) => Math.abs(Date.parse(x) - Date.parse(y)) / 864e5;
   assert.ok(d(h.drip.from, h.noDrip.from) <= 7); assert.ok(d(h.index.from, h.drip.from) <= 7);
 });
+
+test('dos cierres de enero con la misma etiqueta no se pisan', () => {
+  const y = buildAnnual([{ fiscalYear: '2024', date: '2024-01-31', revenue: 1 }, { fiscalYear: '2024', date: '2025-01-31', revenue: 2 }], [], []);
+  assert.equal(y.length, 2); assert.equal(y[1].i.revenue, 2);
+});
