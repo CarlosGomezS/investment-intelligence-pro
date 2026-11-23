@@ -1,15 +1,15 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=f598cc18';
-import { buildModel } from '../calc/model.js?v=f598cc18';
-import { evaluateRatios } from '../calc/ratios.js?v=f598cc18';
-import { detectAlerts } from '../calc/alerts.js?v=f598cc18';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=f598cc18';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=f598cc18';
-import { buildReport } from '../calc/report.js?v=f598cc18';
-import { store } from '../store.js?v=f598cc18';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=f598cc18';
-import { logoHTML, countryOf } from '../app.js?v=f598cc18';
-import { isNum } from '../calc/finance.js?v=f598cc18';
+import { data, gather } from '../providers/index.js?v=e1106417';
+import { buildModel } from '../calc/model.js?v=e1106417';
+import { evaluateRatios } from '../calc/ratios.js?v=e1106417';
+import { detectAlerts } from '../calc/alerts.js?v=e1106417';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=e1106417';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=e1106417';
+import { buildReport } from '../calc/report.js?v=e1106417';
+import { store } from '../store.js?v=e1106417';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=e1106417';
+import { logoHTML, countryOf } from '../app.js?v=e1106417';
+import { isNum } from '../calc/finance.js?v=e1106417';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +17,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=f598cc18'), grafico: () => import('./tabs/chart.js?v=f598cc18'), estados: () => import('./tabs/statements.js?v=f598cc18'), ratios: () => import('./tabs/ratios.js?v=f598cc18'),
-  crecimiento: () => import('./tabs/growth.js?v=f598cc18'), deuda: () => import('./tabs/debt.js?v=f598cc18'), valoracion: () => import('./tabs/valuation.js?v=f598cc18'), dividendos: () => import('./tabs/dividends.js?v=f598cc18'),
-  competidores: () => import('./tabs/peers.js?v=f598cc18'), moat: () => import('./tabs/moat.js?v=f598cc18'), noticias: () => import('./tabs/news.js?v=f598cc18'), analistas: () => import('./tabs/analysts.js?v=f598cc18'),
-  riesgos: () => import('./tabs/risks.js?v=f598cc18'), scoring: () => import('./tabs/scoring.js?v=f598cc18'), informe: () => import('./tabs/report.js?v=f598cc18'), simulador: () => import('./tabs/simulator.js?v=f598cc18'),
+  resumen: () => import('./tabs/overview.js?v=e1106417'), grafico: () => import('./tabs/chart.js?v=e1106417'), estados: () => import('./tabs/statements.js?v=e1106417'), ratios: () => import('./tabs/ratios.js?v=e1106417'),
+  crecimiento: () => import('./tabs/growth.js?v=e1106417'), deuda: () => import('./tabs/debt.js?v=e1106417'), valoracion: () => import('./tabs/valuation.js?v=e1106417'), dividendos: () => import('./tabs/dividends.js?v=e1106417'),
+  competidores: () => import('./tabs/peers.js?v=e1106417'), moat: () => import('./tabs/moat.js?v=e1106417'), noticias: () => import('./tabs/news.js?v=e1106417'), analistas: () => import('./tabs/analysts.js?v=e1106417'),
+  riesgos: () => import('./tabs/risks.js?v=e1106417'), scoring: () => import('./tabs/scoring.js?v=e1106417'), informe: () => import('./tabs/report.js?v=e1106417'), simulador: () => import('./tabs/simulator.js?v=e1106417'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -77,6 +77,9 @@ function fixQuote(raw, sym) {
 
 export function compute(S) {
   const m = buildModel(S.raw, S.fx);
+  // Sin ficha de empresa (ninguna fuente la da): se sigue con el símbolo para no romper el análisis
+  if (!m.symbol) m.symbol = S.sym;
+  if (!m.profile.symbol) m.profile = { ...m.profile, symbol: S.sym, companyName: m.profile.companyName || S.sym };
   m.priceData = S.raw.prices.ok ? S.raw.prices.data : [];
   const ratios = evaluateRatios(m);
   const alerts = detectAlerts(m);
@@ -157,7 +160,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=f598cc18').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=e1106417').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -193,13 +196,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=f598cc18');
+      const { exportAll } = await import('../exportall.js?v=e1106417');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=f598cc18');
+    const { clearCache } = await import('../providers/http.js?v=e1106417');
     await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);

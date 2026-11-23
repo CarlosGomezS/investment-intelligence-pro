@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=f598cc18';
-import { alphavantage } from './alphavantage.js?v=f598cc18';
-import { finnhub } from './finnhub.js?v=f598cc18';
-import { twelvedata } from './twelvedata.js?v=f598cc18';
-import { roic } from './roic.js?v=f598cc18';
-import { sec } from './sec.js?v=f598cc18';
-import { esef } from './esef.js?v=f598cc18';
-import { config } from '../config.js?v=f598cc18';
-import { ApiError, usage, queueDelay } from './http.js?v=f598cc18';
-import { setHint } from './hints.js?v=f598cc18';
+import { fmp } from './fmp.js?v=e1106417';
+import { alphavantage } from './alphavantage.js?v=e1106417';
+import { finnhub } from './finnhub.js?v=e1106417';
+import { twelvedata } from './twelvedata.js?v=e1106417';
+import { roic } from './roic.js?v=e1106417';
+import { sec } from './sec.js?v=e1106417';
+import { esef } from './esef.js?v=e1106417';
+import { config } from '../config.js?v=e1106417';
+import { ApiError, usage, queueDelay } from './http.js?v=e1106417';
+import { setHint } from './hints.js?v=e1106417';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -129,7 +129,7 @@ async function search(query) {
     res.forEach((r, i) => {
       if (r.status === 'rejected') { lastErr = r.reason; return; }
       src.push(P[ids[i]].name);
-      for (const x of r.value.data || []) if (x.symbol && !seen.has(x.symbol)) { seen.add(x.symbol); out.push(x); }
+      for (const x of r.value.data || []) if (x.symbol && !/^0[A-Z0-9]{3}(\.(L|IL))?$/.test(x.symbol) && !seen.has(x.symbol)) { seen.add(x.symbol); out.push(x); }
     });
     if (out.length >= 4) break;
   }
