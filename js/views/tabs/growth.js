@@ -1,11 +1,12 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=5b306087';
-import { esc, card, pct, big, num, cls, sgnPct, table } from '../../ui/dom.js?v=5b306087';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=5b306087';
+import { fundamentals } from '../../ui/charts.js?v=47aea58d';
+import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=47aea58d';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=47aea58d';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;
+  if (!Y.length) { el.innerHTML = unavailable('Crecimiento y calidad', { code: 'not_found', message: 'Aún no hay estados financieros anuales de esta empresa (puede que alguna fuente siga descargando: pulsa «Actualizar» en un minuto).' }); return; }
   const s = (f) => Y.map((y) => y[f]);
   const H = [1, 3, 5, 10];
   const rows = [['Ingresos', 'revenue'], ['Beneficio neto', 'netIncome'], ['BPA diluido', 'eps'], ['Flujo de caja libre', 'fcf'], ['EBITDA', 'ebitda'], ['Acciones en circulación', 'shares'], ['Deuda total', 'debt'], ['Patrimonio neto', 'equity']]

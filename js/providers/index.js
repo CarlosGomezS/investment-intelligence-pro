@@ -5,20 +5,20 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=5b306087';
-import { alphavantage } from './alphavantage.js?v=5b306087';
-import { finnhub } from './finnhub.js?v=5b306087';
-import { twelvedata } from './twelvedata.js?v=5b306087';
-import { roic } from './roic.js?v=5b306087';
-import { sec } from './sec.js?v=5b306087';
-import { esef } from './esef.js?v=5b306087';
-import { config } from '../config.js?v=5b306087';
-import { ApiError, usage, queueDelay } from './http.js?v=5b306087';
-import { setHint } from './hints.js?v=5b306087';
+import { fmp } from './fmp.js?v=47aea58d';
+import { alphavantage } from './alphavantage.js?v=47aea58d';
+import { finnhub } from './finnhub.js?v=47aea58d';
+import { twelvedata } from './twelvedata.js?v=47aea58d';
+import { roic } from './roic.js?v=47aea58d';
+import { sec } from './sec.js?v=47aea58d';
+import { esef } from './esef.js?v=47aea58d';
+import { config } from '../config.js?v=47aea58d';
+import { ApiError, usage, queueDelay } from './http.js?v=47aea58d';
+import { setHint } from './hints.js?v=47aea58d';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
-const STATEMENTS = ['fmp', 'finnhub', 'sec', 'esef', 'roic', 'av'];
+const STATEMENTS = ['fmp', 'finnhub', 'sec', 'roic', 'esef', 'av']; // ESEF (lento) después de ROIC; completa años si faltan
 export const ORDER = {
   profile: ['fmp', 'finnhub', 'roic', 'av', 'sec'],
   quote: ['finnhub', 'td', 'fmp', 'av'],
@@ -60,8 +60,8 @@ const KEYF = {
   cashflow: ['operatingCashFlow', 'freeCashFlow', 'capitalExpenditure'],
 };
 const fyOf = (r) => String(r.fiscalYear || String(r.date || '').slice(0, 4));
-function gaps(method, rows) {
-  if (!Array.isArray(rows)) return false;
+function gaps(method, rows, limit = 15) {
+  if (!Array.isArray(rows) || limit < 8) return false; // consultas cortas (competidores, screener): no se completa
   if (rows.length < 8) return true;
   return KEYF[method].some((f) => rows.filter((r) => r[f] == null).length > rows.length * 0.2);
 }
@@ -69,11 +69,12 @@ async function complete(method, args, base, rest) {
   const rows = base.data.map((r) => ({ ...r }));
   const cur = rows[0] && rows[0].reportedCurrency;
   const used = [base.provider];
+  const deadline = Date.now() + 10000; // como mucho 10 s extra: nunca bloquear la carga
   for (const id of rest) {
-    if (!gaps(method, rows)) break;
-    if (queueDelay(id) > 8000) continue;
+    if (!gaps(method, rows) || Date.now() > deadline) break;
+    if (id === 'av' || queueDelay(id) > 2000) continue; // Alpha Vantage (25/día) no se gasta en completar
     try {
-      const r = await P[id][method](...args);
+      const r = await Promise.race([P[id][method](...args), new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), Math.max(1000, deadline - Date.now())))]);
       if (!Array.isArray(r.data) || !r.data.length) continue;
       if (cur && r.data[0].reportedCurrency && r.data[0].reportedCurrency !== cur) continue;
       let added = false;
@@ -107,7 +108,7 @@ async function run(method, args) {
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);
       if (empty) { best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
       if (method === 'profile' && r.data) setHint(args[0], { name: r.data.companyName, isin: r.data.isin, country: r.data.country });
-      if (KEYF[method] && args[1] !== 'quarter' && gaps(method, r.data)) return await complete(method, args, { ...r, provider: id }, list.slice(i + 1));
+      if (KEYF[method] && args[1] !== 'quarter' && gaps(method, r.data, args[2] ?? 15)) return await complete(method, args, { ...r, provider: id }, list.slice(i + 1));
       return { ...r, provider: id };
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(e.code || 'not_found', e.message || 'Sin datos', { provider: id });
@@ -129,7 +130,11 @@ async function search(query) {
     res.forEach((r, i) => {
       if (r.status === 'rejected') { lastErr = r.reason; return; }
       src.push(P[ids[i]].name);
-      for (const x of r.value.data || []) if (x.symbol && !/^0[A-Z0-9]{3}(\.(L|IL))?$/.test(x.symbol) && !seen.has(x.symbol)) { seen.add(x.symbol); out.push(x); }
+      for (const x of r.value.data || []) {
+        if (!x.symbol || /^0[A-Z0-9]{3}(\.(L|IL))?$/.test(x.symbol)) continue;
+        if (seen.has(x.symbol)) { const o = out.find((y) => y.symbol === x.symbol); for (const [k, v] of Object.entries(x)) if (o[k] == null || o[k] === '') o[k] = v; continue; } // completar bolsa, moneda…
+        seen.add(x.symbol); out.push({ ...x });
+      }
     });
     if (out.length >= 4) break;
   }
@@ -165,8 +170,9 @@ data.logo = fmp.logo;
 export { setHint };
 
 /** Ejecuta varias peticiones y nunca lanza: devuelve {ok, value|error} por clave. */
-export async function gather(map) {
+export async function gather(map, ms = 0) {
   const keys = Object.keys(map);
-  const res = await Promise.allSettled(keys.map((k) => map[k]()));
+  const lim = (p) => (ms ? Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new ApiError('network', 'La fuente tarda demasiado; inténtalo de nuevo en un minuto')), ms))]) : p);
+  const res = await Promise.allSettled(keys.map((k) => lim(Promise.resolve().then(map[k]))));
   return Object.fromEntries(keys.map((k, i) => [k, res[i].status === 'fulfilled' ? { ok: true, ...res[i].value } : { ok: false, error: res[i].reason }]));
 }

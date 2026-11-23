@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=5b306087';
-import { data, setHint } from './providers/index.js?v=5b306087';
-import { usage } from './providers/http.js?v=5b306087';
-import { config, restoreConfig } from './config.js?v=5b306087';
-import { store } from './store.js?v=5b306087';
-import { destroyAll } from './ui/charts.js?v=5b306087';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=47aea58d';
+import { data, setHint } from './providers/index.js?v=47aea58d';
+import { usage } from './providers/http.js?v=47aea58d';
+import { config, restoreConfig } from './config.js?v=47aea58d';
+import { store } from './store.js?v=47aea58d';
+import { destroyAll } from './ui/charts.js?v=47aea58d';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=5b306087'),
-  c: () => import('./views/company.js?v=5b306087'),
-  watchlist: () => import('./views/watchlist.js?v=5b306087'),
-  screener: () => import('./views/screener.js?v=5b306087'),
-  comparar: () => import('./views/compare.js?v=5b306087'),
-  calendario: () => import('./views/calendar.js?v=5b306087'),
-  metodologia: () => import('./views/methodology.js?v=5b306087'),
-  ajustes: () => import('./views/settings.js?v=5b306087'),
+  dashboard: () => import('./views/dashboard.js?v=47aea58d'),
+  c: () => import('./views/company.js?v=47aea58d'),
+  watchlist: () => import('./views/watchlist.js?v=47aea58d'),
+  screener: () => import('./views/screener.js?v=47aea58d'),
+  comparar: () => import('./views/compare.js?v=47aea58d'),
+  calendario: () => import('./views/calendar.js?v=47aea58d'),
+  metodologia: () => import('./views/methodology.js?v=47aea58d'),
+  ajustes: () => import('./views/settings.js?v=47aea58d'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -45,11 +45,11 @@ export const countryOf = (r) => SUFFIX[(r.symbol || '').split('.')[1]] || EXCH_C
 export const logoHTML = (sym, size = 28) => `<span class="logo" style="width:${size}px;height:${size}px"><img src="${data.logo(sym)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
 
 const q = $('#q'), sugg = $('#sugg');
-let timer = null, seq = 0, items = [], sel = -1;
+let timer = null, seq = 0, items = [], sel = -1, itemsFor = null; // itemsFor: texto al que corresponden las sugerencias
 
 function rank(list, term) {
   const t = term.toUpperCase();
-  const major = /^(NASDAQ|NYSE|AMEX|BME|XETRA|EURONEXT|LSE|PAR|AMS|MIL|SIX|TSX|JPX|HKSE)$/;
+  const major = /^(US|NASDAQ|NYSE|AMEX|BME|XETRA|EURONEXT|LSE|PAR|AMS|MIL|SIX|TSX|JPX|HKSE)$/;
   return list.map((r) => {
     let s = 0; const sym = (r.symbol || '').toUpperCase(), nm = (r.name || '').toUpperCase();
     if (sym === t) s += 100; else if (sym.startsWith(t)) s += 40;
@@ -58,6 +58,7 @@ function rank(list, term) {
     if (!sym.includes('.')) s += 5;
     if (/\b(ETF|FUND|TRUST UNIT|PREFERRED|DEPOSITARY|ENHANCED|INCOME SHARES)\b/.test(nm)) s -= 30; // fondos y preferentes detrás
     s -= sym.length * 0.2; // a igualdad, la acción ordinaria (ticker más corto)
+    s -= nm.replace(/[^A-Z]/g, '').length * 0.15; // a igualdad, el nombre más corto («Apple Inc.» antes que «Apple Hospitality REIT»)
     return { r, s };
   }).sort((a, b) => b.s - a.s).map((x) => x.r);
 }
@@ -89,7 +90,7 @@ async function doSearch(term) {
     const r = await data.search(term);
     if (my !== seq) return;
     const list = rank(r.data, term).slice(0, 10);
-    renderSugg(list);
+    renderSugg(list); itemsFor = term;
     // cotización de los 3 primeros resultados (cacheada unos minutos)
     for (const it of list.slice(0, 3)) data.quote(it.symbol).then((x) => { const el = sugg.querySelector(`.qp[data-s="${CSS.escape(it.symbol)}"]`); if (el && x.data) el.innerHTML = `<br>${num(x.data.price, 2)} <span class="${cls(x.data.changePercentage)}">${sgnPct(x.data.changePercentage / 100)}</span>`; }).catch(() => {});
   } catch (e) { if (my === seq) renderSugg([], e.message); }
@@ -97,11 +98,18 @@ async function doSearch(term) {
 
 q.addEventListener('input', () => {
   const t = q.value.trim(); clearTimeout(timer);
-  if (t.length < 2) { showHistory(); return; }
+  itemsFor = null; // las sugerencias visibles ya no corresponden a lo escrito
+  if (t.length < 2) { showHistory(); itemsFor = t; return; }
   timer = setTimeout(() => doSearch(t), 280);
 });
-q.addEventListener('focus', () => { if (q.value.trim().length < 2) showHistory(); });
+q.addEventListener('focus', () => { if (q.value.trim().length < 2) { showHistory(); itemsFor = q.value.trim(); } });
 q.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault(); const t = q.value.trim();
+    const fresh = itemsFor !== null && itemsFor === t && !sugg.hidden;
+    if (fresh && items[sel >= 0 ? sel : 0]) choose(items[sel >= 0 ? sel : 0]); else if (t) { clearTimeout(timer); enterFree(t); }
+    return;
+  }
   if (sugg.hidden) return;
   const n = items.length;
   if (e.key === 'ArrowDown') { sel = (sel + 1) % n; e.preventDefault(); } else if (e.key === 'ArrowUp') { sel = (sel - 1 + n) % n; e.preventDefault(); } else if (e.key === 'Enter') { e.preventDefault(); if (items[sel >= 0 ? sel : 0]) choose(items[sel >= 0 ? sel : 0]); else if (q.value.trim()) enterFree(q.value.trim()); return; } else if (e.key === 'Escape') { closeSugg(); return; } else return;

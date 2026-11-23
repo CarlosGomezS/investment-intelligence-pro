@@ -1,10 +1,10 @@
 // Screener en dos fases: 1) filtro de universo en el proveedor (capitalización, sector, país, dividendo, beta…);
 // 2) enriquecimiento con ratios TTM de los N primeros para filtrar por calidad, crecimiento y valoración.
-import { data, gather } from '../providers/index.js?v=5b306087';
-import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=5b306087';
-import { logoHTML } from '../app.js?v=5b306087';
-import { isNum, asc } from '../calc/finance.js?v=5b306087';
-import { exportCSV } from '../export.js?v=5b306087';
+import { data, gather } from '../providers/index.js?v=47aea58d';
+import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=47aea58d';
+import { logoHTML } from '../app.js?v=47aea58d';
+import { isNum, asc } from '../calc/finance.js?v=47aea58d';
+import { exportCSV } from '../export.js?v=47aea58d';
 
 const SECTORS = ['', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Communication Services', 'Energy', 'Utilities', 'Real Estate', 'Basic Materials'];
 const SECT_ES = { Technology: 'Tecnología', Healthcare: 'Salud', 'Financial Services': 'Financiero', 'Consumer Cyclical': 'Consumo cíclico', 'Consumer Defensive': 'Consumo defensivo', Industrials: 'Industria', 'Communication Services': 'Comunicaciones', Energy: 'Energía', Utilities: 'Utilities', 'Real Estate': 'Inmobiliario', 'Basic Materials': 'Materiales' };
@@ -59,7 +59,7 @@ export function render(view) {
     res.innerHTML = `<div class="empty">Analizando ${n} empresas…</div>`;
     const sub = last.universe.slice(0, n);
     const rich = await Promise.all(sub.map(async (c) => {
-      const r = await gather({ rt: () => data.ratiosTTM(c.symbol), km: () => data.keyMetricsTTM(c.symbol), ...(needCF ? { cf: () => data.cashflow(c.symbol, 'annual', 4), inc: () => data.income(c.symbol, 'annual', 2) } : {}) });
+      const r = await gather({ rt: () => data.ratiosTTM(c.symbol), km: () => data.keyMetricsTTM(c.symbol), ...(needCF ? { cf: () => data.cashflow(c.symbol, 'annual', 4), inc: () => data.income(c.symbol, 'annual', 2) } : {}) }, 15000);
       const rt = r.rt.ok ? r.rt.data || {} : {}, km = r.km.ok ? r.km.data || {} : {};
       const cf = r.cf && r.cf.ok ? asc(r.cf.data).map((x) => x.freeCashFlow) : [];
       const inc = r.inc && r.inc.ok ? asc(r.inc.data) : [];

@@ -1,9 +1,9 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=5b306087';
-import { isNum } from '../../calc/finance.js?v=5b306087';
-import { store } from '../../store.js?v=5b306087';
-import { loadPeers } from './peers.js?v=5b306087';
-import { exportXLSX } from '../../export.js?v=5b306087';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=47aea58d';
+import { isNum } from '../../calc/finance.js?v=47aea58d';
+import { store } from '../../store.js?v=47aea58d';
+import { loadPeers } from './peers.js?v=47aea58d';
+import { exportXLSX } from '../../export.js?v=47aea58d';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 

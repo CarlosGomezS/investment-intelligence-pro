@@ -1,10 +1,10 @@
 // Ratios financieros: valor actual, evolución, medias 5/10 años, comparación sectorial, interpretación y alertas.
-import { fundamentals } from '../../ui/charts.js?v=5b306087';
-import { esc, card, pct, num } from '../../ui/dom.js?v=5b306087';
-import { fmtRatio } from '../../calc/ratios.js?v=5b306087';
-import { isNum, median } from '../../calc/finance.js?v=5b306087';
-import { loadPeers } from './peers.js?v=5b306087';
-import { exportCSV } from '../../export.js?v=5b306087';
+import { fundamentals } from '../../ui/charts.js?v=47aea58d';
+import { esc, card, pct, num } from '../../ui/dom.js?v=47aea58d';
+import { fmtRatio } from '../../calc/ratios.js?v=47aea58d';
+import { isNum, median } from '../../calc/finance.js?v=47aea58d';
+import { loadPeers } from './peers.js?v=47aea58d';
+import { exportCSV } from '../../export.js?v=47aea58d';
 
 const PEER_KEY = { pe: 'pe', evebitda: 'evEbitda', roe: 'roe', roic: 'roic', gm: 'grossMargin', om: 'opMargin', nm: 'netMargin', de: 'de', nde: 'ndEbitda', fcfy: 'fcfYield' };
 let selected = 'pe';
