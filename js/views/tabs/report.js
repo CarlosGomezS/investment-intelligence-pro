@@ -1,15 +1,17 @@
 // Informe final: 13 preguntas, conclusión razonada, argumentos a favor y en contra, exportación a PDF.
-import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=85a54e71';
-import { store } from '../../store.js?v=85a54e71';
-import { gauge } from './overview.js?v=85a54e71';
-import { printReport } from '../../export.js?v=85a54e71';
+import { relBox } from './overview.js?v=5ad630d4';
+import { coverageTier } from '../../calc/reliability.js?v=5ad630d4';
+import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=5ad630d4';
+import { store } from '../../store.js?v=5ad630d4';
+import { gauge } from './overview.js?v=5ad630d4';
+import { printReport } from '../../export.js?v=5ad630d4';
 
 export function render(el, S) {
   const { m, rep, sc, val } = S, c = val.composite;
   const prev = store.analyses(m.symbol).slice(0, 5);
   el.innerHTML = `<div class="row between noprint" style="margin-bottom:12px"><span class="note">Informe generado ${datetime(Date.now())} con datos de ${esc([...new Set(Object.values(m.prov).filter((p) => p.source).map((p) => p.source))].join(', '))}.</span><div class="row"><button class="btn" id="pdf">Exportar a PDF</button><button class="btn pri" id="sv">Guardar en el historial</button></div></div>
   <div class="grid g3">
-    ${card('Conclusión', `<div class="gauge">${gauge(rep.total)}<div class="verdict" style="color:${scoreColor(rep.total)}">${esc(rep.conclusion)}</div></div>
+    ${card('Conclusión', `<div class="gauge">${gauge(rep.total)}<div class="verdict" style="color:${scoreColor(rep.total)}">${esc(rep.conclusion)}</div></div>${relBox(val.reliability)}<p class="note">Cobertura de datos de la puntuación: ${Math.round((sc.coverage || 0) * 100)} % (<b>${esc(coverageTier(sc.coverage).label)}</b>).</p>
       <div class="kpis" style="grid-template-columns:1fr 1fr;margin-top:10px"><div class="kpi"><span>Precio</span><b>${num(m.price)} ${esc(m.tradeCur)}</b></div><div class="kpi"><span>Valor intrínseco</span><b>${num(c.value)}</b></div><div class="kpi"><span>Margen de seguridad</span><b class="${cls(c.mos)}">${pct(c.mos, 0)}</b></div><div class="kpi"><span>Calidad (media)</span><b>${rep.quality != null ? Math.round(rep.quality) : '—'}/100</b></div></div>`)}
     ${card('Argumentos a favor', rep.pros.length ? `<ul style="margin:0;padding-left:18px">${rep.pros.map((p) => `<li style="margin:5px 0">${esc(p)}</li>`).join('')}${isNum(c.mos) && c.mos > 0.15 ? `<li>Cotiza un ${pct(c.mos, 0)} por debajo de su valor estimado.</li>` : ''}</ul>` : '<p class="note">Ninguna categoría destaca por encima de 70/100.</p>')}
     ${card('Argumentos en contra', rep.cons.length ? `<ul style="margin:0;padding-left:18px">${rep.cons.map((p) => `<li style="margin:5px 0">${esc(p)}</li>`).join('')}${isNum(c.mos) && c.mos < 0 ? `<li>${c.value === 0 ? 'El valor estimado del capital es 0: la deuda supera al valor de la empresa.' : `El precio supera en un ${pct(m.price / c.value - 1, 0)} el valor estimado.`}</li>` : ''}</ul>` : '<p class="note">Ninguna categoría por debajo de 45/100 ni alertas graves.</p>')}

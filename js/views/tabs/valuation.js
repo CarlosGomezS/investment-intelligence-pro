@@ -1,9 +1,10 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=85a54e71';
-import { isNum } from '../../calc/finance.js?v=85a54e71';
-import { store } from '../../store.js?v=85a54e71';
-import { loadPeers } from './peers.js?v=85a54e71';
-import { exportXLSX } from '../../export.js?v=85a54e71';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=5ad630d4';
+import { isNum } from '../../calc/finance.js?v=5ad630d4';
+import { relBox } from './overview.js?v=5ad630d4';
+import { store } from '../../store.js?v=5ad630d4';
+import { loadPeers } from './peers.js?v=5ad630d4';
+import { exportXLSX } from '../../export.js?v=5ad630d4';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -29,7 +30,7 @@ export async function render(el, S, ctx) {
     ${card('Resumen de valoración', `<div class="kpis" style="grid-template-columns:1fr 1fr">
       <div class="kpi"><span>Precio actual</span><b>${num(m.price)} ${esc(cur)}</b></div><div class="kpi"><span>Valor intrínseco central</span><b>${num(comp.value)} ${esc(cur)}</b></div>
       <div class="kpi"><span>Margen de seguridad</span><b class="${cls(comp.mos)}">${pct(comp.mos, 0)}</b></div><div class="kpi"><span>Potencial de revalorización</span><b class="${cls(comp.up)}">${sgnPct(comp.up, 0)}</b></div></div>
-      <p class="note">Valor central = mediana de ${comp.n} estimaciones propias (DCF base con doble peso, múltiplos históricos y de competidores${val.ddm.applicable ? ', DDM' : ''}). No incluye objetivos de analistas ni el DCF de FMP, que se muestran solo como referencia.</p>`, { cls: '' })}
+      <p class="note">Valor central = mediana de ${comp.n} estimaciones propias (DCF base con doble peso, múltiplos históricos y de competidores${val.ddm.applicable ? ', DDM' : ''}). No incluye objetivos de analistas ni el DCF de FMP, que se muestran solo como referencia.</p>${relBox(val.reliability)}`, { cls: '' })}
     <div class="span2">${card('Mapa de valoraciones por método', `${methods.map(bar).join('')}<p class="note">Línea vertical: precio actual (${num(m.price)} ${esc(cur)}). Verde = por encima del precio.</p>`)}</div>
   </div>
 

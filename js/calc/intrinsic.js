@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=85a54e71';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=85a54e71';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=5ad630d4';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=5ad630d4';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -17,11 +17,11 @@ export function dcfDefaults(m) {
   const g = suggestGrowth({ fcfCagr5: m.growth.fcf5 ?? cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
-    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio'} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}`, alt: m.X(fcf3) },
+    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal && !(m.ttmFilled || []).includes('fcf') ? 'real · FCF de los últimos 12 meses' : 'real · FCF del último ejercicio' + (m.ttmIsReal ? ' (tu fuente no da el de 12 meses)' : '')} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}`, alt: m.X(fcf3) },
     growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts, capped: g.capped },
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
-    rf: { value: m.market.rf10, origin: m.market.rfAssumed ? 'supuesto · 4,5 % (sin dato del bono a 10 años)' : `real · bono EE. UU. 10a (${m.market.rfDate})` },
+    rf: { value: m.market.rf10, origin: (m.market.rfAssumed ? 'supuesto · 4,5 % (sin dato del bono a 10 años)' : `real · bono EE. UU. 10a (${m.market.rfDate})`) + (m.repCur && m.repCur !== 'USD' ? ` · ojo: los flujos están en ${m.repCur}; lo correcto es el bono a 10 años de esa moneda (cámbialo si lo conoces)` : '') },
     beta: { value: m.market.beta, origin: m.market.betaAssumed ? 'supuesto · beta 1 (sin dato)' : `calculado · beta ajustada de Blume (0,67 × ${(m.market.betaRaw || 0).toFixed(2).replace('.', ',')} ${m.market.betaCalc ? 'calculada frente al S&P 500' : 'del proveedor'} + 0,33)` },
     erp: { value: m.market.erp, origin: m.market.erpAssumed ? 'supuesto · 4,5 % (prima típica de mercado desarrollado)' : `real · prima de riesgo ${m.market.erpCountry} (Damodaran vía FMP)` },
     costDebt: { value: m.market.costDebt, origin: m.market.costDebt != null ? 'real · intereses / deuda, media 3a' : 'falta' },

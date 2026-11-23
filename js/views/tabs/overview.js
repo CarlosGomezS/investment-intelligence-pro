@@ -1,11 +1,19 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=85a54e71';
-import { isNum } from '../../calc/finance.js?v=85a54e71';
+import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=5ad630d4';
+import { isNum } from '../../calc/finance.js?v=5ad630d4';
+import { coverageTier } from '../../calc/reliability.js?v=5ad630d4';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
   const x = cx + R * Math.cos(a), y = cy - R * Math.sin(a);
   return `<svg viewBox="0 0 200 112" style="width:${size}px" role="img" aria-label="Puntuación ${s ?? 'sin datos'} sobre 100"><path d="M20 92A80 80 0 0 1 180 92" fill="none" stroke="var(--panel2)" stroke-width="14" stroke-linecap="round"/>${isNum(s) ? `<path d="M20 92A80 80 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${scoreColor(s)}" stroke-width="14" stroke-linecap="round"/>` : ''}<text x="100" y="84" text-anchor="middle" font-size="40" font-weight="600" fill="currentColor">${isNum(s) ? s : '—'}</text><text x="100" y="106" text-anchor="middle" font-size="11" fill="var(--mute)">sobre 100</text></svg>`;
+}
+
+const REL_C = { alta: 'pos', media: 'warn', baja: 'neg', 'muy baja': 'neg', 'no valorable': 'neg' };
+/** Recuadro de fiabilidad de la valoración (nivel + motivos). */
+export function relBox(r) {
+  if (!r) return '';
+  return `<div class="alert-row" style="margin-top:8px"><span class="pill ${r.level === 'alta' ? 'baja' : r.level === 'media' ? 'media' : 'alta'}">Fiabilidad</span><div><p style="margin:0"><b class="${REL_C[r.level] || ''}">${esc(r.level)}</b>${isNum(r.score) && r.level !== 'no valorable' ? ` (${r.score}/100)` : ''}${r.reasons && r.reasons.length ? ': ' + esc(r.reasons.join('; ')) + '.' : ': datos y supuestos sólidos.'}</p></div></div>`;
 }
 
 export function render(el, S) {
@@ -31,13 +39,14 @@ export function render(el, S) {
   const diag = `<details style="margin-top:14px" class="card"><summary style="padding:12px 16px;cursor:pointer;font-weight:600">Diagnóstico de datos: ${okN} de ${totN} bloques recibidos${m.derived && m.derived.length ? ` · calculados por la app: ${esc(m.derived.join(', '))}` : ''}</summary><div class="cb"><div class="tablewrap"><table class="dense"><tbody>${rows}</tbody></table></div><p class="note">Si una fuente aparece con ✕ en todo, revisa su clave en <a href="#/ajustes">Ajustes</a> (botón «Probar todas»). «…» = sigue descargando.</p></div></details>`;
   el.innerHTML = `
   <div class="grid g3" style="margin-bottom:14px">
-    ${card('Puntuación de inversión', `<div class="gauge">${gauge(sc.total)}<div class="verdict">${esc(rep.conclusion)}</div><p class="note">Cobertura de datos: ${pct(sc.coverage, 0)} de las métricas. <a href="#/c/${encodeURIComponent(m.symbol)}/informe">Ver informe completo</a></p></div>`)}
+    ${card('Puntuación de inversión', `<div class="gauge">${gauge(sc.total)}<div class="verdict">${esc(rep.conclusion)}</div><p class="note">Cobertura de datos: ${pct(sc.coverage, 0)} de las métricas (<b>${esc(coverageTier(sc.coverage).label)}</b>). <a href="#/c/${encodeURIComponent(m.symbol)}/informe">Ver informe completo</a></p></div>`)}
     ${card('Valor intrínseco estimado', `<div class="kpis" style="grid-template-columns:1fr 1fr">
         <div class="kpi"><span>Precio actual</span><b>${num(m.price)} ${esc(cur)}</b></div>
         <div class="kpi"><span>Valor intrínseco (central)</span><b>${num(comp.value)} ${esc(cur)}</b></div>
         <div class="kpi"><span>Margen de seguridad</span><b class="${cls(comp.mos)}">${pct(comp.mos, 0)}</b></div>
         <div class="kpi"><span>Potencial</span><b class="${cls(comp.up)}">${sgnPct(comp.up, 0)}</b></div>
       </div>
+      ${relBox(val.reliability)}
       <p class="note">Rango central ${num(comp.low)}–${num(comp.high)} ${esc(cur)} · mediana de ${comp.n} métodos. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? num(val.dcf.perShare) : esc(val.dcf && val.dcf.error ? 'no aplicable' : '—')}. <a href="#/c/${encodeURIComponent(m.symbol)}/valoracion">Ajustar supuestos</a></p>`)}
     ${card('Señales de alerta', top.length ? top.map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('') + (alerts.length > 4 ? `<p class="note"><a href="#/c/${encodeURIComponent(m.symbol)}/riesgos">Ver las ${alerts.length} alertas</a></p>` : '') : '<p class="note">No se detectan anomalías en los últimos estados financieros.</p>')}
   </div>

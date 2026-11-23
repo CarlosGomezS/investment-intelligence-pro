@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=85a54e71';
-import { compute, fxFor } from './company.js?v=85a54e71';
-import { METHODS, rankMethod } from '../calc/methods.js?v=85a54e71';
-import { fxRate } from '../providers/fxrate.js?v=85a54e71';
-import { alligator } from '../calc/alligator.js?v=85a54e71';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=85a54e71';
-import { logoHTML } from '../app.js?v=85a54e71';
-import { isNum } from '../calc/finance.js?v=85a54e71';
-import { store } from '../store.js?v=85a54e71';
-import { exportCSV } from '../export.js?v=85a54e71';
+import { data } from '../providers/index.js?v=5ad630d4';
+import { compute, fxFor } from './company.js?v=5ad630d4';
+import { METHODS, rankMethod } from '../calc/methods.js?v=5ad630d4';
+import { fxRate } from '../providers/fxrate.js?v=5ad630d4';
+import { alligator } from '../calc/alligator.js?v=5ad630d4';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=5ad630d4';
+import { logoHTML } from '../app.js?v=5ad630d4';
+import { isNum } from '../calc/finance.js?v=5ad630d4';
+import { store } from '../store.js?v=5ad630d4';
+import { exportCSV } from '../export.js?v=5ad630d4';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -57,6 +57,8 @@ async function analyzeOne(sym) {
   const sh = S.m.years.map((y) => y.shares).filter(isNum);
   const jump = sh.some((v, i) => i && (v / sh[i - 1] > 1.2 || v / sh[i - 1] < 0.85)) || (isNum(S.m.shares) && sh.length && (S.m.shares / sh[sh.length - 1] > 1.2 || S.m.shares / sh[sh.length - 1] < 0.85));
   if ((S.m.splitsAdj || []).length || jump) { raw.splits = await lim(wrap(data.splits(sym)), 15000); if (raw.splits.ok) S = compute({ sym, raw, fx, noSaved: true }); }
+  // Si reparte dividendo, el historial de pagos (para los 20 años de Graham y la rentabilidad por dividendo)
+  if (S.m.last && S.m.last.dividendsPaid > 0) { raw.dividends = await lim(wrap(data.via(['fmp', 'av'], 'dividends', sym)), 15000); S = compute({ sym, raw, fx, noSaved: true }); }
   // Tipo de cambio a USD para los umbrales en dólares (tamaño de Graham)
   if (S.m.tradeCur && S.m.tradeCur !== 'USD') { const u = await usdRate(S.m.tradeCur); S.usdRate = u; } else S.usdRate = 1;
   if (S.m.profile.isEtf || S.m.profile.isFund) throw new Error('es un ETF o fondo');
