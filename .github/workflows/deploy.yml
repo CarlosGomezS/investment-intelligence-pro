@@ -93,6 +93,8 @@ jobs:
           sleep 5
           t() { R="$(curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' -w '\n%{http_code}' "$U/$2")"; C="$(echo "$R" | tail -1)"; B="$(echo "$R" | sed '$d')"; echo "$1 → HTTP $C · $(echo "$B" | jq -r "$3" 2>/dev/null | head -c 160)"; }
           t "SEC EDGAR (cuentas de Apple)" "sec/api/xbrl/companyfacts/CIK0000320193.json" '"\(.entityName) · \(.facts["us-gaap"] | length) conceptos contables"'
+          t "SEC EDGAR (lista de tickers)" "sec/files/company_tickers.json" '"\(length) empresas"'
+          echo "Respuesta de la SEC (inicio):"; curl -s -m 30 -H 'Origin: https://carlosgomezs.github.io' "$U/sec/api/xbrl/companyfacts/CIK0000320193.json" | head -c 600 | tr -s '\n\t ' ' '; echo
           t "Europa ESEF (filings.xbrl.org)" "esef/api/filings?page%5Bsize%5D=1" '"\(.data | length) informe(s) recibido(s)"'
           t "FMP (perfil de Apple)" "fmp/profile?symbol=AAPL" 'if type=="array" then .[0].companyName else (.error // ."Error Message" // .) end'
           t "Finnhub (perfil de Apple)" "finnhub/stock/profile2?symbol=AAPL" '.name // .error'
