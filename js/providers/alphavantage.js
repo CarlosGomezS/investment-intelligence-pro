@@ -1,6 +1,6 @@
 // Proveedor Alpha Vantage (respaldo). Normaliza sus respuestas al modelo canónico (nombres de FMP).
-import { getJSON } from './http.js?v=cc3b3e4a';
-import { config } from '../config.js?v=cc3b3e4a';
+import { getJSON } from './http.js?v=85a54e71';
+import { config } from '../config.js?v=85a54e71';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v === undefined || v === null || v === 'None' || v === '-' || v === '' ? null : Number(v));
@@ -13,7 +13,7 @@ function incomeRow(r, sym, cur) {
     revenue: rev, costOfRevenue: n(r.costOfRevenue) ?? n(r.costofGoodsAndServicesSold), grossProfit: n(r.grossProfit),
     researchAndDevelopmentExpenses: n(r.researchAndDevelopment), sellingGeneralAndAdministrativeExpenses: n(r.sellingGeneralAndAdministrative),
     operatingExpenses: n(r.operatingExpenses), operatingIncome: n(r.operatingIncome), ebit: n(r.ebit), ebitda: n(r.ebitda),
-    interestExpense: n(r.interestExpense), incomeBeforeTax: n(r.incomeBeforeTax), incomeTaxExpense: n(r.incomeTaxExpense),
+    interestExpense: n(r.interestExpense), interestIncome: n(r.interestIncome), incomeBeforeTax: n(r.incomeBeforeTax), incomeTaxExpense: n(r.incomeTaxExpense),
     netIncome: ni, depreciationAndAmortization: n(r.depreciationAndAmortization), eps: null, epsDiluted: null,
     weightedAverageShsOut: null, weightedAverageShsOutDil: null, _source: 'Alpha Vantage',
   };
@@ -72,13 +72,9 @@ export const alphavantage = {
     const r = await q('TIME_SERIES_DAILY', { symbol: s, outputsize: 'compact' }, H().prices, (b) => b && b['Time Series (Daily)']);
     const ts = r.data['Time Series (Daily)'];
     const rows = Object.keys(ts).sort().map((d) => ({ date: d, open: n(ts[d]['1. open']), high: n(ts[d]['2. high']), low: n(ts[d]['3. low']), close: n(ts[d]['4. close']), volume: n(ts[d]['5. volume']) }));
-    // Serie gratuita sin ajustar a splits (y solo 100 días): un salto de un día del tamaño de un split típico se ajusta
-    const SPL = [2, 3, 4, 5, 8, 10, 15, 20, 25, 50];
-    for (let i = rows.length - 1; i > 0; i--) {
-      const q0 = rows[i - 1].close / rows[i].close; const k = SPL.find((c) => Math.abs(q0 / c - 1) < 0.08) || (SPL.find((c) => Math.abs(q0 * c - 1) < 0.08) ? 1 / SPL.find((c) => Math.abs(q0 * c - 1) < 0.08) : null);
-      if (k) for (let j = 0; j < i; j++) for (const f of ['open', 'high', 'low', 'close']) if (rows[j][f] != null) rows[j][f] /= k;
-    }
-    return { ...r, source: r.source + ' (100 días, ajustado a splits por la app)', data: rows };
+    // Serie gratuita de 100 días sin ajustar a splits: el ajuste se hace en el modelo SOLO con la lista real de splits
+    // (un desplome del −50 % no se confunde con un split 2:1)
+    return { ...r, source: r.source + ' (100 días)', unadjusted: true, data: rows };
   },
   async income(s, period = 'annual') {
     const r = await q('INCOME_STATEMENT', { symbol: s }, H().fundamentals, (b) => b && b.annualReports);

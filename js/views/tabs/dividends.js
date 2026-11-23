@@ -1,8 +1,8 @@
 // Dividendos: historial completo, DPA anual, rentabilidad histórica, crecimiento, payout, continuidad, recortes y próximas fechas.
-import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
-import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=cc3b3e4a';
-import { isNum, div, cagrN } from '../../calc/finance.js?v=cc3b3e4a';
-import { exportCSV } from '../../export.js?v=cc3b3e4a';
+import { fundamentals } from '../../ui/charts.js?v=85a54e71';
+import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=85a54e71';
+import { isNum, div, cagrN } from '../../calc/finance.js?v=85a54e71';
+import { exportCSV } from '../../export.js?v=85a54e71';
 
 export function render(el, S) {
   const m = S.m, cur = m.tradeCur, d = m.dpsSeries, all = m.divs;
@@ -13,6 +13,7 @@ export function render(el, S) {
   const g = d.map((x, i) => (i ? div(x.dps - d[i - 1].dps, d[i - 1].dps) : null));
   const cuts = d.filter((x, i) => i && x.dps < d[i - 1].dps * 0.95).map((x, i) => x.year);
   // Rachas contadas desde el último año CERRADO: si dejó de pagar, la racha es 0 y se avisa de la suspensión
+  if (!d.length) { el.innerHTML = card('Dividendos', `<div class="empty">Ha empezado a pagar dividendo este año (${all.length} pago${all.length > 1 ? 's' : ''}); aún no hay ningún año completo para calcular rachas ni crecimiento.</div>`); return; }
   const yearsSet = new Set(d.map((x) => +x.year)); const lastClosed = new Date().getFullYear() - 1;
   const maxY = lastClosed; const suspendedSince = yearsSet.has(lastClosed) ? null : Math.max(...yearsSet) + 1;
   let streak = 0; for (let y = maxY; yearsSet.has(y); y--) streak++;

@@ -1,9 +1,9 @@
 // Panel principal: mercados, alertas activadas, seguimiento, próximos resultados y accesos rápidos.
-import { data } from '../providers/index.js?v=cc3b3e4a';
-import { store } from '../store.js?v=cc3b3e4a';
-import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=cc3b3e4a';
-import { logoHTML } from '../app.js?v=cc3b3e4a';
-import { checkAlerts } from './watchlist.js?v=cc3b3e4a';
+import { data } from '../providers/index.js?v=85a54e71';
+import { store } from '../store.js?v=85a54e71';
+import { esc, card, num, sgnPct, cls, date, pct } from '../ui/dom.js?v=85a54e71';
+import { logoHTML } from '../app.js?v=85a54e71';
+import { checkAlerts } from './watchlist.js?v=85a54e71';
 
 const MARKETS = [['^GSPC', 'S&P 500'], ['^NDX', 'Nasdaq 100'], ['^STOXX50E', 'Euro Stoxx 50'], ['^IBEX', 'IBEX 35']];
 const IDEAS = [['AAPL', 'Apple'], ['MSFT', 'Microsoft'], ['NVDA', 'NVIDIA'], ['GOOGL', 'Alphabet'], ['AMZN', 'Amazon'], ['META', 'Meta'], ['V', 'Visa'], ['KO', 'Coca-Cola'], ['JNJ', 'Johnson & Johnson'], ['ASML', 'ASML'], ['NVO', 'Novo Nordisk'], ['SAN.MC', 'Banco Santander'], ['ITX.MC', 'Inditex']];
@@ -31,6 +31,6 @@ export async function render(view) {
       view.querySelector('#cal').innerHTML = ev.length ? ev.map((e) => `<div class="wl-item">${logoHTML(e.symbol)}<a href="#/c/${encodeURIComponent(e.symbol)}/noticias"><b>${esc(e.symbol)}</b></a><span>${date(e.date)}</span><span class="note">BPA est. ${num(e.epsEstimated)}</span></div>`).join('') : '<p class="note">Ninguna de tus empresas presenta resultados en los próximos 45 días.</p>';
     } catch (e) { view.querySelector('#cal').innerHTML = `<p class="note">Calendario no disponible: ${esc(e.message)}</p>`; }
   } else view.querySelector('#cal').innerHTML = '<p class="note">Sigue empresas para ver aquí sus fechas de resultados.</p>';
-  const al = (await checkAlerts()).filter((x) => x.hits && x.hits.length);
-  if (al.length) view.querySelector('#alerts').innerHTML = card('Alertas activadas', al.map((x) => `<div class="wl-item">${logoHTML(x.sym)}<a href="#/c/${encodeURIComponent(x.sym)}/valoracion"><b>${esc(x.sym)}</b> <span class="mute">${esc(x.name || '')}</span></a><span class="pill alta">${esc(x.hits.join(' · '))}</span><span></span></div>`).join('')) + '<div style="height:14px"></div>';
+  const al = (await checkAlerts()).filter((x) => (x.hits && x.hits.length) || x.stale); // también las que hay que revisar
+  if (al.length) view.querySelector('#alerts').innerHTML = card('Alertas activadas', al.map((x) => `<div class="wl-item">${logoHTML(x.sym)}<a href="#/c/${encodeURIComponent(x.sym)}/valoracion"><b>${esc(x.sym)}</b> <span class="mute">${esc(x.name || '')}</span></a>${x.hits.length ? `<span class="pill alta">${esc(x.hits.join(' · '))}</span>` : `<span class="pill media">Revisar: ${esc(x.stale)}</span>`}<span></span></div>`).join('')) + '<div style="height:14px"></div>';
 }

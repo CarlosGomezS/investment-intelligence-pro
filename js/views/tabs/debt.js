@@ -1,8 +1,8 @@
 // Deuda y solvencia: estructura, vencimientos, coste, cobertura, apalancamiento, liquidez y riesgo de refinanciación.
-import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
-import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=cc3b3e4a';
-import { isNum, div, lin, mean } from '../../calc/finance.js?v=cc3b3e4a';
-import { gauge } from './overview.js?v=cc3b3e4a';
+import { fundamentals } from '../../ui/charts.js?v=85a54e71';
+import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=85a54e71';
+import { isNum, div, lin, mean } from '../../calc/finance.js?v=85a54e71';
+import { gauge } from './overview.js?v=85a54e71';
 
 export function solvency(m) {
   const T = m.T, L = m.last;

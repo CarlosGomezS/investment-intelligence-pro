@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=cc3b3e4a';
+import { isNum, mean, stdev, median } from './finance.js?v=85a54e71';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -141,7 +141,7 @@ export const METHODS = {
     rules: [
       'Excluye bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas (estructura financiera distinta).',
       'Rentabilidad del beneficio = EBIT / valor de empresa (más alta = más barata).',
-      'Rendimiento del capital = EBIT / (capital circulante neto + activo fijo neto) (más alto = mejor negocio). Capital circulante sin caja ni deuda a corto.',
+      'Rendimiento del capital = EBIT / (capital circulante neto + activo fijo neto) (más alto = mejor negocio). Capital circulante sin caja ni deuda a corto; si es negativo cuenta como 0 (si no, el denominador podría acercarse a cero y el rendimiento salir absurdo).',
       'Se ordena por la suma de ambos puestos dentro del universo analizado; se compran las primeras (20-30 en cartera).',
     ],
     exit: 'Se mantiene cada posición un año y se vuelve a pasar la fórmula. No usa stop de precio ni objetivo.',
@@ -162,7 +162,8 @@ export const METHODS = {
         const roc = isNum(ebitR) && isNum(cap) && cap > 0 ? ebitR / cap : null;
         return { r, excluded, ey, roc, wc, ppe };
       });
-      const ok = rows.filter((x) => !x.excluded && isNum(x.ey) && isNum(x.roc));
+      // Solo compiten empresas con EBIT y capital positivos (las que pierden dinero no inflan el ranking del resto)
+      const ok = rows.filter((x) => !x.excluded && isNum(x.ey) && isNum(x.roc) && x.ey > 0 && x.roc > 0);
       const rk = (k) => { const s = [...ok].sort((a, b) => b[k] - a[k]); s.forEach((x, i) => (x['rank_' + k] = i + 1)); };
       rk('ey'); rk('roc');
       ok.forEach((x) => (x.sum = x.rank_ey + x.rank_roc));

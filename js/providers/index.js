@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=cc3b3e4a';
-import { alphavantage } from './alphavantage.js?v=cc3b3e4a';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=cc3b3e4a';
-import { twelvedata } from './twelvedata.js?v=cc3b3e4a';
-import { roic } from './roic.js?v=cc3b3e4a';
-import { sec, forgetSec } from './sec.js?v=cc3b3e4a';
-import { esef, forgetEsef } from './esef.js?v=cc3b3e4a';
-import { config } from '../config.js?v=cc3b3e4a';
-import { ApiError, usage, queueDelay } from './http.js?v=cc3b3e4a';
-import { setHint } from './hints.js?v=cc3b3e4a';
+import { fmp } from './fmp.js?v=85a54e71';
+import { alphavantage } from './alphavantage.js?v=85a54e71';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=85a54e71';
+import { twelvedata } from './twelvedata.js?v=85a54e71';
+import { roic } from './roic.js?v=85a54e71';
+import { sec, forgetSec } from './sec.js?v=85a54e71';
+import { esef, forgetEsef } from './esef.js?v=85a54e71';
+import { config } from '../config.js?v=85a54e71';
+import { ApiError, usage, queueDelay } from './http.js?v=85a54e71';
+import { setHint } from './hints.js?v=85a54e71';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -98,6 +98,8 @@ async function complete(method, args, base, rest) {
   return used.length > 1 ? { ...base, data: rows.slice(0, Math.max(args[2] || 15, base.data.length)), source: used.map((u) => names[u] || u).join(' + '), merged: used } : base;
 }
 
+const EMPTY_OK = new Set(['splits', 'dividends', 'insiders', 'filings', 'pressReleases', 'news', 'dividendsCalendar', 'grades', 'gradesHistorical']);
+
 async function run(method, args, order) {
   const list = chain(method, args, order);
   if (!list.length) {
@@ -112,6 +114,8 @@ async function run(method, args, order) {
     if (i < list.length - 1 && queueDelay(id) > 8000) { tried.push([id, 'en cola por límite por minuto']); continue; }
     try {
       const r = await P[id][method](...args);
+      // Una lista vacía es una respuesta válida en estos datos («no tiene splits», «no paga dividendo»…): no es un fallo
+      if (Array.isArray(r.data) && r.data.length === 0 && EMPTY_OK.has(method)) return { ...r, provider: id };
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);
       if (empty) { tried.push([id, 'sin datos']); best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
       if (method === 'profile' && r.data) setHint(args[0], { name: r.data.companyName, isin: r.data.isin, country: r.data.country });

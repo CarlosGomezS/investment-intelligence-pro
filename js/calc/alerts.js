@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=cc3b3e4a';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=85a54e71';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';
@@ -23,8 +23,8 @@ export function detectAlerts(m) {
   if (isNum(a.fcf) && a.fcf < 0) add('alta', 'Caja', 'Flujo de caja libre negativo', `FCF de ${fmtB(a.fcf)} en ${a.year}: la empresa consume caja.`);
   else if (isNum(fg) && fg < -0.25) add('media', 'Caja', 'Caída del flujo de caja libre', `El FCF cayó un ${pct(-fg)} en ${a.year}.`);
 
-  if (isNum(a.debt) && a.debt > 0.1 * (a.assets || Infinity) && !(b.debt > 0)) add('alta', 'Deuda', 'Aparece deuda relevante', `Pasa de no tener deuda a ${fmtB(a.debt)} (${pct(a.debt / a.assets)} del activo) en un año.`);
-  const dg = gr(a.debt, b.debt);
+  if (!a.balanceStale && isNum(a.debt) && a.debt > 0.1 * (a.assets || Infinity) && !(b.debt > 0)) add('alta', 'Deuda', 'Aparece deuda relevante', `Pasa de no tener deuda a ${fmtB(a.debt)} (${pct(a.debt / a.assets)} del activo) en un año.`);
+  const dg = a.balanceStale ? null : gr(a.debt, b.debt); // balance del año aún sin publicar: no se comparan saldos
   if (isNum(dg) && dg > 0.3 && (!isNum(rg) || dg > rg + 0.15)) add('alta', 'Deuda', 'Aumento excesivo de deuda', `La deuda creció un ${pct(dg)} (hasta ${fmtB(a.debt)}) mientras las ventas variaron un ${isNum(rg) ? pct(rg) : '—'}.`);
 
   const s1 = gr(a.shares, b.shares), s5 = cagrN(Y.map((y) => y.shares), 5);
@@ -34,16 +34,16 @@ export function detectAlerts(m) {
   const roic3 = mean(Y.slice(-4, -1).map((y) => y.roic).filter(isNum));
   if (isNum(a.roic) && isNum(roic3) && Y.slice(-4).every((y) => !y.negCapital) && a.roic < roic3 - 0.05) add('media', 'Rentabilidad', 'Deterioro del ROIC', `ROIC ${pct(a.roic)} frente a ${pct(roic3)} de media previa.`);
 
-  const ig = gr(a.inventory, b.inventory);
+  const ig = a.balanceStale ? null : gr(a.inventory, b.inventory);
   if (isNum(ig) && isNum(rg) && ig > rg + 0.15 && a.inventory > 0.05 * a.revenue) add('media', 'Circulante', 'Inventarios crecen más que las ventas', `Inventario +${pct(ig)} frente a ventas ${pct(rg)}: posible exceso de stock o demanda más débil.`);
-  const rcg = gr(a.receivables, b.receivables);
+  const rcg = a.balanceStale ? null : gr(a.receivables, b.receivables);
   if (isNum(rcg) && isNum(rg) && rcg > rg + 0.15 && a.receivables > 0.05 * a.revenue) add('media', 'Circulante', 'Cuentas por cobrar crecen anormalmente', `Clientes pendientes de cobro +${pct(rcg)} frente a ventas ${pct(rg)}: vigila la calidad de las ventas.`);
 
   const iq = lastAvg(Y.map((y) => y.incomeQuality), 2);
   if (isNum(iq) && iq < 0.8 && isNum(a.netIncome) && a.netIncome > 0) add('alta', 'Calidad', 'Beneficios que no se convierten en caja', `La caja operativa es solo el ${pct(iq)} del beneficio neto (media 2 años). Lo sano es ≥ 100 %.`);
 
-  if (isNum(a.goodwill) && a.goodwill > 0.1 * (a.assets || Infinity) && !(b.goodwill > 0)) add('media', 'Contabilidad', 'Aparece fondo de comercio relevante', `Pasa de 0 a ${fmtB(a.goodwill)}: hubo una adquisición importante. Revisa su integración y posibles deterioros.`);
-  const gw = gr(a.goodwill, b.goodwill);
+  if (!a.balanceStale && isNum(a.goodwill) && a.goodwill > 0.1 * (a.assets || Infinity) && !(b.goodwill > 0)) add('media', 'Contabilidad', 'Aparece fondo de comercio relevante', `Pasa de 0 a ${fmtB(a.goodwill)}: hubo una adquisición importante. Revisa su integración y posibles deterioros.`);
+  const gw = a.balanceStale ? null : gr(a.goodwill, b.goodwill);
   if (isNum(gw) && gw > 0.25 && a.goodwill > 0.05 * (a.assets || Infinity)) add('baja', 'Contabilidad', 'Fondo de comercio en fuerte aumento', `El fondo de comercio creció un ${pct(gw)}: señal de adquisiciones relevantes. Revisa su integración y posibles deterioros futuros.`);
   if (isNum(a.taxRate) && isNum(b.taxRate) && Math.abs(a.taxRate - b.taxRate) > 0.15) add('baja', 'Contabilidad', 'Cambio brusco del tipo impositivo efectivo', `Pasó de ${pct(b.taxRate)} a ${pct(a.taxRate)}: puede haber partidas extraordinarias que distorsionan el beneficio.`);
 

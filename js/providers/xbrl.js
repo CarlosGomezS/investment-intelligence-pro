@@ -17,6 +17,7 @@ export const MAP = {
     operatingExpenses: [...G('OperatingExpenses', 'CostsAndExpenses')],
     operatingIncome: [...G('OperatingIncomeLoss'), ...I('ProfitLossFromOperatingActivities')],
     interestExpense: [...G('InterestExpense', 'InterestExpenseNonoperating', 'InterestExpenseDebt'), ...I('FinanceCosts', 'InterestExpense')],
+    interestIncome: [...G('InvestmentIncomeInterest', 'InterestIncomeOther', 'InvestmentIncomeInterestAndDividend'), ...I('InterestIncome', 'FinanceIncome')],
     incomeBeforeTax: [...G('IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments'), ...I('ProfitLossBeforeTax')],
     incomeTaxExpense: [...G('IncomeTaxExpenseBenefit'), ...I('IncomeTaxExpenseContinuingOperations')],
     netIncome: [...G('NetIncomeLoss', 'ProfitLoss'), ...I('ProfitLossAttributableToOwnersOfParent', 'ProfitLoss')],
@@ -44,7 +45,8 @@ export const MAP = {
     ltdCurrent: [...G('LongTermDebtCurrent'), ...I('CurrentPortionOfLongtermBorrowings')],
     stBorrowings: [...G('ShortTermBorrowings')],
     commercialPaper: [...G('CommercialPaper')],
-    longTermDebt: [...G('LongTermDebtNoncurrent', 'LongTermDebtAndCapitalLeaseObligations'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    longTermDebt: [...G('LongTermDebtNoncurrent'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    ltdAndLease: [...G('LongTermDebtAndCapitalLeaseObligations')], // ya incluye los arrendamientos financieros
     longTermDebtTotal: [...G('LongTermDebt')], // en US-GAAP incluye la parte a corto
     leaseCurrent: [...G('OperatingLeaseLiabilityCurrent'), ...I('CurrentLeaseLiabilities')],
     leaseNoncurrent: [...G('OperatingLeaseLiabilityNoncurrent'), ...I('NoncurrentLeaseLiabilities')],
@@ -127,13 +129,15 @@ export function toStatements(facts, symbol, maxYears = 15) {
     // Si no se publica la parte a corto por separado, se resta la deuda corriente total (que la incluye) para no contarla dos veces
     // De la deuda corriente total solo se resta lo que está dentro de LongTermDebt (no pagarés ni préstamos a corto)
     const ltdCur = r.ltdCurrent ?? (r.debtCurrentTotal != null ? Math.max(0, r.debtCurrentTotal - (r.commercialPaper || 0) - (r.stBorrowings || 0)) : 0);
+    let leaseIn = false;
+    if (r.longTermDebt == null && r.ltdAndLease != null) { r.longTermDebt = r.ltdAndLease; leaseIn = true; }
     if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = Math.max(0, r.longTermDebtTotal - ltdCur);
     // Arrendamientos (NIIF 16 / ASC 842): son deuda a efectos de apalancamiento
     const lease = [r.leaseCurrent, r.leaseNoncurrent, r.financeLease].some((x) => x != null) ? (r.leaseCurrent || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0) : null;
     r.capitalLeaseObligations = lease;
     // Arrendamientos a corto con la deuda a corto y el resto con la de largo (cuentan en liquidez y en Graham)
     if (r.leaseCurrent != null) r.shortTermDebt = (r.shortTermDebt || 0) + r.leaseCurrent;
-    if (r.leaseNoncurrent != null || r.financeLease != null) r.longTermDebt = (r.longTermDebt || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0);
+    if (r.leaseNoncurrent != null || (r.financeLease != null && !leaseIn)) r.longTermDebt = (r.longTermDebt || 0) + (r.leaseNoncurrent || 0) + (leaseIn ? 0 : r.financeLease || 0); // sin contar dos veces el financiero
     r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null ? null : (r.shortTermDebt || 0) + (r.longTermDebt || 0);
     r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null ? r.cashAndCashEquivalents + (r.shortTermInvestments || 0) : null;
     r.netDebt = r.totalDebt != null ? r.totalDebt - (r.cashAndShortTermInvestments || 0) : null;

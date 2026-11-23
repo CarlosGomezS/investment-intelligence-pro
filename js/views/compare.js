@@ -1,10 +1,10 @@
 // Comparador de empresas (hasta 5, métricas actuales e históricas) y comparador sectorial (medianas del sector).
-import { data, gather } from '../providers/index.js?v=cc3b3e4a';
-import { fundamentals } from '../ui/charts.js?v=cc3b3e4a';
-import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=cc3b3e4a';
-import { logoHTML } from '../app.js?v=cc3b3e4a';
-import { isNum, buildAnnual, deriveYear, median, cagrN, adjustSplits } from '../calc/finance.js?v=cc3b3e4a';
-import { exportCSV } from '../export.js?v=cc3b3e4a';
+import { data, gather } from '../providers/index.js?v=85a54e71';
+import { fundamentals } from '../ui/charts.js?v=85a54e71';
+import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=85a54e71';
+import { logoHTML } from '../app.js?v=85a54e71';
+import { isNum, buildAnnual, deriveYear, median, cagrN, adjustSplits } from '../calc/finance.js?v=85a54e71';
+import { exportCSV } from '../export.js?v=85a54e71';
 
 const METRICS = [['revenue', 'Ingresos', 'big'], ['netIncome', 'Beneficio neto', 'big'], ['fcf', 'FCF', 'big'], ['ebitda', 'EBITDA', 'big'], ['eps', 'BPA', 'n'], ['grossMargin', 'Margen bruto', 'pct'], ['operatingMargin', 'Margen operativo', 'pct'], ['netMargin', 'Margen neto', 'pct'], ['roic', 'ROIC', 'pct'], ['roe', 'ROE', 'pct'], ['debt', 'Deuda total', 'big'], ['cash', 'Caja', 'big'], ['equity', 'Patrimonio', 'big'], ['shares', 'Acciones', 'big']];
 let metric = 'revenue', mode = 'empresas';

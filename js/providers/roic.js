@@ -1,8 +1,8 @@
 // ROIC.AI API v2 (gratis: 5 peticiones/minuto, cobertura mundial, 2 años de estados anuales).
 // Respaldo para empresas fuera de EE. UU. Acepta ticker o ISIN como identificador.
-import { getJSON } from './http.js?v=cc3b3e4a';
-import { config } from '../config.js?v=cc3b3e4a';
-import { hint } from './hints.js?v=cc3b3e4a';
+import { getJSON } from './http.js?v=85a54e71';
+import { config } from '../config.js?v=85a54e71';
+import { hint } from './hints.js?v=85a54e71';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -39,7 +39,7 @@ export const roic = {
       date: pickDate(x), symbol: s, fiscalYear: pickFY(x), period: 'FY', reportedCurrency: x.currency,
       revenue: n(x.is_sales_revenue_turnover ?? x.is_sales_and_services_revenues), costOfRevenue: n(x.is_cogs ?? x.is_cog_and_services_sold), grossProfit: n(x.is_gross_profit),
       operatingExpenses: n(x.is_operating_expn), sellingGeneralAndAdministrativeExpenses: n(x.is_sg_and_a_expense), researchAndDevelopmentExpenses: n(x.is_operating_expenses_r_and_d),
-      operatingIncome: n(x.is_oper_income), ebit: n(x.ebit ?? x.is_oper_income), ebitda: n(x.ebitda), interestExpense: x.is_int_expense != null ? Math.abs(n(x.is_int_expense)) : null,
+      operatingIncome: n(x.is_oper_income), ebit: n(x.ebit ?? x.is_oper_income), ebitda: n(x.ebitda), interestExpense: x.is_int_expense != null ? Math.abs(n(x.is_int_expense)) : null, interestIncome: x.is_int_inc != null ? Math.abs(n(x.is_int_inc)) : null,
       incomeBeforeTax: n(x.is_pretax_income), incomeTaxExpense: n(x.is_inc_tax_exp), netIncome: n(x.is_net_income), eps: n(x.eps), epsDiluted: n(x.diluted_eps),
       weightedAverageShsOut: n(x.is_avg_num_sh_for_eps), weightedAverageShsOutDil: n(x.is_sh_for_diluted_eps), depreciationAndAmortization: n(x.is_depr_exp), _source: 'ROIC.AI',
     })) };

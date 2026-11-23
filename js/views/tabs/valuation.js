@@ -1,9 +1,9 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=cc3b3e4a';
-import { isNum } from '../../calc/finance.js?v=cc3b3e4a';
-import { store } from '../../store.js?v=cc3b3e4a';
-import { loadPeers } from './peers.js?v=cc3b3e4a';
-import { exportXLSX } from '../../export.js?v=cc3b3e4a';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=85a54e71';
+import { isNum } from '../../calc/finance.js?v=85a54e71';
+import { store } from '../../store.js?v=85a54e71';
+import { loadPeers } from './peers.js?v=85a54e71';
+import { exportXLSX } from '../../export.js?v=85a54e71';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -11,8 +11,8 @@ export async function render(el, S, ctx) {
   if (!S.peers) { try { await loadPeers(S); ctx.recompute(); } catch {} }
   const { m, val } = S, d = val.defaults, I = val.inputs, R = val.dcf, cur = m.tradeCur, comp = val.composite;
   const methods = [
-    ...(R && isNum(R.perShare) ? [{ n: 'DCF (caso base)', v: R.perShare, o: 'Supuestos editables abajo' }] : []),
-    ...(R && R.scen ? R.scen.filter((s) => s.id !== 'base' && s.result && !s.result.error).map((s) => ({ n: `DCF ${s.label.toLowerCase()}`, v: s.result.perShare, o: 'Escenario' })) : []),
+    ...(R && isNum(R.perShare) ? [{ n: 'DCF (caso base)', v: Math.max(0, R.perShare), o: R.perShare <= 0 ? 'La deuda supera al valor: 0' : 'Supuestos editables abajo' }] : []),
+    ...(R && R.scen ? R.scen.filter((s) => s.id !== 'base' && s.result && !s.result.error).map((s) => ({ n: `DCF ${s.label.toLowerCase()}`, v: Math.max(0, s.result.perShare), o: 'Escenario' })) : []),
     ...val.mult.filter((x) => isNum(x.value) && x.value > 0).map((x) => ({ n: x.method + (x.exclude ? ' (no cuenta)' : ''), v: x.value, o: x.origin, ext: x.exclude })),
     ...(val.ddm.applicable && isNum(val.ddm.value) ? [{ n: 'Descuento de dividendos (DDM)', v: val.ddm.value, o: 'Gordon' }] : []),
     ...(isNum(m.priceTarget.targetConsensus) ? [{ n: 'Precio objetivo medio analistas', v: m.priceTarget.targetConsensus, o: 'analistas', ext: true }] : []),

@@ -16,7 +16,7 @@ const UPSTREAM = {
   roic: { base: 'https://api.roic.ai/v2/', key: 'apikey', secret: 'ROIC_KEY' },
   esef: { base: 'https://filings.xbrl.org/', ua: true },
 };
-const TTL = [[/quote|price-change|historical-chart|stock-prices\/latest/, 300], [/historical-price|time_series|stock-prices/, 6 * 3600], [/news/, 1800], [/company_tickers|submissions|profile/, 7 * 86400], [/companyfacts|\.json$/, 86400]];
+const TTL = [[/quote|price-change|historical-chart|stock-prices\/latest/, 300], [/historical-price|time_series|stock-prices/, 6 * 3600], [/news/, 1800], [/company_tickers|submissions/, 7 * 86400], [/profile/, 86400], [/companyfacts|\.json$/, 86400]];
 const hits = new Map();
 
 function cors(origin, allowed) {

@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=cc3b3e4a';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=cc3b3e4a';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=85a54e71';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=85a54e71';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -14,7 +14,7 @@ export function dcfDefaults(m) {
   const unlev = (y) => { if (!isNum(y.fcf)) return null; const t = isNum(y.taxRate) ? y.taxRate : 0.21; let v = y.fcf - (isNum(y.sbc) ? y.sbc : 0); if (usGaap) v += ((y.interestExpense || 0) - (y.interestIncome || 0)) * (1 - t); return v; };
   const fcfTTM = unlev(m.T);
   const fcf3 = lastAvg(m.years.map(unlev), 3);
-  const g = suggestGrowth({ fcfCagr5: cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
+  const g = suggestGrowth({ fcfCagr5: m.growth.fcf5 ?? cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
     fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio'} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}`, alt: m.X(fcf3) },

@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=cc3b3e4a';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=cc3b3e4a';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=85a54e71';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=85a54e71';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -24,9 +24,15 @@ export function buildModel(raw, fxRate = 1) {
   let balanceFrom = null;
   if (ys0.length >= 2 && !ys0[ys0.length - 1].b && ys0[ys0.length - 2].b) { ys0[ys0.length - 1].b = ys0[ys0.length - 2].b; balanceFrom = ys0[ys0.length - 2].year; }
   const years = ys0.map((y) => deriveYear(y));
+  if (balanceFrom && years.length) years[years.length - 1].balanceStale = true; // su balance es el del año anterior
   const splitsAdj = adjustSplits(years, raw.splits && raw.splits.ok ? val(raw.splits) || [] : null); // acciones y BPA comparables entre años
   const last = years[years.length - 1] || {};
-  const prices = asc(val(raw.prices) || []);
+  let prices = asc(val(raw.prices) || []);
+  // Precios sin ajustar (Alpha Vantage gratuito): se ajustan con la lista REAL de splits, nunca por intuición
+  if (raw.prices && raw.prices.unadjusted && raw.splits && raw.splits.ok) {
+    const sp = (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0);
+    if (sp.length) prices = prices.map((p) => { const f = sp.filter((s) => String(s.date) > String(p.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1); return f === 1 ? p : { ...p, open: p.open / f, high: p.high / f, low: p.low / f, close: p.close / f }; });
+  }
   let ratiosHist = asc(val(raw.ratios) || []);
   let kmHist = asc(val(raw.keyMetrics) || []);
   const derived = [];
@@ -51,9 +57,14 @@ export function buildModel(raw, fxRate = 1) {
   // ordinarias, mientras el precio es de la clase cotizada o del ADR. Si acciones × precio difiere más de un 25 % de
   // la capitalización del proveedor, se usan las acciones equivalentes a esa capitalización (en vivo con el precio).
   let sharesNote = null;
-  if (isNum(shares) && isNum(price) && price > 0 && isNum(mcProv) && mcProv > 0) {
-    const ratio = (shares * price) / mcProv;
-    if (ratio > 1.25 || ratio < 0.8) { const pRef = isNum(profile.price) && profile.price > 0 ? profile.price : price; shares = mcProv / pRef; sharesNote = 'equivalentes a la capitalización (doble clase o ADR)'; }
+  // La capitalización del proveedor es de un momento anterior: se compara con el precio DE ESE MOMENTO (el del perfil,
+  // o el cierre del día en que se descargó), nunca con el de hoy; si no se sabe ese precio, no se toca nada
+  // (así una subida o caída fuerte del día no se confunde con un problema de clases de acciones).
+  const pRef = isNum(profile.price) && profile.price > 0 ? profile.price
+    : raw.profile && raw.profile.fetchedAt && prices.length ? (closeAt(prices, new Date(raw.profile.fetchedAt - 864e5).toISOString().slice(0, 10)) || {}).close : null;
+  if (isNum(shares) && isNum(pRef) && pRef > 0 && isNum(mcProv) && mcProv > 0) {
+    const ratio = (shares * pRef) / mcProv;
+    if (ratio > 1.25 || ratio < 0.8) { shares = mcProv / pRef; sharesNote = 'equivalentes a la capitalización (doble clase de acciones o ADR)'; }
   }
   // Split posterior al último ejercicio (p. ej. ejecutado este año): las acciones actuales son k veces las del último
   // informe. Se ajustan acciones y BPA de todos los años (y del TTM si viene sin ajustar) para que PER y múltiplos cuadren.
@@ -68,7 +79,7 @@ export function buildModel(raw, fxRate = 1) {
     // contrasplit solo se acepta en ADR (1 ADR = k acciones ordinarias), donde la moneda de cuentas y cotización difiere.
     const known = raw.splits && raw.splits.ok ? (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0) : null;
     // ADR: emisor extranjero que cotiza en EE. UU. (incluye los que presentan cuentas en USD, como BP o Shell)
-    const adr = !!profile.isAdr || repCur !== tradeCur || (!!profile.country && !/^(US|USA|United States)$/i.test(profile.country) && /NYSE|NASDAQ|AMEX|US/i.test(profile.exchange || profile.exchangeFullName || ''));
+    const adr = !!profile.isAdr || repCur !== tradeCur || (!!profile.country && !/^(US|USA|United States)$/i.test(profile.country) && /NYSE|NASDAQ|AMEX|NEW YORK|\bUS\b/i.test(profile.exchange || profile.exchangeFullName || ''));
     const verify = (g, since) => {
       if (!g) return null;
       if (known) { const k = known.filter((s) => String(s.date) > String(since)).reduce((a, s) => a * (s.numerator / s.denominator), 1); return Math.abs(k / g - 1) < 0.12 || (g < 1 && adr) ? g : null; }
@@ -98,7 +109,7 @@ export function buildModel(raw, fxRate = 1) {
 
   // Series alineadas al calendario: si falta un ejercicio intermedio se deja un hueco (null), así un CAGR «a 5 años»
   // no mide 6 años por error
-  const series = (f) => { const out = []; years.forEach((y, i) => { if (i > 0) { const gap = Number(y.year) - Number(years[i - 1].year); for (let k = 1; k < gap && gap < 6; k++) out.push(null); } out.push(y[f]); }); return out; };
+  const series = (f) => { const out = []; years.forEach((y, i) => { if (i > 0) { const gap = Number(y.year) - Number(years[i - 1].year); for (let k = 1; k < gap && gap < 30; k++) out.push(null); } out.push(y[f]); }); return out; };
   const rev = series('revenue'), ni = series('netIncome'), eps = series('eps'), fcf = series('fcf'), sh = series('shares');
   const growth = {
     rev1: cagrN(rev, 1), rev3: cagrN(rev, 3), rev5: cagrN(rev, 5), rev10: cagrN(rev, 10),
@@ -126,7 +137,7 @@ export function buildModel(raw, fxRate = 1) {
   const dpsSeries = dpsYears.map((y) => ({ year: y, dps: byYear[y] }));
   const last12 = divs.filter((d) => new Date(d.date) > new Date(Date.now() - 365 * 864e5)).reduce((a, d) => a + (d.adjDividend ?? d.dividend), 0);
   // El último dividendo del perfil solo como respaldo si no llegó el historial (si llegó y no hay pagos en 12 meses, es 0)
-  let dpsTTM = last12 || (!divs.length && isNum(profile.lastDividend) ? profile.lastDividend : 0);
+  let dpsTTM = last12 || (!(raw.dividends && raw.dividends.ok) && isNum(profile.lastDividend) ? profile.lastDividend : 0);
   // Cotización en subunidades (peniques…) con dividendos en la unidad principal (libras): se comprueban contra los
   // dividendos pagados del flujo de caja y, si salen 100 veces menores, se pasan a la moneda de cotización
   let dpsScale = 1;
@@ -154,11 +165,13 @@ export function buildModel(raw, fxRate = 1) {
   const beta = betaAssumed ? 1 : 0.67 * betaRaw + 0.33;
   if (isNum(betaCalc)) derived.push('beta');
   const costDebt = isNum(costDebtHist) ? Math.max(costDebtHist, rf10) : null;
-  const w = waccCalc({ rf: rf10, beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
+  const taxAvg = lastAvg(series('taxRate'), 3);
+  const w = waccCalc({ rf: rf10, beta, erp, costDebtPre: costDebt, taxRate: taxAvg, equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
 
   // ---- Cálculos propios cuando el proveedor no da el dato (se marcan como «calculado») ----
   // Con cuentas en otra moneda no se derivan: aplicar el tipo de cambio de hoy a beneficios de hace 10 años los falsearía
-  if ((!ratiosHist.length || !kmHist.length) && prices.length > 200 && fx === 1) {
+  const fxExact = fx === 1 || (/^(GBp|GBX|ILA|ZAc|ZAC)$/.test(tradeCur) && ({ GBp: 'GBP', GBX: 'GBP', ILA: 'ILS', ZAc: 'ZAR', ZAC: 'ZAR' })[tradeCur] === repCur); // peniques/libras: conversión fija ×100
+  if ((!ratiosHist.length || !kmHist.length) && prices.length > 200 && fxExact) {
     const R = [], K = [];
     for (const y of years) {
       const p = closeAt(prices, String(y.date || '').slice(0, 10)); if (!p || !isNum(y.shares)) continue;
@@ -173,7 +186,8 @@ export function buildModel(raw, fxRate = 1) {
   let change = val(raw.priceChange) || {};
   if (!Object.keys(change).length && prices.length > 2) { change = priceChanges(prices); derived.push('variaciones de precio'); }
   let scores = val(raw.scores) || {};
-  if (!isNum(scores.piotroskiScore) && years.length >= 2) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } }
+  // Con el balance copiado del año anterior, el F-Score regalaría puntos (deuda y liquidez «sin cambios»): no se calcula
+  if (!isNum(scores.piotroskiScore) && years.length >= 2 && !years[years.length - 1].balanceStale) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } }
   if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) && isNum(fx) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
 
   // PER coherente con el resto del análisis: precio / BPA del mismo periodo que los estados (TTM o último ejercicio).
@@ -183,10 +197,10 @@ export function buildModel(raw, fxRate = 1) {
 
   return {
     symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, netDebtFrom, balanceFrom, sharesNote, shares, marketCap, ev, netDebt: netDebtT,
-    years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
+    years, last, T, ttmIsReal, prices, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
-    market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaRaw, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
+    market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaRaw, betaAssumed, betaCalc: isNum(betaCalc), costDebt, taxAvg, wacc: w },
     pe: peRatio, peProvider, periodLabel, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
     stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('rc'), 5), roicMin5: Math.min(...series('rc').slice(-5).filter(isNum)), roicIsRoce: !!last.negCapital, gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,

@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=cc3b3e4a';
-import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=cc3b3e4a';
-import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=cc3b3e4a';
-import { extra } from '../company.js?v=cc3b3e4a';
-import { exportCSV, exportXLSX } from '../../export.js?v=cc3b3e4a';
+import { data } from '../../providers/index.js?v=85a54e71';
+import { fundamentals } from '../../ui/charts.js?v=85a54e71';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=85a54e71';
+import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=85a54e71';
+import { extra } from '../company.js?v=85a54e71';
+import { exportCSV, exportXLSX } from '../../export.js?v=85a54e71';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -46,7 +46,8 @@ function rollingTTM(qAsc, defs, isStock) {
     if (![1, 2, 3].every((j) => { const d = (new Date(w[j].date) - new Date(w[j - 1].date)) / 864e5; return d > 60 && d < 120; })) continue;
     for (const k of Object.keys(qAsc[i])) {
       if (typeof qAsc[i][k] !== 'number') continue;
-      r[k] = isStock || /eps|Shs|shares/i.test(k) ? qAsc[i][k] : (w.every((x) => isNum(x[k])) ? w.reduce((a, x) => a + x[k], 0) : null);
+      // Acciones: las del último trimestre. BPA: se suma (4 trimestres) o se recalcula abajo con beneficio / acciones
+      r[k] = isStock || /Shs|shares/i.test(k) ? qAsc[i][k] : (w.every((x) => isNum(x[k])) ? w.reduce((a, x) => a + x[k], 0) : null);
     }
     if (isNum(r.netIncome) && isNum(qAsc[i].weightedAverageShsOutDil)) r.epsDiluted = r.netIncome / qAsc[i].weightedAverageShsOutDil;
     if (isNum(r.netIncome) && isNum(qAsc[i].weightedAverageShsOut)) r.eps = r.netIncome / qAsc[i].weightedAverageShsOut;

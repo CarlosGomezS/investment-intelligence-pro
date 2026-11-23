@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=cc3b3e4a';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=85a54e71';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -33,7 +33,7 @@ export function metricsFor(m, ctx) {
   // También pérdidas crónicas (último dato ≤ 0, aunque nunca hubiera beneficio): puntúa 0, no se excluye
   const toLoss = (k) => { const v = s(k).filter(isNum); return v.length >= 1 && v[v.length - 1] <= 0; };
   const eps5 = isNum(m.growth.eps5) ? m.growth.eps5 : toLoss('eps') ? -1 : null;
-  const fcf5 = isNum(cagrN(s('fcf'), 5)) ? cagrN(s('fcf'), 5) : toLoss('fcf') ? -1 : null;
+  const fcf5 = isNum(m.growth.fcf5) ? m.growth.fcf5 : toLoss('fcf') ? -1 : null; // CAGR alineado al calendario (con huecos)
   // Si el crecimiento se ha frenado, compararse con sus múltiplos de antes no dice nada (misma regla que la valoración)
   const revS = s('revenue'); const gThen = cagrN(revS.slice(0, -2), 5) ?? m.growth.rev5, gNow = median([m.growth.rev1, m.growth.rev3, m.growth.analystRev].filter(isNum));
   const slowed = isNum(gThen) && isNum(gNow) && gThen > 0.05 && gNow < 0.6 * gThen;

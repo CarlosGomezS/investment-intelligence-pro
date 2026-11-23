@@ -1,10 +1,10 @@
 // Competidores: detección automática (FMP stock-peers), lista editable, tabla comparativa, gráficos y ganador por pilar.
-import { data, gather } from '../../providers/index.js?v=cc3b3e4a';
-import { fundamentals } from '../../ui/charts.js?v=cc3b3e4a';
-import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=cc3b3e4a';
-import { isNum, div, asc, median } from '../../calc/finance.js?v=cc3b3e4a';
-import { store } from '../../store.js?v=cc3b3e4a';
-import { logoHTML } from '../../app.js?v=cc3b3e4a';
+import { data, gather } from '../../providers/index.js?v=85a54e71';
+import { fundamentals } from '../../ui/charts.js?v=85a54e71';
+import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=85a54e71';
+import { isNum, div, asc, median } from '../../calc/finance.js?v=85a54e71';
+import { store } from '../../store.js?v=85a54e71';
+import { logoHTML } from '../../app.js?v=85a54e71';
 
 async function peerRow(sym) {
   const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), inc: () => data.income(sym, 'annual', 4) }, 15000);
@@ -26,7 +26,7 @@ async function peerRow(sym) {
 function selfRow(S) {
   const m = S.m, T = m.T;
   return { symbol: m.symbol, name: m.profile.companyName, currency: m.repCur, tcur: m.tradeCur, marketCap: m.marketCap, revenue: T.revenue, growth1: m.growth.rev1, growth3: m.growth.rev3, netIncome: T.netIncome,
-    grossMargin: T.grossMargin, opMargin: T.operatingMargin, netMargin: T.netMargin, roic: m.kTTM.returnOnInvestedCapitalTTM ?? T.roic ?? m.last.roic, roe: m.kTTM.returnOnEquityTTM ?? T.roe ?? m.last.roe, de: T.debtToEquity, ndEbitda: T.netDebtToEbitda,
+    grossMargin: T.grossMargin, opMargin: T.operatingMargin, netMargin: T.netMargin, roic: T.roic ?? m.last.roic, roe: T.roe ?? m.last.roe, de: T.debtToEquity, ndEbitda: T.netDebtToEbitda, // propios (con patrimonio negativo no aplican)
     pe: m.pe, evEbitda: isNum(T.ebitda) && T.ebitda > 0 ? m.ev / m.X(T.ebitda) : null, fcfYield: div(m.X(T.fcf), m.marketCap), fcf: m.X(T.fcf), self: true };
 }
 
