@@ -1,18 +1,18 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather, forget } from '../providers/index.js?v=b4276095';
-import { fxRate } from '../providers/fxrate.js?v=b4276095';
-import { buildModel } from '../calc/model.js?v=b4276095';
-import { evaluateRatios } from '../calc/ratios.js?v=b4276095';
-import { detectAlerts } from '../calc/alerts.js?v=b4276095';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=b4276095';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=b4276095';
-import { reliability } from '../calc/reliability.js?v=b4276095';
-import { decide } from '../calc/decision.js?v=b4276095';
-import { buildReport } from '../calc/report.js?v=b4276095';
-import { store } from '../store.js?v=b4276095';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=b4276095';
-import { logoHTML, countryOf } from '../app.js?v=b4276095';
-import { isNum } from '../calc/finance.js?v=b4276095';
+import { data, gather, forget } from '../providers/index.js?v=1369edf7';
+import { fxRate } from '../providers/fxrate.js?v=1369edf7';
+import { buildModel } from '../calc/model.js?v=1369edf7';
+import { evaluateRatios } from '../calc/ratios.js?v=1369edf7';
+import { detectAlerts } from '../calc/alerts.js?v=1369edf7';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=1369edf7';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=1369edf7';
+import { reliability } from '../calc/reliability.js?v=1369edf7';
+import { decide } from '../calc/decision.js?v=1369edf7';
+import { buildReport } from '../calc/report.js?v=1369edf7';
+import { store } from '../store.js?v=1369edf7';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=1369edf7';
+import { logoHTML, countryOf } from '../app.js?v=1369edf7';
+import { isNum } from '../calc/finance.js?v=1369edf7';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -20,10 +20,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=b4276095'), grafico: () => import('./tabs/chart.js?v=b4276095'), estados: () => import('./tabs/statements.js?v=b4276095'), ratios: () => import('./tabs/ratios.js?v=b4276095'),
-  crecimiento: () => import('./tabs/growth.js?v=b4276095'), deuda: () => import('./tabs/debt.js?v=b4276095'), valoracion: () => import('./tabs/valuation.js?v=b4276095'), dividendos: () => import('./tabs/dividends.js?v=b4276095'),
-  competidores: () => import('./tabs/peers.js?v=b4276095'), moat: () => import('./tabs/moat.js?v=b4276095'), noticias: () => import('./tabs/news.js?v=b4276095'), analistas: () => import('./tabs/analysts.js?v=b4276095'),
-  riesgos: () => import('./tabs/risks.js?v=b4276095'), scoring: () => import('./tabs/scoring.js?v=b4276095'), informe: () => import('./tabs/report.js?v=b4276095'), simulador: () => import('./tabs/simulator.js?v=b4276095'),
+  resumen: () => import('./tabs/overview.js?v=1369edf7'), grafico: () => import('./tabs/chart.js?v=1369edf7'), estados: () => import('./tabs/statements.js?v=1369edf7'), ratios: () => import('./tabs/ratios.js?v=1369edf7'),
+  crecimiento: () => import('./tabs/growth.js?v=1369edf7'), deuda: () => import('./tabs/debt.js?v=1369edf7'), valoracion: () => import('./tabs/valuation.js?v=1369edf7'), dividendos: () => import('./tabs/dividends.js?v=1369edf7'),
+  competidores: () => import('./tabs/peers.js?v=1369edf7'), moat: () => import('./tabs/moat.js?v=1369edf7'), noticias: () => import('./tabs/news.js?v=1369edf7'), analistas: () => import('./tabs/analysts.js?v=1369edf7'),
+  riesgos: () => import('./tabs/risks.js?v=1369edf7'), scoring: () => import('./tabs/scoring.js?v=1369edf7'), informe: () => import('./tabs/report.js?v=1369edf7'), simulador: () => import('./tabs/simulator.js?v=1369edf7'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -155,7 +155,7 @@ function header(S) {
     </div>
     <div class="px"><b>${num(m.price, 2)} <small class="mute" style="font-size:14px">${esc(m.tradeCur)}</small></b><span class="${cls(ch)}">${sgnPct(isNum(ch) ? ch / 100 : null, 2)} hoy</span><div class="note">${datetime(upd)}${S.raw.quote && S.raw.quote.stale ? ' · <b class="warn">precio en caché, no actualizado</b>' : ''}</div></div>
   </div>
-  ${(() => { const n = []; if (m.balanceFrom) n.push(`el balance de ${esc(m.last.year)} aún no está disponible: deuda, caja y liquidez son las de ${esc(m.balanceFrom)}`); if (m.sharesNote) n.push(`número de acciones ${esc(m.sharesNote)}`); if (m.ttmPartial) n.push('tu fuente da los últimos 12 meses sin flujos de caja: para no mezclar periodos, todo se calcula con el último ejercicio cerrado'); if (m.ttmFilled && m.ttmFilled.length) n.push(`en los últimos 12 meses faltan partidas en tu fuente; se usan las del último ejercicio para: ${esc(m.ttmFilled.filter((k) => /fcf|ocf|capex|dividends|buybacks|sbc|netDebt|debt|cash|equity/i.test(k)).slice(0, 6).join(', ') || 'otras partidas')}`); return n.length ? `<div class="empty" style="margin-bottom:12px"><b>Datos a tener en cuenta:</b> ${n.join(' · ')}.</div>` : ''; })()}
+  ${(() => { const n = []; if (m.balanceFrom) n.push(`el balance de ${esc(m.last.year)} aún no está disponible: deuda, caja y liquidez son las de ${esc(m.balanceFrom)}`); if (m.sharesNote) n.push(`número de acciones ${esc(m.sharesNote)}`); if (m.repCurAssumed) n.push(`la fuente no indica en qué moneda están las cuentas: se supone ${esc(m.repCur)}, la de cotización; compruébalo si es una empresa extranjera`); const ly = m.years[m.years.length - 1] || {}; if (ly.taxAssumed) n.push('el último ejercicio no permite calcular el tipo impositivo real: la rentabilidad del capital (ROIC) usa un 21 % supuesto'); if (m.ttmPartial) n.push('tu fuente da los últimos 12 meses sin flujos de caja: para no mezclar periodos, todo se calcula con el último ejercicio cerrado'); if (m.ttmFilled && m.ttmFilled.length) n.push(`en los últimos 12 meses faltan partidas en tu fuente; se usan las del último ejercicio para: ${esc(m.ttmFilled.filter((k) => /fcf|ocf|capex|dividends|buybacks|sbc|netDebt|debt|cash|equity/i.test(k)).slice(0, 6).join(', ') || 'otras partidas')}`); return n.length ? `<div class="empty" style="margin-bottom:12px"><b>Datos a tener en cuenta:</b> ${n.join(' · ')}.</div>` : ''; })()}
   ${m.repCur !== m.tradeCur ? `<div class="empty" style="margin-bottom:12px">Los estados financieros están en <b>${esc(m.repCur)}</b> y la acción cotiza en <b>${esc(m.tradeCur)}</b>. ${isNum(m.fx) ? `Para ratios y valoración se convierten al tipo ${esc(m.repCur)}/${esc(m.tradeCur)} = ${num(m.fx, 4)}${S.raw.fx && S.raw.fx.ok ? ` (${datetime(S.raw.fx.fetchedAt)})` : ''}.` : '<b class="neg">No se pudo obtener el tipo de cambio:</b> la valoración, el PER y todo lo que cruza precio con cuentas queda sin calcular para no darte cifras falsas. Pulsa «Actualizar» en unos minutos.'}</div>` : ''}`;
 }
 
@@ -185,7 +185,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=b4276095').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=1369edf7').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -221,13 +221,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=b4276095');
+      const { exportAll } = await import('../exportall.js?v=1369edf7');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=b4276095');
+    const { clearCache } = await import('../providers/http.js?v=1369edf7');
     const base = m.symbol.split('.')[0], p = m.profile || {};
     const cik = p.cik ? 'CIK' + String(p.cik).replace(/^0+/, '').padStart(10, '0') : null;
     await clearCache(m.symbol, [`symbol=${encodeURIComponent(base)}&`, cik, p.isin, p.isin && `isin=${p.isin}`]); forget(m.symbol); cache.delete(m.symbol); view.dataset.loaded = ''; // solo esta empresa

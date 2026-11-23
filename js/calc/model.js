@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=b4276095';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=b4276095';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=1369edf7';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=1369edf7';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -12,7 +12,10 @@ export function buildModel(raw, fxRate = 1) {
   const price = quote.price ?? profile.price;
   const tradeCur = (isNum(quote.price) && quote.currency) || profile.currency || quote.currency || 'USD'; // el precio sale de la cotización: su moneda (GBp frente a GBP del perfil en Londres)
   const inc = asc(val(raw.income) || []), bal = asc(val(raw.balance) || []), cf = asc(val(raw.cashflow) || []);
-  const repCur = (inc[inc.length - 1] || {}).reportedCurrency || tradeCur;
+  // Moneda de los informes: si la fuente no la indica se supone la de cotización, pero queda marcado (repCurAssumed) y se avisa
+  const repCurRaw = (inc[inc.length - 1] || {}).reportedCurrency || null;
+  const repCur = repCurRaw || tradeCur;
+  const repCurAssumed = !repCurRaw && inc.length > 0;
   // Unidades de moneda de cotización por 1 unidad de moneda de reporte. Sin tipo de cambio válido NO se supone 1:
   // fx = null deja sin calcular todo lo que cruza precio con estados (valoración, PER, rentabilidades…).
   const fx = repCur === tradeCur ? 1 : isNum(fxRate) && fxRate > 0 ? fxRate : null;
@@ -143,7 +146,9 @@ export function buildModel(raw, fxRate = 1) {
   const dpsSeries = dpsYears.map((y) => ({ year: y, dps: byYear[y] }));
   const last12 = divs.filter((d) => new Date(d.date) > new Date(Date.now() - 365 * 864e5)).reduce((a, d) => a + (d.adjDividend ?? d.dividend), 0);
   // El último dividendo del perfil solo como respaldo si no llegó el historial (si llegó y no hay pagos en 12 meses, es 0)
-  let dpsTTM = last12 || (!(raw.dividends && raw.dividends.ok) && isNum(profile.lastDividend) ? profile.lastDividend : 0);
+  // Historial recibido sin pagos = 0 (no reparte). Historial NO recibido = desconocido (null), salvo el dato del perfil
+  const divsKnown = !!(raw.dividends && raw.dividends.ok && Array.isArray(raw.dividends.data));
+  let dpsTTM = last12 > 0 ? last12 : divsKnown ? 0 : isNum(profile.lastDividend) ? profile.lastDividend : null;
   // Cotización en subunidades (peniques…) con dividendos en la unidad principal (libras): se comprueban contra los
   // dividendos pagados del flujo de caja y, si salen 100 veces menores, se pasan a la moneda de cotización
   let dpsScale = 1;
@@ -151,7 +156,7 @@ export function buildModel(raw, fxRate = 1) {
     const expected = (last.dividendsPaid * fx) / last.shares; const r = dpsTTM / expected;
     if (r > 0.004 && r < 0.025) dpsScale = 100;
   }
-  dpsTTM *= dpsScale;
+  if (isNum(dpsTTM)) dpsTTM *= dpsScale;
   if (dpsScale !== 1) { for (const d of dpsSeries) d.dps *= dpsScale; for (let i = 0; i < divs.length; i++) divs[i] = { ...divs[i], adjDividend: (divs[i].adjDividend ?? divs[i].dividend) * dpsScale, dividend: divs[i].dividend * dpsScale }; }
 
   // Datos de mercado para el WACC (todos con su origen)
@@ -193,7 +198,7 @@ export function buildModel(raw, fxRate = 1) {
   if (!Object.keys(change).length && prices.length > 2) { change = priceChanges(prices); derived.push('variaciones de precio'); }
   let scores = val(raw.scores) || {};
   // Con el balance copiado del año anterior, el F-Score regalaría puntos (deuda y liquidez «sin cambios»): no se calcula
-  if (!isNum(scores.piotroskiScore) && years.length >= 2 && !years[years.length - 1].balanceStale) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } }
+  if (!isNum(scores.piotroskiScore) && years.length >= 2 && !years[years.length - 1].balanceStale) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } else { const rg = piotroskiRange(years[years.length - 1], years[years.length - 2]); if (rg && rg.known >= 5) scores = { ...scores, piotroskiRange: rg }; } }
   if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) && isNum(fx) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
 
   // PER coherente con el resto del análisis: precio / BPA del mismo periodo que los estados (TTM o último ejercicio).
@@ -202,7 +207,7 @@ export function buildModel(raw, fxRate = 1) {
   const periodLabel = ttmIsReal ? 'últimos 12 meses (TTM)' : `último ejercicio cerrado (${last.year || '—'}${last.date ? ', cierre ' + String(last.date).slice(0, 10) : ''})`;
 
   return {
-    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, ttmPartial, netDebtFrom, balanceFrom, sharesNote, mcProv, shares, marketCap, ev, netDebt: netDebtT,
+    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, ttmPartial, repCurAssumed, netDebtFrom, balanceFrom, sharesNote, mcProv, shares, marketCap, ev, netDebt: netDebtT,
     years, last, T, ttmIsReal, prices, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),

@@ -140,7 +140,7 @@ export function toStatements(facts, symbol, maxYears = 15) {
     if (r.leaseNoncurrent != null || (r.financeLease != null && !leaseIn)) r.longTermDebt = (r.longTermDebt || 0) + (r.leaseNoncurrent || 0) + (leaseIn ? 0 : r.financeLease || 0); // sin contar dos veces el financiero
     r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null ? null : (r.shortTermDebt || 0) + (r.longTermDebt || 0);
     r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null ? r.cashAndCashEquivalents + (r.shortTermInvestments || 0) : null;
-    r.netDebt = r.totalDebt != null ? r.totalDebt - (r.cashAndShortTermInvestments || 0) : null;
+    r.netDebt = r.totalDebt != null && r.cashAndShortTermInvestments != null ? r.totalDebt - r.cashAndShortTermInvestments : null; // sin caja no se resta cero
     return r;
   });
   const cashflow = mk('cashflow', ends).map((r) => {

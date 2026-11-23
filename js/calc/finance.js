@@ -8,7 +8,7 @@ export const stdev = (xs) => { const v = xs.filter(isNum); if (v.length < 2) ret
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** Ordena filas por fecha ascendente (los proveedores las devuelven descendentes). */
-export const asc = (rows) => (rows || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+export const asc = (rows) => (Array.isArray(rows) ? rows : []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
 /** Tasa de crecimiento anual compuesta. Devuelve null si inicio o final no son positivos. */
 export function cagr(first, last, years) {
@@ -28,7 +28,8 @@ export function yoy(values) {
 }
 
 /** Media de los últimos n valores disponibles. */
-export const lastAvg = (values, n) => { const v = values.filter(isNum); return v.length >= Math.min(n, 2) ? mean(v.slice(-n)) : null; };
+/** Media de los últimos n valores: exige n datos (una «media de 5 años» con 2 datos no lo es). */
+export const lastAvg = (values, n) => { const v = values.filter(isNum); return v.length >= n ? mean(v.slice(-n)) : null; };
 
 /** Suma de los 4 últimos trimestres (TTM) de un campo. Requiere 4 trimestres consecutivos. */
 export function ttm(quartersAsc, field) {
@@ -93,10 +94,16 @@ export function deriveYear(y, taxFallback = 0.21) {
   if (!isNum(i.grossProfit) && isNum(i.revenue) && isNum(i.costOfRevenue)) i = { ...i, grossProfit: i.revenue - i.costOfRevenue };
   const ebit = i.ebit ?? i.operatingIncome;
   const tax = div(i.incomeTaxExpense, i.incomeBeforeTax);
-  const t = isNum(tax) && tax >= 0 && tax < 0.6 ? tax : taxFallback;
+  // Impuesto real si se puede calcular; si no, el supuesto solo sirve para el ROIC y queda marcado (taxAssumed),
+  // nunca como dato: taxRate queda null y no entra en medias ni en el WACC. En pérdidas no hay impuesto que restar.
+  const taxReal = isNum(tax) && tax >= 0 && tax < 0.6 ? tax : null;
+  const t = taxReal ?? (isNum(ebit) && ebit <= 0 ? 0 : taxFallback);
+  const taxAssumed = taxReal == null && isNum(ebit) && ebit > 0;
   const debt = b.totalDebt ?? (isNum(b.shortTermDebt) || isNum(b.longTermDebt) ? (b.shortTermDebt || 0) + (b.longTermDebt || 0) : null);
   const cash = b.cashAndShortTermInvestments ?? b.cashAndCashEquivalents;
-  const invested = isNum(b.totalStockholdersEquity) && isNum(debt) ? b.totalStockholdersEquity + debt - (cash || 0) : null;
+  // Sin dato de caja no se resta cero: deuda neta y capital invertido quedan sin calcular (salvo deuda neta publicada)
+  const netDebt = isNum(b.netDebt) ? b.netDebt : isNum(debt) && isNum(cash) ? debt - cash : null;
+  const invested = isNum(b.totalStockholdersEquity) && isNum(debt) && isNum(cash) ? b.totalStockholdersEquity + debt - cash : null;
   const ocf = c.operatingCashFlow ?? c.netCashProvidedByOperatingActivities;
   // El capex se resta siempre (hay fuentes que lo dan positivo y otras negativo)
   const fcf = c.freeCashFlow ?? (isNum(ocf) && isNum(c.capitalExpenditure) ? ocf - Math.abs(c.capitalExpenditure) : null);
@@ -107,7 +114,7 @@ export function deriveYear(y, taxFallback = 0.21) {
     year: y.year, date: i.date, src: i._from || 'base', revenue: i.revenue, grossProfit: i.grossProfit, operatingIncome: i.operatingIncome, ebit, ebitda, netIncome: i.netIncome,
     // BPA publicado salvo error grosero (unidades, acciones sin ajustar): doble clase o preferentes justifican pequeñas diferencias
     eps: (() => { const rep = i.epsDiluted ?? i.eps, calc = div(i.netIncome, shares); const q = isNum(rep) && isNum(calc) && calc !== 0 ? Math.abs(rep / calc) : null; return isNum(q) && (q > 5 || q < 0.2) ? calc : rep ?? calc; })(), /* solo errores groseros (unidades, splits sin ajustar); un signo distinto puede ser legítimo (minoritarios, preferentes) */ shares, fcf, ocf,
-    capex: c.capitalExpenditure, debt, cash, netDebt: b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), equity: b.totalStockholdersEquity,
+    capex: c.capitalExpenditure, debt, cash, netDebt, equity: b.totalStockholdersEquity,
     assets: b.totalAssets, inventory: b.inventory, receivables: b.netReceivables ?? b.accountsReceivables, deferredRevenue: b.deferredRevenue ?? null, goodwill: b.goodwill, ppe: b.propertyPlantEquipmentNet ?? null, retainedEarnings: b.retainedEarnings ?? null, liabilities: b.totalLiabilities ?? (isNum(b.totalAssets) && isNum(b.totalStockholdersEquity) ? b.totalAssets - b.totalStockholdersEquity : null),
     currentAssets: b.totalCurrentAssets, currentLiabilities: b.totalCurrentLiabilities, shortTermDebt: b.shortTermDebt, longTermDebt: b.longTermDebt,
     interestExpense: isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, interestIncome: isNum(i.interestIncome) ? Math.abs(i.interestIncome) : null, dividendsPaid: isNum(c.commonDividendsPaid) ? Math.abs(c.commonDividendsPaid) : (isNum(c.netDividendsPaid) ? Math.abs(c.netDividendsPaid) : null),
@@ -115,13 +122,13 @@ export function deriveYear(y, taxFallback = 0.21) {
     acquisitions: isNum(c.acquisitionsNet) ? Math.abs(c.acquisitionsNet) : null, sbc: c.stockBasedCompensation ?? null, rnd: i.researchAndDevelopmentExpenses,
     grossMargin: div(i.grossProfit, i.revenue), operatingMargin: div(i.operatingIncome, i.revenue), netMargin: div(i.netIncome, i.revenue),
     fcfMargin: div(fcf, i.revenue), roe: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(i.netIncome, b.totalStockholdersEquity) : null, roa: div(i.netIncome, b.totalAssets),
-    roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null, taxRate: t,
+    roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null, taxRate: taxReal, taxAssumed,
     negCapital: isNum(invested) && invested <= 0,
     // Rentabilidad del capital usada en puntuación y foso: ROIC; si el capital invertido es negativo, ROCE
     rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null,
     // Denominadores negativos invierten el signo: sin EBITDA positivo el ratio no tiene sentido (se marca aparte)
-    netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda) : null,
-    ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && (b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : 0)) > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
+    netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(netDebt, ebitda) : null,
+    ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && isNum(netDebt) && netDebt > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
     currentRatio: div(b.totalCurrentAssets, b.totalCurrentLiabilities), interestCoverage: isNum(i.interestExpense) && i.interestExpense !== 0 ? div(ebit, Math.abs(i.interestExpense)) : null,
     fcfConversion: isNum(i.netIncome) && i.netIncome > 0 ? div(fcf, i.netIncome) : null, incomeQuality: isNum(i.netIncome) && i.netIncome > 0 ? div(ocf, i.netIncome) : null, capexToOcf: isNum(ocf) && ocf > 0 ? div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, ocf) : null,
     fcfPerShare: div(fcf, shares), costOfDebt: div(isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, debt),
@@ -168,8 +175,23 @@ export function piotroski(a, b) {
     isNum(a.grossMargin) && isNum(b.grossMargin) ? a.grossMargin > b.grossMargin : null,
     isNum(a.revenue) && isNum(b.revenue) && isNum(a.assets) && isNum(b.assets) ? a.revenue / a.assets > b.revenue / b.assets : null,
   ];
-  const known = t.filter((x) => x !== null);
-  return known.length >= 7 ? Math.round(known.filter(Boolean).length * 9 / known.length) : null;
+  const d = piotroskiDetail(t);
+  return d.known === 9 ? d.pos : null; // con pruebas sin dato no hay F-Score: ver piotroskiRange
+}
+const piotroskiDetail = (t) => { const known = t.filter((x) => x !== null); return { pos: known.filter(Boolean).length, known: known.length }; };
+/** Rango posible del F-Score cuando faltan pruebas: mínimo = aprobadas; máximo = aprobadas + sin dato. */
+export function piotroskiRange(a, b) {
+  if (!a || !b) return null;
+  const t = [
+    isNum(a.netIncome) ? a.netIncome > 0 : null, isNum(a.ocf) ? a.ocf > 0 : null, isNum(a.roa) && isNum(b.roa) ? a.roa > b.roa : null, isNum(a.ocf) && isNum(a.netIncome) ? a.ocf > a.netIncome : null,
+    isNum(a.longTermDebt) && isNum(b.longTermDebt) && isNum(a.assets) && isNum(b.assets) ? a.longTermDebt / a.assets <= b.longTermDebt / b.assets : null,
+    isNum(a.currentRatio) && isNum(b.currentRatio) ? a.currentRatio > b.currentRatio : null,
+    isNum(a.shares) && isNum(b.shares) ? a.shares <= b.shares * 1.005 : null,
+    isNum(a.grossMargin) && isNum(b.grossMargin) ? a.grossMargin > b.grossMargin : null,
+    isNum(a.revenue) && isNum(b.revenue) && isNum(a.assets) && isNum(b.assets) ? a.revenue / a.assets > b.revenue / b.assets : null,
+  ];
+  const d = piotroskiDetail(t);
+  return { min: d.pos, max: d.pos + (9 - d.known), known: d.known };
 }
 
 /** Altman Z-Score clásico. */

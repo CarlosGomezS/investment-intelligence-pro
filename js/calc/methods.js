@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=b4276095';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=1369edf7';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -10,6 +10,7 @@ const lin = (x, x0, x1) => clamp((x - x0) / (x1 - x0), 0, 1); // 0..1
 const C = (t, ok, v, rule) => ({ t, ok: ok == null ? null : !!ok, v, rule });
 const pctS = (v, d = 1) => (isNum(v) ? (v * 100).toFixed(d).replace('.', ',') + ' %' : 'sin dato');
 // Bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas: su balance no se lee igual (caja, deuda, circulante)
+const GB_MIN = 20; // empresas clasificadas mínimas para que el ranking de Greenblatt signifique algo
 const PIO_MIN = 20; // empresas comparables mínimas para que el quintil barato de Piotroski signifique algo
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const nS = (v, d = 1) => (isNum(v) ? v.toFixed(d).replace('.', ',') : 'sin dato');
@@ -46,7 +47,8 @@ export const METHODS = {
       'Precio: margen de seguridad ≥ 25 % frente al valor intrínseco central de la app.',
     ],
     exit: 'Buffett no usa stop de precio ni objetivo: su periodo favorito de tenencia es «para siempre». Se vende si se rompe el foso (rentabilidad del capital por debajo del coste de capital) o si la cotización se dispara muy por encima del valor intrínseco.',
-    thresholdsNote: 'Los umbrales numéricos (15 %, 2×, 5 puntos, 80 %) son la forma en que la app convierte en números los criterios cualitativos de Buffett.',
+    thresholdsNote: 'Los umbrales numéricos (15 %, 2×, 5 puntos, 80 %) son la forma en que la app convierte en números los criterios cualitativos de Buffett. El foso en sí (de dónde viene la ventaja) lo confirmas tú en el detalle.',
+    manual: [{ key: 'foso', label: 'Sé de dónde viene su ventaja competitiva (marca, escala, red, costes de cambio…) y no se está erosionando' }],
     evaluate(S) {
       const { m, Y, s, iv, mos, price } = base(S);
       const rc = last(s('rc').filter(isNum), 10);
@@ -75,14 +77,17 @@ export const METHODS = {
         C('Margen de seguridad', c7, isNum(mos) ? `${pctS(mos)} (valor ${nS(iv, 2)} vs precio ${nS(price, 2)})${rel ? ` · fiabilidad de la valoración: ${rel}` : ''}` : 'sin valor intrínseco', this.rules[6]),
       ];
       const fin = FIN.test(base(S).sector);
+      // Los números muestran las huellas de un foso, no el foso: de dónde viene la ventaja lo juzga el usuario
+      const uF = manualStore.get(m.symbol).foso;
+      checks.push(C('Tú: sabes de dónde viene su ventaja y no se erosiona', uF ?? null, uF == null ? 'pendiente: márcalo en el detalle' : uF ? 'confirmado por ti' : 'has indicado que no', 'Marca, escala, efecto red, costes de cambio o licencias que los rivales no puedan copiar en años. Rentabilidades altas unos años no bastan.'));
       if (fin) checks.unshift(C('Sector analizable con estos criterios', false, `${base(S).sector.trim() || 'financiero'}: FCF, deuda neta/EBITDA y DCF no tienen sentido en bancos, aseguradoras, inmobiliarias o eléctricas`, 'Analízala en su ficha con ROE, solvencia regulatoria y valor contable.'));
       const W = [25, 15, 15, 15, 15, 15];
       const quality = [c1, c2, c3, c4, c5, c6].reduce((a, c, i) => a + (c ? W[i] : 0), 0);
       const priceSc = isNum(mos) && c7 !== null ? lin(mos, -0.5, 0.35) * 100 : 0; // con valoración poco fiable el precio no suma
       const score = Math.round(0.7 * quality + 0.3 * priceSc);
       const qOk = c1 && [c2, c3, c4, c5, c6].filter(Boolean).length >= 4;
-      const verdict = fin ? 'no' : qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
-      return { score: fin ? Math.min(score, 40) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: 'años (largo plazo)' };
+      const verdict = fin || uF === false ? 'no' : qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
+      return { score: fin ? Math.min(score, 40) : uF === false ? Math.min(score, 20) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: 'años (largo plazo)' };
     },
   },
 
@@ -239,7 +244,7 @@ export const METHODS = {
       const g4 = noDiv ? false : hasHist ? (run >= 20 ? true : Math.min(...dYears) <= lastClosed - 19 ? false : run === dYears.size ? null : false)
         : dp.some((v) => !(v > 0)) ? false : dpAll.length >= 20 && dpAll.every((v) => v != null && v > 0) ? true : null;
       const eps = s('eps').filter(isNum); const w = last(eps, 10);
-      const e3 = mean(last(eps, 3)), e0 = w.length >= 7 ? mean(w.slice(0, 3)) : null;
+      const e3 = mean(last(eps, 3)), e0 = w.length >= 10 ? mean(w.slice(0, 3)) : null; // Graham pide una ventana de 10 años: con menos, no verificable
       const g5 = isNum(e3) && isNum(e0) && e0 > 0 ? e3 >= e0 * 1.33 : null;
       const eps3 = isNum(e3) ? X(e3) : null;
       const pe3 = isNum(eps3) && eps3 > 0 ? price / eps3 : null;
@@ -253,7 +258,7 @@ export const METHODS = {
         C('Situación financiera fuerte', g2, `liquidez ${nS(cr, 2)} · deuda LP ${isNum(ltd) && isNum(wc) ? (ltd <= wc ? '≤' : '>') + ' capital circulante' : 'sin dato'}`, this.rules[1]),
         C('Beneficios estables 10 años', g3, `${ni.filter((v) => v > 0).length} de ${ni.length} años con beneficio${ni.length < 10 ? ' (tus fuentes no dan 10 años)' : ''}`, this.rules[2]),
         C('Historial de dividendos', g4, hasHist ? `${run} años seguidos pagando hasta ${lastClosed}${g4 === null ? ` (el historial disponible solo llega a ${Math.min(...dYears)}: no verificable)` : ''} · Graham pide 20` : noDiv ? 'no paga dividendo' : `${dp.filter((v) => v > 0).length} de ${dpAll.length} años con dividendo en los flujos de caja${g4 === null ? ' (menos de 20: no verificable)' : ''} · Graham pide 20`, this.rules[3]),
-        C('Crecimiento del BPA ≥ 33 %', g5, isNum(e0) ? `BPA medio ${nS(e0, 2)} → ${nS(e3, 2)} (${pctS(e3 / e0 - 1, 0)})` : 'menos de 7 años de BPA', this.rules[4]),
+        C('Crecimiento del BPA ≥ 33 %', g5, isNum(e0) ? `BPA medio ${nS(e0, 2)} → ${nS(e3, 2)} (${pctS(e3 / e0 - 1, 0)})` : `solo ${w.length} años de BPA (Graham pide 10): no verificable`, this.rules[4]),
         C('PER moderado', g6, `PER sobre BPA medio 3 años: ${nS(pe3)}`, this.rules[5]),
         C('Precio/valor contable moderado', g7, `P/VC ${nS(pb, 2)}${isNum(pe3) && isNum(pb) ? ` · PER×P/VC ${nS(pe3 * pb)}` : ''}`, this.rules[6]),
       ];
@@ -287,8 +292,11 @@ export const METHODS = {
         const ey = isNum(ebit) && isNum(m.ev) && m.ev > 0 ? ebit / m.ev : null;
         // Capital circulante operativo: sin la caja (no hace falta para operar) ni la deuda a corto (es financiación)
         const ca = Y0.currentAssets ?? m.last.currentAssets, cl = Y0.currentLiabilities ?? m.last.currentLiabilities;
-        const cash = Y0.cash ?? m.last.cash ?? 0, std = Y0.shortTermDebt ?? m.last.shortTermDebt ?? 0;
-        const wc = isNum(ca) && isNum(cl) ? (ca - cash) - (cl - std) : null;
+        // Sin caja no se resta cero. Deuda a corto: publicada, o deuda total − largo plazo; si no, sin dato
+        const cash = Y0.cash ?? m.last.cash;
+        const dT = Y0.debt ?? m.last.debt, dL = Y0.longTermDebt ?? m.last.longTermDebt;
+        const std = Y0.shortTermDebt ?? m.last.shortTermDebt ?? (isNum(dT) && isNum(dL) && dT >= dL ? dT - dL : null);
+        const wc = isNum(ca) && isNum(cl) && isNum(cash) && isNum(std) ? (ca - cash) - (cl - std) : null;
         const ppe = Y0.ppe ?? m.last.ppe;
         const cap = isNum(wc) && isNum(ppe) ? Math.max(0, wc) + ppe : null;
         const roc = isNum(ebitR) && isNum(cap) && cap > 0 ? ebitR / cap : null;
@@ -312,7 +320,12 @@ export const METHODS = {
       ];
       const score = isNum(g.pos) ? (g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 100) : 0;
       const ebitPos = isNum(g.ey) && g.ey > 0;
-      const verdict = !g.excluded && ebitPos && isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : ebitPos && isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
+      // Con pocas empresas clasificadas, quedar «1.ª de 1» no significa nada: como mucho «vigilar» y solo si cumple
+      // por sí misma rentabilidad del beneficio > bono y rendimiento del capital ≥ 25 %
+      const smallU = g.n < GB_MIN;
+      if (smallU) checks.push(C('Universo suficiente', false, `solo ${g.n} empresas clasificadas (mínimo ${GB_MIN}): el ranking no es representativo`, 'Greenblatt clasifica cientos o miles de empresas. Analiza un universo más amplio en Métodos.'));
+      const top = isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3));
+      const verdict = g.excluded || !ebitPos ? 'no' : smallU ? (checks[1].ok && checks[2].ok ? 'vigilar' : 'no') : top && checks[1].ok ? 'entra' : isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de clasificación, no de precio objetivo)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
   },
@@ -376,15 +389,18 @@ export const METHODS = {
       v.filter((x) => !isNum(x.pb)).forEach((x) => (x.r._pi = { pb: null, cheap: false, n: ok.length, small: ok.length < PIO_MIN }));
     },
     evaluate(S, r) {
-      const { m } = base(S); const p = r._pi || {}; const f = m.scores.piotroskiScore;
+      const { m } = base(S); const p = r._pi || {}; const f = m.scores.piotroskiScore, rg = m.scores.piotroskiRange;
+      // Con pruebas sin dato no se inventa la nota: aprueba si incluso en el peor caso llega a 8; suspende si ni en el mejor
+      const fOk = isNum(f) ? f >= 8 : rg ? (rg.min >= 8 ? true : rg.max < 8 ? false : null) : null;
       const checks = [
         C(p.small ? 'Barata por valor contable (P/VC ≤ 1; universo pequeño)' : 'Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n}${p.small ? `; con menos de ${PIO_MIN} empresas comparables el ranking no es representativo y se exige además P/VC ≤ 1` : ''})` : FIN.test(base(S).sector) ? 'financiera: se compara aparte' : 'sin valor contable positivo', this.rules[0]),
-        C('F-Score ≥ 8', isNum(f) ? f >= 8 : null, isNum(f) ? `${f}/9` : 'sin dato', this.rules[2]),
+        C('F-Score ≥ 8', fOk, isNum(f) ? `${f}/9` : rg ? `${rg.min} aprobadas de ${rg.known} con dato (${9 - rg.known} sin dato): entre ${rg.min} y ${rg.max} de 9` : 'sin dato', this.rules[2]),
       ];
       if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: varias pruebas del F-Score (liquidez, margen bruto) no se leen igual', 'Compruébala en su ficha.'));
-      const score = isNum(f) ? Math.min(FIN.test(base(S).sector) ? 40 : 100, Math.round((f / 9) * (p.cheap ? 100 : 60))) : 0;
+      const fS = isNum(f) ? f : rg ? rg.min : null; // nota con el peor caso
+      const score = isNum(fS) ? Math.min(FIN.test(base(S).sector) ? 40 : 100, Math.round((fS / 9) * (p.cheap ? 100 : 60))) : 0;
       const finP = FIN.test(base(S).sector);
-      const verdict = finP ? 'no' : p.cheap && f >= 8 ? 'entra' : f >= 8 || (p.cheap && f >= 6) ? 'vigilar' : 'no';
+      const verdict = finP ? 'no' : p.cheap && fOk === true ? 'entra' : fOk === true || (p.cheap && fS >= 6) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de selección)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
   },

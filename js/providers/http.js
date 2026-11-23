@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js?v=b4276095';
+import { config, KEYS } from '../config.js?v=1369edf7';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }
@@ -150,5 +150,8 @@ export function classify(provider, status, body) {
   if (status >= 500) return new ApiError('network', 'El proveedor no responde', { provider });
   if (provider === 'av' && body && body['Error Message']) return new ApiError('not_found', 'Símbolo no encontrado en Alpha Vantage', { provider });
   if (status >= 400) return new ApiError('bad_response', msg || `Error ${status}`, { provider });
+  // Errores devueltos con HTTP 200 que no encajan en lo anterior («Invalid symbol», etc.): un objeto suelto con un
+  // campo de error y casi nada más no es un dato
+  if (body && typeof body === 'object' && !Array.isArray(body) && (body['Error Message'] || (typeof body.error === 'string' && Object.keys(body).length <= 3))) return new ApiError('bad_response', msg || 'El proveedor ha devuelto un error', { provider });
   return null;
 }

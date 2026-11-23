@@ -1,7 +1,7 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=b4276095';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=b4276095';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=1369edf7';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=1369edf7';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
@@ -17,7 +17,7 @@ export function dcfDefaults(m) {
   const g = suggestGrowth({ fcfCagr5: m.growth.fcf5, revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
-    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal && !(m.ttmFilled || []).includes('fcf') ? 'real · FCF de los últimos 12 meses' : 'real · FCF del último ejercicio' + (m.ttmIsReal ? ' (tu fuente no da el de 12 meses)' : '')} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}`, alt: m.X(fcf3) },
+    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal && !(m.ttmFilled || []).includes('fcf') ? 'real · FCF de los últimos 12 meses' : 'real · FCF del último ejercicio' + (m.ttmIsReal ? ' (tu fuente no da el de 12 meses)' : '')} − pagos en acciones${usGaap ? ' + intereses netos × (1 − impuesto)' : ''}${!isNum(m.T.sbc) ? ' · ojo: sin dato de pagos en acciones, no se han podido restar (el flujo puede estar inflado)' : ''}${usGaap && !isNum(m.T.interestExpense) ? ' · sin dato de intereses: no se suman (prudente)' : ''}${usGaap && !isNum(m.T.taxRate) && isNum(m.T.interestExpense) ? ' · impuesto de los intereses supuesto (21 %)' : ''}`, alt: m.X(fcf3), sbcMissing: !isNum(m.T.sbc) },
     growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts, capped: g.capped },
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
@@ -83,6 +83,7 @@ export function multiples(m, peersAll) {
 
 export function dividendModel(m, ke) {
   const d = m.dpsSeries;
+  if (!isNum(m.dpsTTM)) return { applicable: false, reason: 'Sin datos de dividendos (no se pudo descargar el historial).' };
   if (!d.length || !(m.dpsTTM > 0)) return { applicable: false, reason: 'La empresa no paga dividendo.' };
   const vals = d.map((x) => x.dps);
   const g5 = cagrN(vals, 5);

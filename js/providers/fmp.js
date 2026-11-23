@@ -1,7 +1,7 @@
 // Proveedor Financial Modeling Prep (API "stable"). Devuelve datos ya en el modelo canónico
 // (el modelo canónico de la app usa los nombres de campo de FMP; ver docs/ARQUITECTURA.md).
-import { getJSON } from './http.js?v=b4276095';
-import { config } from '../config.js?v=b4276095';
+import { getJSON } from './http.js?v=1369edf7';
+import { config } from '../config.js?v=1369edf7';
 
 const H = () => config.get().cacheHours;
 const arr = (x) => (Array.isArray(x) ? x : x ? [x] : []);
@@ -48,7 +48,7 @@ export const fmp = {
   grades: (s, limit = 30) => q('grades', { symbol: s, limit }, H().fundamentals),
   gradesHistorical: (s, limit = 24) => q('grades-historical', { symbol: s, limit }, H().fundamentals),
   peers: (s) => q('stock-peers', { symbol: s }, H().static),
-  dividends: (s) => q('dividends', { symbol: s, limit: 400 }, H().fundamentals, () => true),
+  dividends: (s) => q('dividends', { symbol: s, limit: 400 }, H().fundamentals, (d) => Array.isArray(d)), // [] = sin pagos (válido); un objeto de error, no
   splits: (s) => q('splits', { symbol: s }, H().static, () => true),
   earnings: (s) => q('earnings', { symbol: s, limit: 24 }, H().fundamentals, () => true),
   dividendsCalendar: (from, to) => q('dividends-calendar', { from, to }, H().prices, () => true),

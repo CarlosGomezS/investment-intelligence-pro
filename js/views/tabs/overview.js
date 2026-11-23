@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=b4276095';
-import { isNum } from '../../calc/finance.js?v=b4276095';
-import { coverageTier } from '../../calc/reliability.js?v=b4276095';
+import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=1369edf7';
+import { isNum } from '../../calc/finance.js?v=1369edf7';
+import { coverageTier } from '../../calc/reliability.js?v=1369edf7';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -44,7 +44,7 @@ export function render(el, S) {
     ['Capitalización', big(m.marketCap, cur)], ['Enterprise Value', big(m.ev, cur)], ['Acciones en circulación', big(m.shares)],
     ['Máx. 52 semanas', isNum(rng[1]) ? num(rng[1]) : '—'], ['Mín. 52 semanas', isNum(rng[0]) ? num(rng[0]) : '—'], ['Divisa', `${esc(cur)}${m.repCur !== cur ? ` <small>(estados en ${esc(m.repCur)})</small>` : ''}`],
     ['1 día', chg('1D')], ['1 semana', chg('5D')], ['1 mes', chg('1M')], ['6 meses', chg('6M')], ['En el año', chg('ytd')], ['1 año', chg('1Y')], ['5 años', chg('5Y')], ['10 años', chg('10Y')],
-    ['PER', isNum(m.pe) && m.pe > 0 ? num(m.pe, 1) + '×' : '—'], ['Rent. dividendo', m.dpsTTM ? pct(m.dpsTTM / m.price, 2) : '—'], ['Beta', `${num(m.market.beta, 2)}${m.market.betaCalc ? ' <small>calculada</small>' : m.market.betaAssumed ? ' <small>supuesta</small>' : ''}`],
+    ['PER', isNum(m.pe) && m.pe > 0 ? num(m.pe, 1) + '×' : '—'], ['Rent. dividendo', isNum(m.dpsTTM) ? pct(m.dpsTTM / m.price, 2) : '—'], ['Beta', `${num(m.market.beta, 2)}${m.market.betaCalc ? ' <small>calculada</small>' : m.market.betaAssumed ? ' <small>supuesta</small>' : ''}`],
     ['Próximos resultados', next ? `${date(next.date)}${isNum(next.epsEstimated) ? ` <small>BPA est. ${num(next.epsEstimated)}</small>` : ''}` : '—'],
   ];
   const top = alerts.slice(0, 4);

@@ -1,6 +1,6 @@
 // Fiabilidad de la valoración: independiente del valor intrínseco. Dice cuánto fiarse del número y por qué.
 // Parte de 100 y resta por cada debilidad conocida de los datos o de los supuestos. Los motivos se muestran tal cual.
-import { isNum } from './finance.js?v=b4276095';
+import { isNum } from './finance.js?v=1369edf7';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 
@@ -29,6 +29,10 @@ export function reliability(m, val, sc, raw) {
   if (isNum(c.low) && isNum(c.high) && c.low <= 0 && c.high > 0) minus(15, 'un método da valor 0 (deuda mayor que el valor) y otro no: discrepan por completo');
   else if (isNum(c.low) && isNum(c.high) && c.low > 0) { const r = c.high / c.low; if (r > 2.5) minus(15, `los métodos discrepan mucho (de ${c.low.toFixed(0)} a ${c.high.toFixed(0)})`); else if (r > 1.6) minus(8, 'los métodos discrepan bastante entre sí'); }
   if (c.n === 2) minus(5, 'solo dos métodos de valoración');
+  if (d.fcfBase && d.fcfBase.sbcMissing && !edited('fcfBase')) minus(5, 'sin dato de pagos en acciones: el flujo de caja del DCF no los descuenta');
+  if (m.repCurAssumed) minus(10, `la fuente no indica la moneda de las cuentas: se supone ${m.repCur}, la misma que la cotización`);
+  const lastY = m.years[m.years.length - 1] || {};
+  if (lastY.taxAssumed) minus(5, 'sin tipo impositivo real en el último ejercicio: la rentabilidad del capital usa un 21 % supuesto');
   if (c.contrasted === false) minus(15, `sin contraste entre flujos y múltiplos: solo ${(c.families || []).map((f) => ({ dcf: 'DCF', ddm: 'dividendos', hist: 'múltiplos propios', peers: 'múltiplos de competidores' })[f]).join(' y ')}`);
   const W = m.market.wacc;
   if (W && W.kdAssumed && !manualW && !isNum(I.costDebt)) { if (W.wd > 0.2) minus(15, `coste de la deuda desconocido con un ${Math.round(W.wd * 100)} % de deuda en el capital: el WACC usa el coste del capital propio`); else minus(5, 'coste de la deuda desconocido (poca deuda: efecto pequeño en el WACC)'); }

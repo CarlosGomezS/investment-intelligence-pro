@@ -1,8 +1,8 @@
 // Dividendos: historial completo, DPA anual, rentabilidad histórica, crecimiento, payout, continuidad, recortes y próximas fechas.
-import { fundamentals } from '../../ui/charts.js?v=b4276095';
-import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=b4276095';
-import { isNum, div, cagrN } from '../../calc/finance.js?v=b4276095';
-import { exportCSV } from '../../export.js?v=b4276095';
+import { fundamentals } from '../../ui/charts.js?v=1369edf7';
+import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=1369edf7';
+import { isNum, div, cagrN } from '../../calc/finance.js?v=1369edf7';
+import { exportCSV } from '../../export.js?v=1369edf7';
 
 export function render(el, S) {
   const m = S.m, cur = m.tradeCur, d = m.dpsSeries, all = m.divs;
@@ -29,7 +29,7 @@ export function render(el, S) {
   const yld = d.map((x) => (avgPx[x.year] ? x.dps / (avgPx[x.year].reduce((a, b) => a + b, 0) / avgPx[x.year].length) : null));
   const freq = all[all.length - 1].frequency;
   el.innerHTML = `<div class="kpis" style="margin-bottom:14px">
-      <div class="kpi"><span>Dividendo últimos 12 meses</span><b>${num(m.dpsTTM, 3)} ${esc(cur)}</b></div><div class="kpi"><span>Rentabilidad actual</span><b>${pct(m.dpsTTM / m.price, 2)}</b></div>
+      <div class="kpi"><span>Dividendo últimos 12 meses</span><b>${num(m.dpsTTM, 3)} ${esc(cur)}</b></div><div class="kpi"><span>Rentabilidad actual</span><b>${isNum(m.dpsTTM) ? pct(m.dpsTTM / m.price, 2) : '—'}</b></div>
       <div class="kpi"><span>CAGR 3 años</span><b>${pct(cagrN(vals, 3))}</b></div><div class="kpi"><span>CAGR 5 años</span><b>${pct(cagrN(vals, 5))}</b></div><div class="kpi"><span>CAGR 10 años</span><b>${pct(cagrN(vals, 10))}</b></div>
       <div class="kpi"><span>Payout sobre beneficio</span><b>${lastP.uncovNi ? 'con pérdidas' : pct(lastP.ni, 0)}</b></div><div class="kpi"><span>Payout sobre FCF</span><b>${lastP.uncovFcf ? 'FCF negativo' : pct(lastP.fcf, 0)}</b></div>
       <div class="kpi"><span>Años seguidos pagando</span><b>${streak}</b></div><div class="kpi"><span>Años seguidos subiéndolo</span><b>${inc}</b></div><div class="kpi"><span>Frecuencia</span><b>${esc(freq || '—')}</b></div>
