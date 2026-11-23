@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=1369edf7';
-import { isNum } from '../../calc/finance.js?v=1369edf7';
-import { coverageTier } from '../../calc/reliability.js?v=1369edf7';
+import { esc, safeUrl, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=f2479787';
+import { isNum } from '../../calc/finance.js?v=f2479787';
+import { coverageTier } from '../../calc/reliability.js?v=f2479787';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -76,7 +76,7 @@ export function render(el, S) {
         <div class="kpi"><span>Salida a bolsa</span><b style="font-size:14px">${date(p.ipoDate)}</b></div><div class="kpi"><span>Sede</span><b style="font-size:14px">${esc([p.city, p.country].filter(Boolean).join(', ') || '—')}</b></div>
       </div>${source(m.prov.profile)}`)}
     ${card('Informes oficiales y fuentes primarias', `<ul style="margin:0;padding-left:18px;line-height:2">
-        ${p.website ? `<li><a href="${esc(p.website)}" target="_blank" rel="noopener">Web corporativa y relación con inversores</a></li>` : ''}
+        ${safeUrl(p.website) ? `<li><a href="${esc(safeUrl(p.website))}" target="_blank" rel="noopener noreferrer">Web corporativa y relación con inversores</a></li>` : ''}
         ${cik ? `<li><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=10-K&dateb=&owner=include&count=40" target="_blank" rel="noopener">SEC EDGAR · informes anuales 10-K</a></li><li><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=10-Q&dateb=&owner=include&count=40" target="_blank" rel="noopener">SEC EDGAR · informes trimestrales 10-Q</a></li><li><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cik}&type=8-K&dateb=&owner=include&count=40" target="_blank" rel="noopener">SEC EDGAR · hechos relevantes 8-K</a></li>` : ''}
         ${/\.MC$/.test(m.symbol) || p.country === 'ES' ? `<li><a href="https://www.cnmv.es/portal/Consultas/BusquedaPorEntidad.aspx?nombre=${encodeURIComponent(p.companyName || '')}" target="_blank" rel="noopener">CNMV · información regulada</a></li>` : ''}
         ${p.isin && p.country !== 'US' ? `<li><a href="https://registers.esma.europa.eu/publication/searchRegister?core=esma_registers_firds&searchText=${encodeURIComponent(p.isin)}" target="_blank" rel="noopener">ESMA · registro FIRDS por ISIN</a></li>` : ''}

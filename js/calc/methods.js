@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=1369edf7';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=f2479787';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -318,7 +318,9 @@ export const METHODS = {
         C('Rendimiento del capital', isNum(g.roc) ? g.roc >= 0.25 : null, isNum(g.roc) ? `${pctS(g.roc, 0)} (puesto ${g.rank_roc || '—'} de ${g.n})` : 'sin dato (falta activo fijo o capital circulante)', this.rules[2]),
         C('Clasificación conjunta', isNum(g.pos) ? g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) : null, isNum(g.pos) ? `puesto ${g.pos} de ${g.n}` : 'no clasificada', this.rules[3]),
       ];
-      const score = isNum(g.pos) ? (g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 100) : 0;
+      // Universo pequeño: la nota relativa no significa nada; se puntúa solo lo absoluto (máx. 50) y se dice
+      const smallU0 = g.n < GB_MIN;
+      const score = smallU0 ? (isNum(g.ey) && g.ey > (rf || 0.04) ? 25 : 0) + (isNum(g.roc) && g.roc >= 0.25 ? 25 : 0) : isNum(g.pos) ? (g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 100) : 0;
       const ebitPos = isNum(g.ey) && g.ey > 0;
       // Con pocas empresas clasificadas, quedar «1.ª de 1» no significa nada: como mucho «vigilar» y solo si cumple
       // por sí misma rentabilidad del beneficio > bono y rendimiento del capital ≥ 25 %
@@ -346,21 +348,24 @@ export const METHODS = {
       const { m, price } = base(S);
       const eps = m.X(m.T.eps ?? m.last.eps), pe = isNum(eps) && eps > 0 ? price / eps : null;
       const g = m.growth.eps5;
-      const dy0 = isNum(m.rTTM && m.rTTM.dividendYieldTTM) ? m.rTTM.dividendYieldTTM : isNum(m.dpsTTM) && price ? m.dpsTTM / price : 0;
-      const dy = isNum(dy0) && dy0 >= 0 && dy0 < 0.25 ? dy0 : 0; // > 25 % = dato sin ajustar a splits: no se suma
+      // Dividendo desconocido ≠ 0: sin él no hay PEGY (sí se puede calcular el PEG, que no lo usa)
+      const dy0 = isNum(m.rTTM && m.rTTM.dividendYieldTTM) ? m.rTTM.dividendYieldTTM : isNum(m.dpsTTM) && price ? m.dpsTTM / price : null;
+      const dyUnknown = !isNum(dy0);
+      const dy = dyUnknown ? 0 : dy0 >= 0 && dy0 < 0.25 ? dy0 : 0; // > 25 % = dato sin ajustar a splits: no se suma
       const gy = isNum(g) ? (g + (dy || 0)) * 100 : null;
       const okG = isNum(pe) && isNum(g) && g > 0;
       const gyC = isNum(gy) ? Math.min(gy, 30) : null; // mismo tope (30) para el PEGY y el precio justo: coherentes entre sí
-      const pegy = okG && gyC > 0 ? pe / gyC : null;
+      const pegy = okG && gyC > 0 && !dyUnknown ? pe / gyC : null;
       const fair = okG && gyC > 0 ? eps * gyC : null;
       const checks = [
-        C('Beneficio y crecimiento positivos', isNum(pe) && isNum(g) && g > 0, `PER ${nS(pe)} · BPA 5a ${pctS(g)}/año · dividendo ${pctS(dy, 2)}`, this.rules[2]),
-        C('PEGY ≤ 1', isNum(pegy) ? pegy <= 1 : null, `PEGY ${nS(pegy, 2)}`, this.rules[1]),
+        C('Beneficio y crecimiento positivos', isNum(pe) && isNum(g) && g > 0, `PER ${nS(pe)} · BPA 5a ${pctS(g)}/año · dividendo ${dyUnknown ? 'sin dato' : pctS(dy, 2)}`, this.rules[2]),
+        C('PEGY ≤ 1', isNum(pegy) ? pegy <= 1 : null, dyUnknown ? 'sin dato de dividendo: no se puede calcular el PEGY' : `PEGY ${nS(pegy, 2)}`, this.rules[1]),
         C('PEGY ≤ 0,5 (muy atractivo)', isNum(pegy) ? pegy <= 0.5 : null, `PEGY ${nS(pegy, 2)}`, this.rules[1]),
       ];
       if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: el BPA puede ser muy volátil', 'Compruébala en su ficha.'));
       const score = isNum(pegy) ? Math.round(pegy <= 0.5 ? 100 : pegy <= 1 ? 100 - (pegy - 0.5) * 80 : Math.max(0, 60 - (pegy - 1) * 60)) : 0;
-      const verdict = !okG ? 'no' : pegy <= 1 ? 'entra' : pegy <= 1.5 ? 'vigilar' : 'no';
+      // Sin dato de dividendo: sin PEGY no hay «entra»; si el PEG (sin dividendo, más exigente) ya es ≤ 1, «vigilar»
+      const verdict = !okG ? 'no' : dyUnknown ? (pe / Math.min(g * 100, 30) <= 1 ? 'vigilar' : 'no') : pegy <= 1 ? 'entra' : pegy <= 1.5 ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: fair, entryNote: 'precio con PEGY = 1 (crecimiento limitado al 30 %)', target: fair, targetNote: 'precio justo (PEGY = 1)', stop: null, stopNote: 'sin stop de precio: se vende si cambia la historia', horizon: '1-5 años' };
     },
   },

@@ -34,6 +34,9 @@ export default {
     if (env.ALLOWED_ORIGIN && env.ALLOWED_ORIGIN !== '*' && H['Access-Control-Allow-Origin'] === 'null') return json({ error: 'Origen no permitido' }, 403, H);
 
     const ip = req.headers.get('CF-Connecting-IP') || 'x', k = ip + ':' + Math.floor(Date.now() / 60000);
+    // Límite por IP de Cloudflare (compartido entre todas las instancias del Worker). El contador en memoria de abajo
+    // queda como segunda barrera por si el límite de Cloudflare no estuviera disponible.
+    if (env.RL) { try { const { success } = await env.RL.limit({ key: ip }); if (!success) return json({ error: 'rate limit' }, 429, H); } catch { /* sin límite compartido: sigue el local */ } }
     hits.set(k, (hits.get(k) || 0) + 1); if (hits.size > 5000) hits.clear();
     if (hits.get(k) > 240) return json({ error: 'rate limit' }, 429, H);
 

@@ -1,6 +1,6 @@
 // Proveedor Alpha Vantage (respaldo). Normaliza sus respuestas al modelo canónico (nombres de FMP).
-import { getJSON } from './http.js?v=1369edf7';
-import { config } from '../config.js?v=1369edf7';
+import { getJSON } from './http.js?v=f2479787';
+import { config } from '../config.js?v=f2479787';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v === undefined || v === null || v === 'None' || v === '-' || v === '' ? null : Number(v));
@@ -19,7 +19,9 @@ function incomeRow(r, sym, cur) {
   };
 }
 function balanceRow(r, sym) {
-  const debt = (n(r.shortLongTermDebtTotal) ?? ((n(r.shortTermDebt) || 0) + (n(r.longTermDebt) || 0))) || null;
+  // Total publicado; si no, corto + largo solo si llegan los dos (con uno solo se infravalora la deuda)
+  const stD = n(r.shortTermDebt) ?? n(r.currentDebt), ltD = n(r.longTermDebt);
+  const debt = n(r.shortLongTermDebtTotal) ?? (stD != null && ltD != null ? stD + ltD : null);
   const cash = n(r.cashAndCashEquivalentsAtCarryingValue);
   const csti = n(r.cashAndShortTermInvestments);
   return {
@@ -29,7 +31,7 @@ function balanceRow(r, sym) {
     netReceivables: n(r.currentNetReceivables), inventory: n(r.inventory), propertyPlantEquipmentNet: n(r.propertyPlantEquipment),
     goodwill: n(r.goodwill), intangibleAssets: n(r.intangibleAssets), totalAssets: n(r.totalAssets), totalCurrentLiabilities: n(r.totalCurrentLiabilities),
     shortTermDebt: n(r.shortTermDebt) ?? n(r.currentDebt), longTermDebt: n(r.longTermDebt), totalLiabilities: n(r.totalLiabilities),
-    totalStockholdersEquity: n(r.totalShareholderEquity), totalDebt: debt, netDebt: debt != null ? debt - (csti ?? cash ?? 0) : null,
+    totalStockholdersEquity: n(r.totalShareholderEquity), totalDebt: debt, netDebt: debt != null && (csti ?? cash) != null ? debt - (csti ?? cash) : null, /* sin caja no se resta cero */
     commonStockSharesOutstanding: n(r.commonStockSharesOutstanding), retainedEarnings: n(r.retainedEarnings), _source: 'Alpha Vantage',
   };
 }

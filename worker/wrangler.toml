@@ -15,3 +15,10 @@ ALLOWED_ORIGIN = "https://carlosgomezs.github.io"
 #   npx wrangler secret put ROIC_KEY
 #   npx wrangler secret put AV_KEY
 #   npx wrangler secret put SEC_USER_AGENT   (p. ej. «InvestmentIntelligencePro tu@email.com»)
+
+# Límite de peticiones por IP compartido por todas las instancias (Cloudflare Rate Limiting): 120 por minuto
+[[unsafe.bindings]]
+name = "RL"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }

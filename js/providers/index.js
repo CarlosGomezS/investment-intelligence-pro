@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=1369edf7';
-import { alphavantage } from './alphavantage.js?v=1369edf7';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=1369edf7';
-import { twelvedata } from './twelvedata.js?v=1369edf7';
-import { roic } from './roic.js?v=1369edf7';
-import { sec, forgetSec } from './sec.js?v=1369edf7';
-import { esef, forgetEsef } from './esef.js?v=1369edf7';
-import { config } from '../config.js?v=1369edf7';
-import { ApiError, usage, queueDelay } from './http.js?v=1369edf7';
-import { setHint } from './hints.js?v=1369edf7';
+import { fmp } from './fmp.js?v=f2479787';
+import { alphavantage } from './alphavantage.js?v=f2479787';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=f2479787';
+import { twelvedata } from './twelvedata.js?v=f2479787';
+import { roic } from './roic.js?v=f2479787';
+import { sec, forgetSec } from './sec.js?v=f2479787';
+import { esef, forgetEsef } from './esef.js?v=f2479787';
+import { config } from '../config.js?v=f2479787';
+import { ApiError, usage, queueDelay } from './http.js?v=f2479787';
+import { setHint } from './hints.js?v=f2479787';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -77,7 +77,8 @@ async function complete(method, args, base, rest) {
     if (!gaps(method, rows) || Date.now() > deadline) break;
     if (id === 'av' || queueDelay(id) > 2000) continue; // Alpha Vantage (25/día) no se gasta en completar
     try {
-      const r = await Promise.race([P[id][method](...args), new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), Math.max(1000, deadline - Date.now())))]);
+      let tm; // el temporizador se limpia siempre (la petición en sí tiene su propio tiempo máximo en http.js)
+      const r = await Promise.race([P[id][method](...args), new Promise((_, rej) => { tm = setTimeout(() => rej(new Error('lento')), Math.max(1000, deadline - Date.now())); })]).finally(() => clearTimeout(tm));
       if (!Array.isArray(r.data) || !r.data.length) continue;
       // Misma moneda obligatoria (si alguna no la indica, no se mezcla)
       if (!cur || !r.data[0].reportedCurrency || r.data[0].reportedCurrency !== cur) continue;
@@ -214,7 +215,7 @@ export { setHint };
 /** Ejecuta varias peticiones y nunca lanza: devuelve {ok, value|error} por clave. */
 export async function gather(map, ms = 0) {
   const keys = Object.keys(map);
-  const lim = (p) => (ms ? Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new ApiError('network', 'La fuente tarda demasiado; inténtalo de nuevo en un minuto')), ms))]) : p);
+  const lim = (p) => { if (!ms) return p; let tm; return Promise.race([p, new Promise((_, rej) => { tm = setTimeout(() => rej(new ApiError('network', 'La fuente tarda demasiado; inténtalo de nuevo en un minuto')), ms); })]).finally(() => clearTimeout(tm)); };
   const res = await Promise.allSettled(keys.map((k) => lim(Promise.resolve().then(map[k]))));
   return Object.fromEntries(keys.map((k, i) => [k, res[i].status === 'fulfilled' ? { ok: true, ...res[i].value } : { ok: false, error: res[i].reason }]));
 }

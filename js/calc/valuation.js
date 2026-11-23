@@ -1,10 +1,11 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=1369edf7';
+import { isNum, div, mean, median, cagr } from './finance.js?v=f2479787';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
   if (![rf, beta, erp].every(isNum)) return null;
   const ke = rf + beta * erp;
+  const taxAssumed = isNum(costDebtPre) && !isNum(taxRate); // escudo fiscal de la deuda con un 21 % supuesto: se marca
   const kd = isNum(costDebtPre) ? costDebtPre * (1 - (isNum(taxRate) ? taxRate : 0.21)) : null;
   const E = isNum(equityValue) && equityValue > 0 ? equityValue : 0;
   const D = isNum(debtValue) && debtValue > 0 ? debtValue : 0;
@@ -13,7 +14,7 @@ export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtVal
   // el WACC) y se marca kdAssumed para que la fiabilidad lo descuente y la interfaz lo diga.
   const kdAssumed = kd == null && wd > 0;
   const w = we * ke + wd * (kd ?? ke);
-  return { ke, kd, we, wd, wacc: w, kdAssumed };
+  return { ke, kd, we, wd, wacc: w, kdAssumed, taxAssumed };
 }
 
 /**

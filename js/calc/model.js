@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=1369edf7';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=1369edf7';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, piotroskiRange, altman, adjustSplits } from './finance.js?v=f2479787';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=f2479787';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -18,7 +18,10 @@ export function buildModel(raw, fxRate = 1) {
   const repCurAssumed = !repCurRaw && inc.length > 0;
   // Unidades de moneda de cotización por 1 unidad de moneda de reporte. Sin tipo de cambio válido NO se supone 1:
   // fx = null deja sin calcular todo lo que cruza precio con estados (valoración, PER, rentabilidades…).
-  const fx = repCur === tradeCur ? 1 : isNum(fxRate) && fxRate > 0 ? fxRate : null;
+  // Moneda de las cuentas sin indicar: solo se acepta suponer la de cotización en una empresa de EE. UU. que cotiza en
+  // dólares (sus cuentas oficiales van en dólares). En cualquier otro caso no se cruza precio con cuentas (fx = null).
+  const usUSD = tradeCur === 'USD' && /^(US|USA|United States)$/i.test(profile.country || '');
+  const fx = repCurAssumed && !usUSD ? null : repCur === tradeCur ? 1 : isNum(fxRate) && fxRate > 0 ? fxRate : null;
   const fxMissing = fx === null;
 
   const ys0 = buildAnnual(inc, bal, cf);

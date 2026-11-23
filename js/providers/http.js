@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js?v=1369edf7';
+import { config, KEYS } from '../config.js?v=f2479787';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }

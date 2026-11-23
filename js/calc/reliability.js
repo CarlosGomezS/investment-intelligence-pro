@@ -1,6 +1,6 @@
 // Fiabilidad de la valoración: independiente del valor intrínseco. Dice cuánto fiarse del número y por qué.
 // Parte de 100 y resta por cada debilidad conocida de los datos o de los supuestos. Los motivos se muestran tal cual.
-import { isNum } from './finance.js?v=1369edf7';
+import { isNum } from './finance.js?v=f2479787';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 
@@ -31,6 +31,7 @@ export function reliability(m, val, sc, raw) {
   if (c.n === 2) minus(5, 'solo dos métodos de valoración');
   if (d.fcfBase && d.fcfBase.sbcMissing && !edited('fcfBase')) minus(5, 'sin dato de pagos en acciones: el flujo de caja del DCF no los descuenta');
   if (m.repCurAssumed) minus(10, `la fuente no indica la moneda de las cuentas: se supone ${m.repCur}, la misma que la cotización`);
+  if (m.market.wacc && m.market.wacc.taxAssumed && m.market.wacc.wd > 0.2 && !manualW) minus(5, 'el WACC descuenta el coste de la deuda con un impuesto supuesto (21 %): no hay tipo impositivo real de 3 años');
   const lastY = m.years[m.years.length - 1] || {};
   if (lastY.taxAssumed) minus(5, 'sin tipo impositivo real en el último ejercicio: la rentabilidad del capital usa un 21 % supuesto');
   if (c.contrasted === false) minus(15, `sin contraste entre flujos y múltiplos: solo ${(c.families || []).map((f) => ({ dcf: 'DCF', ddm: 'dividendos', hist: 'múltiplos propios', peers: 'múltiplos de competidores' })[f]).join(' y ')}`);

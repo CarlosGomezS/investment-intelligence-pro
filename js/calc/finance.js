@@ -99,7 +99,8 @@ export function deriveYear(y, taxFallback = 0.21) {
   const taxReal = isNum(tax) && tax >= 0 && tax < 0.6 ? tax : null;
   const t = taxReal ?? (isNum(ebit) && ebit <= 0 ? 0 : taxFallback);
   const taxAssumed = taxReal == null && isNum(ebit) && ebit > 0;
-  const debt = b.totalDebt ?? (isNum(b.shortTermDebt) || isNum(b.longTermDebt) ? (b.shortTermDebt || 0) + (b.longTermDebt || 0) : null);
+  // Deuda total: la publicada, o la suma de corto y largo plazo solo si se conocen las dos (con una sola se infravaloraría)
+  const debt = b.totalDebt ?? (isNum(b.shortTermDebt) && isNum(b.longTermDebt) ? b.shortTermDebt + b.longTermDebt : null);
   const cash = b.cashAndShortTermInvestments ?? b.cashAndCashEquivalents;
   // Sin dato de caja no se resta cero: deuda neta y capital invertido quedan sin calcular (salvo deuda neta publicada)
   const netDebt = isNum(b.netDebt) ? b.netDebt : isNum(debt) && isNum(cash) ? debt - cash : null;
@@ -125,7 +126,8 @@ export function deriveYear(y, taxFallback = 0.21) {
     roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null, taxRate: taxReal, taxAssumed,
     negCapital: isNum(invested) && invested <= 0,
     // Rentabilidad del capital usada en puntuación y foso: ROIC; si el capital invertido es negativo, ROCE
-    rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null,
+    // (el ROCE solo sustituye al ROIC cuando el capital invertido se CONOCE y es negativo; si es desconocido, sin dato)
+    rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : isNum(invested) && invested <= 0 && isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null,
     // Denominadores negativos invierten el signo: sin EBITDA positivo el ratio no tiene sentido (se marca aparte)
     netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(netDebt, ebitda) : null,
     ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && isNum(netDebt) && netDebt > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,

@@ -1,22 +1,22 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=1369edf7';
-import { data, setHint } from './providers/index.js?v=1369edf7';
-import { usage } from './providers/http.js?v=1369edf7';
-import { config, restoreConfig } from './config.js?v=1369edf7';
-import { store } from './store.js?v=1369edf7';
-import { destroyAll } from './ui/charts.js?v=1369edf7';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=f2479787';
+import { data, setHint } from './providers/index.js?v=f2479787';
+import { usage } from './providers/http.js?v=f2479787';
+import { config, restoreConfig } from './config.js?v=f2479787';
+import { store } from './store.js?v=f2479787';
+import { destroyAll } from './ui/charts.js?v=f2479787';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=1369edf7'),
-  c: () => import('./views/company.js?v=1369edf7'),
-  watchlist: () => import('./views/watchlist.js?v=1369edf7'),
-  comprobar: () => import('./views/selfcheck.js?v=1369edf7'),
-  metodos: () => import('./views/methods.js?v=1369edf7'),
-  screener: () => import('./views/screener.js?v=1369edf7'),
-  comparar: () => import('./views/compare.js?v=1369edf7'),
-  calendario: () => import('./views/calendar.js?v=1369edf7'),
-  metodologia: () => import('./views/methodology.js?v=1369edf7'),
-  ajustes: () => import('./views/settings.js?v=1369edf7'),
+  dashboard: () => import('./views/dashboard.js?v=f2479787'),
+  c: () => import('./views/company.js?v=f2479787'),
+  watchlist: () => import('./views/watchlist.js?v=f2479787'),
+  comprobar: () => import('./views/selfcheck.js?v=f2479787'),
+  metodos: () => import('./views/methods.js?v=f2479787'),
+  screener: () => import('./views/screener.js?v=f2479787'),
+  comparar: () => import('./views/compare.js?v=f2479787'),
+  calendario: () => import('./views/calendar.js?v=f2479787'),
+  metodologia: () => import('./views/methodology.js?v=f2479787'),
+  ajustes: () => import('./views/settings.js?v=f2479787'),
 };
 
 export function go(path) { location.hash = '#/' + path; }

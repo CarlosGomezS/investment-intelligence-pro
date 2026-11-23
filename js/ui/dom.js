@@ -1,8 +1,10 @@
 // Utilidades de interfaz: escape, formato numérico en español, tablas, estados de carga/error.
-import { isNum } from '../calc/finance.js?v=1369edf7';
+import { isNum } from '../calc/finance.js?v=f2479787';
 
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+/** Enlace externo seguro: solo http(s). Cualquier otro protocolo (javascript:, data:…) devuelve '' (sin enlace). */
+export const safeUrl = (u) => { try { const x = new URL(String(u || ''), 'https://invalid.local/'); return /^https?:$/.test(x.protocol) && x.hostname !== 'invalid.local' ? x.href : ''; } catch { return ''; } };
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const nf = (d) => new Intl.NumberFormat('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d });

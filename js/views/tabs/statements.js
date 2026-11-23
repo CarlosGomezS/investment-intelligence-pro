@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=1369edf7';
-import { fundamentals } from '../../ui/charts.js?v=1369edf7';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=1369edf7';
-import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=1369edf7';
-import { extra } from '../company.js?v=1369edf7';
-import { exportCSV, exportXLSX } from '../../export.js?v=1369edf7';
+import { data } from '../../providers/index.js?v=f2479787';
+import { fundamentals } from '../../ui/charts.js?v=f2479787';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=f2479787';
+import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=f2479787';
+import { extra } from '../company.js?v=f2479787';
+import { exportCSV, exportXLSX } from '../../export.js?v=f2479787';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -20,7 +20,7 @@ export const DEFS = {
     ['Activo corriente', 'totalCurrentAssets', 'tot'], ['Efectivo y equivalentes', 'cashAndCashEquivalents', 'sub'], ['Inversiones a corto plazo', 'shortTermInvestments', 'sub'], ['Cuentas por cobrar', 'netReceivables', 'sub'], ['Inventarios', 'inventory', 'sub'],
     ['Activo no corriente', 'totalNonCurrentAssets', 'tot'], ['Inmovilizado material', 'propertyPlantEquipmentNet', 'sub'], ['Fondo de comercio', 'goodwill', 'sub'], ['Intangibles', 'intangibleAssets', 'sub'], ['Inversiones a largo plazo', 'longTermInvestments', 'sub'],
     ['Activos totales', 'totalAssets', 'tot'], ['Pasivo corriente', 'totalCurrentLiabilities', 'tot'], ['Deuda a corto plazo', 'shortTermDebt', 'sub'], ['Deuda a largo plazo', 'longTermDebt', 'sub'], ['Pasivos totales', 'totalLiabilities', 'tot'],
-    ['Patrimonio neto', 'totalStockholdersEquity', 'tot'], ['Deuda total', 'totalDebt'], ['Deuda neta', (r) => r.netDebt ?? (isNum(r.totalDebt) ? r.totalDebt - (r.cashAndShortTermInvestments ?? r.cashAndCashEquivalents ?? 0) : null)],
+    ['Patrimonio neto', 'totalStockholdersEquity', 'tot'], ['Deuda total', 'totalDebt'], ['Deuda neta', (r) => r.netDebt ?? (isNum(r.totalDebt) && isNum(r.cashAndShortTermInvestments ?? r.cashAndCashEquivalents) ? r.totalDebt - (r.cashAndShortTermInvestments ?? r.cashAndCashEquivalents) : null)],
     ['Capital circulante', (r) => (isNum(r.totalCurrentAssets) && isNum(r.totalCurrentLiabilities) ? r.totalCurrentAssets - r.totalCurrentLiabilities : null)],
   ] },
   cashflow: { title: 'Estado de flujos de efectivo', rows: [

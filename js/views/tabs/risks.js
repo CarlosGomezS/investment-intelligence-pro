@@ -1,8 +1,8 @@
 // Alertas y riesgos: anomalías detectadas en las cuentas, riesgo de mercado y alertas de valoración del usuario.
-import { esc, card, pct, num, toast } from '../../ui/dom.js?v=1369edf7';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=1369edf7';
-import { store } from '../../store.js?v=1369edf7';
-import { solvency } from './debt.js?v=1369edf7';
+import { esc, card, pct, num, toast } from '../../ui/dom.js?v=f2479787';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=f2479787';
+import { store } from '../../store.js?v=f2479787';
+import { solvency } from './debt.js?v=f2479787';
 
 export function render(el, S) {
   const { m, alerts } = S;

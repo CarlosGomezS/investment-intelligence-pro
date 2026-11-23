@@ -1,9 +1,9 @@
 // Noticias y eventos: noticias, notas de prensa, documentos ante el regulador y resultados trimestrales.
 // Clasificación automática por palabras clave (tema y tipo: hecho / previsión / opinión), indicada como tal.
-import { data } from '../../providers/index.js?v=1369edf7';
-import { esc, card, num, pct, date, datetime, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=1369edf7';
-import { isNum } from '../../calc/finance.js?v=1369edf7';
-import { extra } from '../company.js?v=1369edf7';
+import { data } from '../../providers/index.js?v=f2479787';
+import { esc, safeUrl, card, num, pct, date, datetime, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=f2479787';
+import { isNum } from '../../calc/finance.js?v=f2479787';
+import { extra } from '../company.js?v=f2479787';
 
 const TOPICS = [
   ['Resultados', /earnings|results|quarter|revenue|profit|EPS|beats|misses|resultados|beneficio|ventas trimestr/i],
@@ -41,12 +41,12 @@ export async function render(el, S) {
   const E = m.earnings.filter((e) => isNum(e.epsActual)).slice(-12).reverse();
   el.innerHTML = `<div class="grid g2">
     <div>${nw.status === 'fulfilled' ? card(`Noticias recientes (${news.length})`, `<div class="chips noprint" id="tf" style="margin-bottom:8px">${topics.map((t) => `<button class="chip ${t === filter ? 'on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-        <div class="news">${shown.slice(0, 40).map((n) => `<a class="it" href="${esc(n.url)}" target="_blank" rel="noopener"><div><b>${esc(n.title)}</b><small>${esc(n.site || n.publisher || '')} · ${datetime(n.publishedDate)} · ${n.topics.map(esc).join(', ')}</small></div><span class="org ${n.kind === 'Hecho' ? 'real' : n.kind === 'Previsión' ? 'est' : 'sup'}">${n.kind}</span></a>`).join('') || '<p class="note">Sin noticias para este filtro.</p>'}</div>
+        <div class="news">${shown.slice(0, 40).map((n) => `<a class="it" ${safeUrl(n.url) ? `href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer"` : ''}><div><b>${esc(n.title)}</b><small>${esc(n.site || n.publisher || '')} · ${datetime(n.publishedDate)} · ${n.topics.map(esc).join(', ')}</small></div><span class="org ${n.kind === 'Hecho' ? 'real' : n.kind === 'Previsión' ? 'est' : 'sup'}">${n.kind}</span></a>`).join('') || '<p class="note">Sin noticias para este filtro.</p>'}</div>
         <p class="note">Tema y tipo se asignan automáticamente por palabras clave del titular: verifica en la fuente original.</p>${source(nw.value)}`) : unavailable('Noticias', nw.reason)}</div>
     <div class="stack-y">
       ${card('Resultados trimestrales', E.length ? table('earn', [{ k: 'date', label: 'Fecha', f: date, align: 'left' }, { k: 'epsActual', label: 'BPA real', f: (v) => num(v) }, { k: 'epsEstimated', label: 'BPA estimado', f: (v) => num(v) }, { k: (r) => (isNum(r.epsActual) && isNum(r.epsEstimated) && r.epsEstimated !== 0 ? (r.epsActual - r.epsEstimated) / Math.abs(r.epsEstimated) : null), label: 'Sorpresa', f: (v) => `<span class="${cls(v)}">${sgnPct(v)}</span>` }, { k: 'revenueActual', label: 'Ventas', f: (v) => (isNum(v) ? (v / 1e9).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' mil M' : '—') }], E, { dense: true }) + source(m.prov.earnings) : unavailable('Resultados', S.raw.earnings.error))}
-      ${pr.status === 'fulfilled' && pr.value.data.length ? card('Notas de prensa de la compañía', `<div class="news">${pr.value.data.slice(0, 10).map((n) => `<a class="it" href="${esc(n.url || '#')}" target="_blank" rel="noopener"><div><b>${esc(n.title)}</b><small>${datetime(n.publishedDate || n.date)}</small></div><span class="org real">Oficial</span></a>`).join('')}</div>${source(pr.value)}`) : card('Notas de prensa de la compañía', unavailable('Notas de prensa', pr.reason))}
-      ${fl.status === 'fulfilled' ? card('Documentos presentados ante la SEC (12 meses)', `${keyF.length ? `<div class="news">${keyF.slice(0, 20).map((f) => `<a class="it" href="${esc(f.finalLink || f.link)}" target="_blank" rel="noopener"><div><b>${esc(f.formType)} · ${esc(FORMS[f.formType] || 'Documento')}</b><small>${date(f.filingDate)}</small></div><span class="org real">SEC</span></a>`).join('')}</div>` : '<p class="note">Sin documentos (empresa no registrada en la SEC).</p>'}${ins ? `<p class="note">Además, ${ins} formularios 4 de operaciones de directivos (ver Analistas e insiders).</p>` : ''}${source(fl.value)}`) : card('Documentos regulatorios', unavailable('Documentos SEC', fl.reason))}
+      ${pr.status === 'fulfilled' && pr.value.data.length ? card('Notas de prensa de la compañía', `<div class="news">${pr.value.data.slice(0, 10).map((n) => `<a class="it" ${safeUrl(n.url) ? `href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener noreferrer"` : ''}><div><b>${esc(n.title)}</b><small>${datetime(n.publishedDate || n.date)}</small></div><span class="org real">Oficial</span></a>`).join('')}</div>${source(pr.value)}`) : card('Notas de prensa de la compañía', unavailable('Notas de prensa', pr.reason))}
+      ${fl.status === 'fulfilled' ? card('Documentos presentados ante la SEC (12 meses)', `${keyF.length ? `<div class="news">${keyF.slice(0, 20).map((f) => `<a class="it" ${safeUrl(f.finalLink || f.link) ? `href="${esc(safeUrl(f.finalLink || f.link))}" target="_blank" rel="noopener noreferrer"` : ''}><div><b>${esc(f.formType)} · ${esc(FORMS[f.formType] || 'Documento')}</b><small>${date(f.filingDate)}</small></div><span class="org real">SEC</span></a>`).join('')}</div>` : '<p class="note">Sin documentos (empresa no registrada en la SEC).</p>'}${ins ? `<p class="note">Además, ${ins} formularios 4 de operaciones de directivos (ver Analistas e insiders).</p>` : ''}${source(fl.value)}`) : card('Documentos regulatorios', unavailable('Documentos SEC', fl.reason))}
     </div></div>`;
   const tf = el.querySelector('#tf'); if (tf) tf.onclick = (e) => { const b = e.target.closest('button'); if (b) { filter = b.dataset.t; render(el, S); } };
 }
