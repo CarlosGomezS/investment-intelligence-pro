@@ -24,3 +24,14 @@ test('CIERRE-02b: la deuda neta publicada por la fuente base (FMP) no se toca', 
   reconcileBalance(row, ['shortTermInvestments'], false);
   assert.equal(row.netDebt, 60);
 });
+
+test('Datos reales (NVDA): en el cocodrilo la entrada nunca supera al valor intrínseco central', async () => {
+  globalThis.localStorage ??= { getItem: () => null, setItem: () => {} };
+  const { rankMethod } = await import('../js/calc/methods.js');
+  const years = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ year: String(2018 + i), revenue: 100 * 1.2 ** i, netIncome: 30 * 1.2 ** i, eps: 3 * 1.2 ** i, fcf: 30 * 1.2 ** i, rc: 0.4, grossMargin: 0.6, operatingMargin: 0.4, dividendsPaid: 2, buybacks: 20, shares: 10 }));
+  const last = years[7];
+  const m = { symbol: 'NV', price: 164, tradeCur: 'USD', profile: { sector: 'Technology' }, years, last, T: { fcf: last.fcf, netIncome: last.netIncome }, prices: [], ratiosHist: years.map(() => ({ priceToEarningsRatio: 40 })), kmHist: years.map(() => ({ freeCashFlowYield: 0.02 })), pe: 47, marketCap: 1640, X: (v) => v, growth: { rev5: 0.2, eps5: 0.2, shares5: 0, rev1: 0.2, rev3: 0.2 }, scores: {} };
+  const [x] = rankMethod('cocodrilo', [{ sym: 'NV', S: { m, val: { composite: { value: 100, mos: -0.64 }, reliability: { level: 'media' } } } }]);
+  assert.ok(x.res.entry <= 100 + 1e-9, String(x.res.entry));
+  assert.match(x.res.entryNote, /valor intrínseco/);
+});

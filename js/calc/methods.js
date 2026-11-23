@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=05f60eff';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=5149fba8';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -196,10 +196,13 @@ export const METHODS = {
       const lv = [];
       if (!slowed && isNum(pe) && isNum(peAvg)) lv.push(price * (peAvg / pe));
       if (!slowed && isNum(fy) && fy > 0 && isNum(fyAvg) && fyAvg > 0) lv.push(price * (fy / fyAvg));
-      const entry = lv.length ? Math.min(...lv) : isNum(iv) && c4how === 'margen' ? iv : null;
+      // Nunca una entrada por encima del valor intrínseco central: se toma la menor de las dos
+      const entryHist = lv.length ? Math.min(...lv) : null;
+      const entry = isNum(entryHist) ? (isNum(iv) && iv > 0 ? Math.min(entryHist, iv) : entryHist) : isNum(iv) && c4how === 'margen' ? iv : null;
+      const entryByIv = isNum(entryHist) && isNum(iv) && iv > 0 && iv < entryHist;
       return {
         score: Math.min(fin ? 40 : userNo ? 20 : 100, sc), verdict, checks,
-        entry, entryNote: lv.length ? 'precio con el que vuelve a su PER medio y a su rentabilidad FCF media (el más bajo)' : 'valor intrínseco central (sin historia de múltiplos)',
+        entry, entryNote: entryByIv ? 'valor intrínseco central (es menor que el precio al que volvería a sus múltiplos medios)' : lv.length ? 'precio con el que vuelve a su PER medio y a su rentabilidad FCF media (el más bajo)' : 'valor intrínseco central (sin historia de múltiplos)',
         target: iv, targetNote: 'valor intrínseco central (referencia: Buffett no vende por objetivo)',
         stop: null, stopNote: 'sin stop de precio: se vende si el foso se rompe o el problema resulta permanente',
         horizon: pendC.length ? `cumple los 4 factores; para «Entraría» falta: ${pendC.join(' y ')}` : deterioro && core && c4 ? 'esperar: la caída muestra deterioro en los datos' : core && !c4 ? 'lista corta: esperar precio' : 'años (largo plazo)',

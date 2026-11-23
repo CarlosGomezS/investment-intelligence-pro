@@ -1,10 +1,10 @@
 // Competidores: detección automática (FMP stock-peers), lista editable, tabla comparativa, gráficos y ganador por pilar.
-import { data, gather } from '../../providers/index.js?v=05f60eff';
-import { fundamentals } from '../../ui/charts.js?v=05f60eff';
-import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=05f60eff';
-import { isNum, div, asc, median } from '../../calc/finance.js?v=05f60eff';
-import { store } from '../../store.js?v=05f60eff';
-import { logoHTML } from '../../app.js?v=05f60eff';
+import { data, gather } from '../../providers/index.js?v=5149fba8';
+import { fundamentals } from '../../ui/charts.js?v=5149fba8';
+import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=5149fba8';
+import { isNum, div, asc, median } from '../../calc/finance.js?v=5149fba8';
+import { store } from '../../store.js?v=5149fba8';
+import { logoHTML } from '../../app.js?v=5149fba8';
 
 async function peerRow(sym) {
   const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), inc: () => data.income(sym, 'annual', 4) }, 15000);

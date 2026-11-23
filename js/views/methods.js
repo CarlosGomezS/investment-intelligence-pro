@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica Alligator de Bill Williams para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=05f60eff';
-import { compute, fxFor } from './company.js?v=05f60eff';
-import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=05f60eff';
-import { fxRate } from '../providers/fxrate.js?v=05f60eff';
-import { alligator } from '../calc/alligator.js?v=05f60eff';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=05f60eff';
-import { logoHTML } from '../app.js?v=05f60eff';
-import { isNum } from '../calc/finance.js?v=05f60eff';
-import { store } from '../store.js?v=05f60eff';
-import { exportCSV } from '../export.js?v=05f60eff';
+import { data } from '../providers/index.js?v=5149fba8';
+import { compute, fxFor } from './company.js?v=5149fba8';
+import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=5149fba8';
+import { fxRate } from '../providers/fxrate.js?v=5149fba8';
+import { alligator } from '../calc/alligator.js?v=5149fba8';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=5149fba8';
+import { logoHTML } from '../app.js?v=5149fba8';
+import { isNum } from '../calc/finance.js?v=5149fba8';
+import { store } from '../store.js?v=5149fba8';
+import { exportCSV } from '../export.js?v=5149fba8';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -136,10 +136,12 @@ async function run(view) {
 async function techTop(view) {
   const top = rankMethod(state.method, [...results.values()]).slice(0, 10);
   const from = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
-  for (const { r } of top) {
-    if (state.techs.has(r.sym)) continue;
-    state.techs.set(r.sym, { loading: true });
-    try { const pd = r.S.m.prices && r.S.m.prices.length ? r.S.m.prices /* ya ajustados a splits */ : r.S.raw.prices && r.S.raw.prices.ok ? r.S.raw.prices.data : (await data.via(VIA.px, 'pricesDaily', r.sym, from)).data; const a = alligator(pd); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: (e && e.message) || 'sin precios' }); }
+  // Todas las pendientes se marcan «calculando…» desde el principio (antes salía «—» hasta terminar cada una)
+  const todo = top.filter(({ r }) => !state.techs.has(r.sym));
+  todo.forEach(({ r }) => state.techs.set(r.sym, { loading: true }));
+  if (todo.length && document.body.contains(view)) draw(view);
+  for (const { r } of todo) {
+    try { const pd = r.S.m.prices && r.S.m.prices.length ? r.S.m.prices /* ya ajustados a splits */ : r.S.raw.prices && r.S.raw.prices.ok ? r.S.raw.prices.data : (await data.via(VIA.px, 'pricesDaily', r.sym, from)).data; if (!Array.isArray(pd) || pd.length < 60) throw new Error('sin precios diarios suficientes (cupo de las fuentes de precios)'); const a = alligator(pd); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: e && e.code === 'rate_limit' ? 'sin precios: cupo agotado, inténtalo más tarde' : (e && e.message) || 'sin precios' }); }
     if (document.body.contains(view)) draw(view);
   }
 }
@@ -160,7 +162,7 @@ function draw(view) {
   const top = ranked.slice(0, 10);
   const cur = (r) => r.S.m.tradeCur || '';
   const T = (sym) => state.techs.get(sym);
-  const techCell = (sym) => { const t = T(sym); if (!t) return '<span class="note">—</span>'; if (t.loading) return '<span class="note">…</span>'; if (t.error) return `<span class="note">${esc(t.error)}</span>`; return `<span class="${t.state.startsWith('come al alza') ? 'pos' : t.state.includes('baja') ? 'neg' : 'warn'}">${esc(t.state)}</span>`; };
+  const techCell = (sym) => { const t = T(sym); if (!t) return '<span class="note">—</span>'; if (t.loading) return '<span class="note">calculando…</span>'; if (t.error) return `<span class="note">${esc(t.error)}</span>`; return `<span class="${t.state.startsWith('come al alza') ? 'pos' : t.state.includes('baja') ? 'neg' : 'warn'}">${esc(t.state)}</span>`; };
   const kv = (k, v) => `<span style="white-space:nowrap"><small class="mute">${k}</small> <b>${v}</b></span>`;
   box.innerHTML = card(`Top 10 · ${esc(METHODS[state.method].name)}`, `<div>
     ${top.map(({ r, res }, i) => { const t = T(r.sym); return `<div data-s="${esc(r.sym)}" style="cursor:pointer;padding:10px 0;border-bottom:1px solid var(--line)">
