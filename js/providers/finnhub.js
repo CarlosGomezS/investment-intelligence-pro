@@ -1,9 +1,9 @@
 // Finnhub (gratis: 60 peticiones/minuto, sin tope diario; datos de EE. UU.).
 // Se usa para cotización, perfil, ratios TTM, competidores, recomendaciones, resultados, noticias y calendario,
 // y así se reserva la cuota diaria de FMP para lo que solo da FMP.
-import { getJSON } from './http.js?v=47aea58d';
-import { config } from '../config.js?v=47aea58d';
-import { toStatements } from './xbrl.js?v=47aea58d';
+import { getJSON } from './http.js?v=e6c88f56';
+import { config } from '../config.js?v=e6c88f56';
+import { toStatements } from './xbrl.js?v=e6c88f56';
 
 const H = () => config.get().cacheHours;
 const q = (path, params, ttl, v) => getJSON('finnhub', path, params, ttl, v);

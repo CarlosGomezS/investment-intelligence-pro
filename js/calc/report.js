@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=47aea58d';
-import { fmtB } from './alerts.js?v=47aea58d';
+import { isNum } from './finance.js?v=e6c88f56';
+import { fmtB } from './alerts.js?v=e6c88f56';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');

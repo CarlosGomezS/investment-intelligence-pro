@@ -1,6 +1,6 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=47aea58d';
-import { isNum } from '../../calc/finance.js?v=47aea58d';
+import { esc, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=e6c88f56';
+import { isNum } from '../../calc/finance.js?v=e6c88f56';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;
@@ -26,7 +26,7 @@ export function render(el, S) {
   const cik = p.cik ? String(p.cik).replace(/^0+/, '') : (!m.symbol.includes('.') ? m.symbol : null); // EDGAR acepta el ticker
   const LABEL = { profile: 'Perfil', quote: 'Cotización', priceChange: 'Variaciones de precio', prices: 'Histórico de precios', income: 'Cuenta de resultados', balance: 'Balance', cashflow: 'Flujos de caja', incomeTTM: 'Resultados TTM', ratios: 'Ratios históricos', keyMetrics: 'Múltiplos históricos', ratiosTTM: 'Ratios actuales', keyMetricsTTM: 'Métricas actuales', scores: 'Piotroski / Altman', estimates: 'Estimaciones de analistas', priceTarget: 'Precio objetivo', gradesConsensus: 'Recomendaciones', dcf: 'DCF del proveedor', dividends: 'Dividendos', earnings: 'Resultados trimestrales', treasury: 'Bono a 10 años', riskPremium: 'Prima de riesgo', spy: 'S&P 500 (beta)' };
   const DER = { priceChange: 'variaciones de precio', ratios: 'ratios históricos', keyMetrics: 'múltiplos históricos', scores: 'Piotroski' };
-  const rows = Object.keys(LABEL).filter((k) => S.raw[k]).map((k) => { const r = S.raw[k]; const calc = !r.ok && DER[k] && (m.derived || []).includes(DER[k]); return `<tr><td class="l">${LABEL[k]}</td><td class="l">${calc ? '<span class="pos">✓</span> Calculado por la app con precios y estados' : r.ok ? `<span class="pos">✓</span> ${esc(r.source || '')}` : `<span class="${r.pending ? 'warn' : 'neg'}">${r.pending ? '…' : '✕'}</span> ${esc((r.error && r.error.message) || 'Sin datos')}`}</td></tr>`; }).join('');
+  const rows = Object.keys(LABEL).filter((k) => S.raw[k]).map((k) => { const r = S.raw[k]; const calc = !r.ok && DER[k] && (m.derived || []).includes(DER[k]); return `<tr><td class="l">${LABEL[k]}</td><td class="l">${calc ? '<span class="pos">✓</span> Calculado por la app con precios y estados' : r.ok ? `<span class="pos">✓</span> ${esc(r.source || '')}` : `<span class="${r.pending ? 'warn' : 'neg'}">${r.pending ? '…' : '✕'}</span> ${esc((r.error && r.error.message) || 'Sin datos')}${r.error && r.error.tried ? `<br><small class="mute">${esc(r.error.tried)}</small>` : ''}`}</td></tr>`; }).join('');
   const okN = Object.keys(LABEL).filter((k) => S.raw[k] && (S.raw[k].ok || (DER[k] && (m.derived || []).includes(DER[k])))).length, totN = Object.keys(LABEL).filter((k) => S.raw[k]).length;
   const diag = `<details style="margin-top:14px" class="card"><summary style="padding:12px 16px;cursor:pointer;font-weight:600">Diagnóstico de datos: ${okN} de ${totN} bloques recibidos${m.derived && m.derived.length ? ` · calculados por la app: ${esc(m.derived.join(', '))}` : ''}</summary><div class="cb"><div class="tablewrap"><table class="dense"><tbody>${rows}</tbody></table></div><p class="note">Si una fuente aparece con ✕ en todo, revisa su clave en <a href="#/ajustes">Ajustes</a> (botón «Probar todas»). «…» = sigue descargando.</p></div></details>`;
   el.innerHTML = `

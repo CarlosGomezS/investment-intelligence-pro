@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=47aea58d';
-import { alphavantage } from './alphavantage.js?v=47aea58d';
-import { finnhub } from './finnhub.js?v=47aea58d';
-import { twelvedata } from './twelvedata.js?v=47aea58d';
-import { roic } from './roic.js?v=47aea58d';
-import { sec } from './sec.js?v=47aea58d';
-import { esef } from './esef.js?v=47aea58d';
-import { config } from '../config.js?v=47aea58d';
-import { ApiError, usage, queueDelay } from './http.js?v=47aea58d';
-import { setHint } from './hints.js?v=47aea58d';
+import { fmp } from './fmp.js?v=e6c88f56';
+import { alphavantage } from './alphavantage.js?v=e6c88f56';
+import { finnhub } from './finnhub.js?v=e6c88f56';
+import { twelvedata } from './twelvedata.js?v=e6c88f56';
+import { roic } from './roic.js?v=e6c88f56';
+import { sec } from './sec.js?v=e6c88f56';
+import { esef } from './esef.js?v=e6c88f56';
+import { config } from '../config.js?v=e6c88f56';
+import { ApiError, usage, queueDelay } from './http.js?v=e6c88f56';
+import { setHint } from './hints.js?v=e6c88f56';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -99,24 +99,28 @@ async function run(method, args) {
     const who = (ORDER[method] || ['fmp']).map((id) => names[id]).join(', ');
     throw anyBlocked ? new ApiError('premium', `Solo lo ofrece ${who} y su plan gratuito no cubre esta empresa`) : new ApiError('no_key', `Solo lo ofrece ${who}: añade su clave en Ajustes`);
   }
-  let best = null;
+  let best = null; const tried = [];
   for (const [i, id] of list.entries()) {
     // Una fuente con cola por límite de minuto se salta si hay alternativas detrás (no hacer esperar)
-    if (i < list.length - 1 && queueDelay(id) > 8000) continue;
+    if (i < list.length - 1 && queueDelay(id) > 8000) { tried.push([id, 'en cola por límite por minuto']); continue; }
     try {
       const r = await P[id][method](...args);
       const empty = r.data == null || (Array.isArray(r.data) && r.data.length === 0);
-      if (empty) { best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
+      if (empty) { tried.push([id, 'sin datos']); best = best || new ApiError('not_found', 'Sin datos', { provider: id }); continue; }
       if (method === 'profile' && r.data) setHint(args[0], { name: r.data.companyName, isin: r.data.isin, country: r.data.country });
       if (KEYF[method] && args[1] !== 'quarter' && gaps(method, r.data, args[2] ?? 15)) return await complete(method, args, { ...r, provider: id }, list.slice(i + 1));
       return { ...r, provider: id };
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(e.code || 'not_found', e.message || 'Sin datos', { provider: id });
+      tried.push([id, ({ premium: 'plan de pago', not_found: 'sin datos', rate_limit: 'límite alcanzado', bad_key: 'clave no válida', network: 'no responde', no_key: 'sin clave', needs_proxy: 'necesita el Worker' })[err.code] || err.message]);
       if (err.code === 'bad_key') badKeys.add(id);
       if (err.code === 'premium' && isSym(args[0]) && ['profile', 'income', 'quote'].includes(method)) block(id, args[0]);
       if (!best || (PRIORITY[err.code] || 0) > (PRIORITY[best.code] || 0)) best = err;
     }
   }
+  const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
+  const skipped = (ORDER[method] || ['fmp']).filter((id) => !list.includes(id)).map((id) => [id, isBlocked(id, args) ? 'plan de pago (bloqueado 3 días)' : !config.canUse(id) ? (id === 'sec' ? 'necesita el Worker' : 'sin clave') : 'cuota del día gastada']);
+  if (best) best.tried = [...tried, ...skipped].map(([id, why]) => `${names[id] || id}: ${why}`).join(' · ');
   throw best;
 }
 
