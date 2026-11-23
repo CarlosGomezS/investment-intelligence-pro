@@ -1,16 +1,19 @@
 // Valoración intrínseca de una empresa a partir del modelo: DCF, múltiplos, DDM y escenarios.
 // Cada supuesto lleva su origen: 'real' (dato del proveedor), 'analistas' (estimación), 'supuesto' (regla de la app o del usuario).
-import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=ca0e8ce3';
-import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=ca0e8ce3';
+import { isNum, mean, median, lastAvg, cagrN } from './finance.js?v=7feadaa0';
+import { dcf, sensitivity, ddm, impliedByPE, impliedByEV, marginOfSafety, upside, scenarios, suggestGrowth, ratioAvg } from './valuation.js?v=7feadaa0';
 
 export function dcfDefaults(m) {
   const fcfs = m.years.map((y) => y.fcf);
-  const fcfTTM = m.T.fcf;
-  const fcf3 = lastAvg(fcfs, 3);
+  // FCF a la empresa para descontar al WACC: FCF − pagos en acciones (son un coste real que diluye) + intereses
+  // pagados después de impuestos (el flujo operativo ya los restó; la deuda se descuenta luego con la deuda neta).
+  const unlev = (y) => (isNum(y.fcf) ? y.fcf - (isNum(y.sbc) ? y.sbc : 0) + (isNum(y.interestExpense) ? y.interestExpense * (1 - (isNum(y.taxRate) ? y.taxRate : 0.21)) : 0) : null);
+  const fcfTTM = unlev(m.T);
+  const fcf3 = lastAvg(m.years.map(unlev), 3);
   const g = suggestGrowth({ fcfCagr5: cagrN(fcfs, 5), revCagr5: m.growth.rev5, analystRevGrowth: m.growth.analystRev, rev1: m.growth.rev1, rev10: m.growth.rev10 });
   const w = m.market.wacc;
   return {
-    fcfBase: { value: m.X(fcfTTM), origin: m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio', alt: m.X(fcf3) },
+    fcfBase: { value: m.X(fcfTTM), origin: `${m.ttmIsReal ? 'real · FCF TTM' : 'real · FCF último ejercicio'} − pagos en acciones + intereses × (1 − impuesto)`, alt: m.X(fcf3) },
     growth: { value: g.value ?? 0.05, origin: g.value != null ? 'supuesto · mediana de ' + g.parts.map(([k]) => k).join(', ') : 'supuesto · 5 % por falta de datos', parts: g.parts, capped: g.capped },
     years: { value: 10, origin: 'supuesto' },
     terminalGrowth: { value: 0.025, origin: 'supuesto · inflación/PIB nominal a largo plazo' },
@@ -88,13 +91,17 @@ export function dividendModel(m, ke) {
 
 /** Valor intrínseco central: mediana de los métodos disponibles (DCF base pesa doble). */
 export function composite(m, dcfRes, mult, ddmRes) {
-  const vals = [];
-  if (dcfRes && isNum(dcfRes.perShare) && dcfRes.perShare > 0) vals.push(dcfRes.perShare, dcfRes.perShare);
-  for (const r of mult) if (!r.exclude && isNum(r.value) && r.value > 0) vals.push(r.value);
-  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) vals.push(ddmRes.value);
-  if (vals.length < 2) return { value: null, n: vals.length };
+  const vals = []; let methods = 0;
+  // DCF: si la deuda supera al valor de la empresa, el capital vale 0 (no se descarta: cuenta como 0)
+  if (dcfRes && isNum(dcfRes.perShare)) { const v = Math.max(0, dcfRes.perShare); vals.push(v, v); methods++; }
+  for (const r of mult) {
+    if (r.exclude || !isNum(r.value)) continue;
+    if (r.value > 0) { vals.push(r.value); methods++; } else if (/EV\//.test(r.method)) { vals.push(0); methods++; } // EV menos deuda neta negativo = 0
+  }
+  if (ddmRes && ddmRes.applicable && isNum(ddmRes.value)) { vals.push(ddmRes.value); methods++; }
+  if (methods < 2) return { value: null, n: methods, reason: 'Hace falta al menos dos métodos de valoración distintos' };
   const v = median(vals);
   const sorted = vals.slice().sort((a, b) => a - b);
-  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: vals.length, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
+  return { value: v, low: sorted[Math.floor(sorted.length * 0.25)], high: sorted[Math.ceil(sorted.length * 0.75) - 1], n: methods, mos: marginOfSafety(v, m.price), up: upside(v, m.price) };
 }
 export { mean };

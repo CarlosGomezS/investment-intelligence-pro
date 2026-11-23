@@ -1,6 +1,6 @@
 // Metodología: fuentes, arquitectura, fórmulas, reglas de alerta y limitaciones conocidas.
-import { card } from '../ui/dom.js?v=ca0e8ce3';
-import { RATIOS } from '../calc/ratios.js?v=ca0e8ce3';
+import { card } from '../ui/dom.js?v=7feadaa0';
+import { RATIOS } from '../calc/ratios.js?v=7feadaa0';
 
 const APIS = [
   ['Financial Modeling Prep', 'Principal', 'Estados (anual/trimestral/TTM), ratios históricos, estimaciones, DCF, dividendos, insiders, screener, índices', '250 peticiones/día; sobre todo EE. UU.', 'Sí', 'https://site.financialmodelingprep.com/developer/docs'],
@@ -33,7 +33,7 @@ export function render(view) {
   ${card('Valoración intrínseca', `<ul style="margin:0;padding-left:18px;line-height:1.7">
     <li><b>WACC</b> = E/(E+D)·ke + D/(E+D)·kd·(1−t). <b>ke</b> = rf + β·prima (CAPM). rf: bono de EE. UU. a 10 años; prima: prima de riesgo total del país (tabla de Damodaran vía FMP); kd: intereses/deuda, media 3 años; pesos a valor de mercado.</li>
     <li><b>DCF</b>: FCF base (TTM o media 3 años) crece al ritmo elegido los años 1-5; con horizonte de 10 años, los años 6-10 convergen linealmente al crecimiento terminal. Valor terminal de Gordon: FCF<sub>n</sub>·(1+g)/(WACC−g). Valor por acción = (VP flujos + VP terminal − deuda neta) / acciones.</li>
-    <li><b>Crecimiento sugerido</b>: mediana de CAGR 5a del FCF, CAGR 5a de ventas y crecimiento de ventas previsto por analistas, acotada a 0-30 %.</li>
+    <li><b>Crecimiento sugerido</b>: mediana de CAGR 5a del FCF, CAGR 5a de ventas y crecimiento de ventas previsto por analistas, acotada entre −10 % y 30 %.</li>
     <li><b>Múltiplos</b>: PER medio 5 y 10 años × BPA TTM; EV/EBITDA y EV/FCF medios 5 años; PER y EV/EBITDA medianos de competidores.</li>
     <li><b>DDM</b>: Gordon con crecimiento = min(CAGR 5a del dividendo; ke − 1 p.p.; 8 %). Solo se considera fiable con 5+ años de historial y payout &lt; 100 %.</li>
     <li><b>Valor central</b>: mediana de los métodos propios (DCF base con doble peso). Objetivos de analistas y el DCF de FMP se muestran como referencia externa y no entran en el cálculo.</li>

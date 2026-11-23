@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown } from './finance.js?v=ca0e8ce3';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=7feadaa0';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -27,6 +27,13 @@ export function metricsFor(m, ctx) {
   const roicAvg5 = mean(s('rc').slice(-5));
   const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
+  // Paso de beneficios (o FCF) a pérdidas: el CAGR no se puede calcular, pero no es «sin dato»: puntúa 0
+  const toLoss = (k) => { const v = s(k).filter(isNum); const n = v.length; return n >= 2 && v[n - 1] <= 0 && v.slice(0, -1).some((x) => x > 0); };
+  const eps5 = isNum(m.growth.eps5) ? m.growth.eps5 : toLoss('eps') ? -1 : null;
+  const fcf5 = isNum(cagrN(s('fcf'), 5)) ? cagrN(s('fcf'), 5) : toLoss('fcf') ? -1 : null;
+  // Si el crecimiento se ha frenado, compararse con sus múltiplos de antes no dice nada (misma regla que la valoración)
+  const revS = s('revenue'); const gThen = cagrN(revS.slice(0, -2), 5), gNow = median([m.growth.rev1, m.growth.rev3, m.growth.analystRev].filter(isNum));
+  const slowed = isNum(gThen) && isNum(gNow) && gThen > 0.05 && gNow < 0.6 * gThen;
 
   const M = (cat, name, value, display, pts, formula) => ({ cat, name, value, display, pts, formula, score: isNum(value) ? Math.round(lin(value, pts)) : null });
   return [
@@ -36,8 +43,8 @@ export function metricsFor(m, ctx) {
     M('calidad', 'Pagos en acciones / ventas', isNum(T.sbc) && isNum(T.revenue) ? T.sbc / T.revenue : (isNum(last.sbc) && last.revenue ? last.sbc / last.revenue : null), P(isNum(last.sbc) && last.revenue ? last.sbc / last.revenue : null), [[0, 100], [0.03, 75], [0.1, 0]], 'SBC / ventas (menos es mejor)'),
 
     M('crecimiento', 'Ventas CAGR 5 años', m.growth.rev5, P(m.growth.rev5), [[-0.05, 0], [0.05, 55], [0.15, 100]], 'CAGR ventas 5a'),
-    M('crecimiento', 'BPA CAGR 5 años', m.growth.eps5, P(m.growth.eps5), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR BPA 5a'),
-    M('crecimiento', 'FCF CAGR 5 años', cagrN(s('fcf'), 5), P(cagrN(s('fcf'), 5)), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR FCF 5a'),
+    M('crecimiento', 'BPA CAGR 5 años', eps5, eps5 === -1 ? 'pasa a pérdidas' : P(eps5), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR BPA 5a'),
+    M('crecimiento', 'FCF CAGR 5 años', fcf5, fcf5 === -1 ? 'FCF negativo' : P(fcf5), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR FCF 5a'),
     M('crecimiento', 'Ventas previstas (analistas)', m.growth.analystRev, P(m.growth.analystRev), [[-0.02, 0], [0.05, 55], [0.15, 100]], 'CAGR estimado de ventas'),
 
     M('rentabilidad', RC, T.rc ?? last.rc, P(T.rc ?? last.rc), [[0, 0], [0.1, 60], [0.25, 100]], last.negCapital ? 'EBIT / (activos − pasivo corriente)' : 'NOPAT / capital invertido'),
@@ -45,7 +52,7 @@ export function metricsFor(m, ctx) {
     M('rentabilidad', 'Margen operativo', T.operatingMargin, P(T.operatingMargin), [[0, 0], [0.12, 60], [0.3, 100]], 'EBIT / ventas'),
     M('rentabilidad', 'Margen neto', T.netMargin, P(T.netMargin), [[0, 0], [0.08, 55], [0.22, 100]], 'Beneficio neto / ventas'),
 
-    M('solidez', 'Deuda neta / EBITDA', T.netDebtToEbitda ?? last.netDebtToEbitda, X(T.netDebtToEbitda ?? last.netDebtToEbitda, 2) + '×', [[-1, 100], [1, 85], [2.5, 50], [4.5, 0]], 'Menos es mejor'),
+    M('solidez', 'Deuda neta / EBITDA', (T.netDebtToEbitda ?? last.netDebtToEbitda) ?? ((T.ebitdaNegWithDebt || last.ebitdaNegWithDebt) ? 99 : null), (T.ebitdaNegWithDebt || last.ebitdaNegWithDebt) && !isNum(T.netDebtToEbitda ?? last.netDebtToEbitda) ? 'EBITDA negativo con deuda' : X(T.netDebtToEbitda ?? last.netDebtToEbitda, 2) + '×', [[-1, 100], [1, 85], [2.5, 50], [4.5, 0]], 'Menos es mejor'),
     M('solidez', 'Cobertura de intereses', T.interestCoverage ?? last.interestCoverage, X(T.interestCoverage ?? last.interestCoverage) + '×', [[1, 0], [4, 55], [12, 100]], 'EBIT / intereses'),
     M('solidez', 'Liquidez corriente', T.currentRatio ?? last.currentRatio, X(T.currentRatio ?? last.currentRatio, 2), [[0.6, 0], [1, 50], [1.8, 100]], 'AC / PC'),
     M('solidez', 'Altman Z-Score', m.scores.altmanZScore, X(m.scores.altmanZScore, 2), [[1.2, 0], [1.8, 30], [3, 80], [5, 100]], '>3 zona segura'),
@@ -61,8 +68,8 @@ export function metricsFor(m, ctx) {
     ...(isNum(ctx.moatUser) ? [M('moat', 'Evaluación cualitativa del usuario', ctx.moatUser, Math.round(ctx.moatUser) + '/100', [[0, 0], [100, 100]], 'Checklist del módulo Moat')] : []),
 
     M('valoracion', 'Margen de seguridad (valor intrínseco)', ctx.mos, P(ctx.mos), [[-0.5, 0], [0, 50], [0.3, 100]], '(Valor − precio)/valor'),
-    M('valoracion', 'PER frente a su media 5a', isNum(m.pe) && m.pe > 0 && isNum(peAvg5) ? m.pe / peAvg5 - 1 : null, isNum(peAvg5) && isNum(m.pe) ? `${X(m.pe)}× vs ${X(peAvg5)}×` : '—', [[-0.3, 100], [0, 60], [0.5, 0]], 'Descuento frente a su propia historia'),
-    M('valoracion', 'EV/EBITDA frente a su media 5a', isNum(eve) && isNum(eveAvg5) ? eve / eveAvg5 - 1 : null, isNum(eve) && isNum(eveAvg5) ? `${X(eve)}× vs ${X(eveAvg5)}×` : '—', [[-0.3, 100], [0, 60], [0.5, 0]], 'Descuento frente a su propia historia'),
+    M('valoracion', 'PER frente a su media 5a', !slowed && isNum(m.pe) && m.pe > 0 && isNum(peAvg5) ? m.pe / peAvg5 - 1 : null, isNum(peAvg5) && isNum(m.pe) ? `${X(m.pe)}× vs ${X(peAvg5)}×` : '—', [[-0.3, 100], [0, 60], [0.5, 0]], 'Descuento frente a su propia historia'),
+    M('valoracion', 'EV/EBITDA frente a su media 5a', !slowed && isNum(eve) && isNum(eveAvg5) ? eve / eveAvg5 - 1 : null, isNum(eve) && isNum(eveAvg5) ? `${X(eve)}× vs ${X(eveAvg5)}×` : '—', [[-0.3, 100], [0, 60], [0.5, 0]], 'Descuento frente a su propia historia'),
     M('valoracion', 'Rentabilidad FCF', fcfy, P(fcfy), [[0, 0], [0.04, 55], [0.08, 100]], 'FCF / capitalización'),
 
     M('riesgo', 'Beta', m.market.betaAssumed ? null : m.market.beta, m.market.betaAssumed ? '—' : X(m.market.beta, 2), [[0.6, 100], [1, 70], [1.8, 0]], 'Sensibilidad al mercado'),

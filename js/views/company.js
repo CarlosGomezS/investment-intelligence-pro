@@ -1,15 +1,16 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=ca0e8ce3';
-import { buildModel } from '../calc/model.js?v=ca0e8ce3';
-import { evaluateRatios } from '../calc/ratios.js?v=ca0e8ce3';
-import { detectAlerts } from '../calc/alerts.js?v=ca0e8ce3';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=ca0e8ce3';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=ca0e8ce3';
-import { buildReport } from '../calc/report.js?v=ca0e8ce3';
-import { store } from '../store.js?v=ca0e8ce3';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=ca0e8ce3';
-import { logoHTML, countryOf } from '../app.js?v=ca0e8ce3';
-import { isNum } from '../calc/finance.js?v=ca0e8ce3';
+import { data, gather } from '../providers/index.js?v=7feadaa0';
+import { fxRate } from '../providers/fxrate.js?v=7feadaa0';
+import { buildModel } from '../calc/model.js?v=7feadaa0';
+import { evaluateRatios } from '../calc/ratios.js?v=7feadaa0';
+import { detectAlerts } from '../calc/alerts.js?v=7feadaa0';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=7feadaa0';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=7feadaa0';
+import { buildReport } from '../calc/report.js?v=7feadaa0';
+import { store } from '../store.js?v=7feadaa0';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=7feadaa0';
+import { logoHTML, countryOf } from '../app.js?v=7feadaa0';
+import { isNum } from '../calc/finance.js?v=7feadaa0';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +18,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=ca0e8ce3'), grafico: () => import('./tabs/chart.js?v=ca0e8ce3'), estados: () => import('./tabs/statements.js?v=ca0e8ce3'), ratios: () => import('./tabs/ratios.js?v=ca0e8ce3'),
-  crecimiento: () => import('./tabs/growth.js?v=ca0e8ce3'), deuda: () => import('./tabs/debt.js?v=ca0e8ce3'), valoracion: () => import('./tabs/valuation.js?v=ca0e8ce3'), dividendos: () => import('./tabs/dividends.js?v=ca0e8ce3'),
-  competidores: () => import('./tabs/peers.js?v=ca0e8ce3'), moat: () => import('./tabs/moat.js?v=ca0e8ce3'), noticias: () => import('./tabs/news.js?v=ca0e8ce3'), analistas: () => import('./tabs/analysts.js?v=ca0e8ce3'),
-  riesgos: () => import('./tabs/risks.js?v=ca0e8ce3'), scoring: () => import('./tabs/scoring.js?v=ca0e8ce3'), informe: () => import('./tabs/report.js?v=ca0e8ce3'), simulador: () => import('./tabs/simulator.js?v=ca0e8ce3'),
+  resumen: () => import('./tabs/overview.js?v=7feadaa0'), grafico: () => import('./tabs/chart.js?v=7feadaa0'), estados: () => import('./tabs/statements.js?v=7feadaa0'), ratios: () => import('./tabs/ratios.js?v=7feadaa0'),
+  crecimiento: () => import('./tabs/growth.js?v=7feadaa0'), deuda: () => import('./tabs/debt.js?v=7feadaa0'), valoracion: () => import('./tabs/valuation.js?v=7feadaa0'), dividendos: () => import('./tabs/dividends.js?v=7feadaa0'),
+  competidores: () => import('./tabs/peers.js?v=7feadaa0'), moat: () => import('./tabs/moat.js?v=7feadaa0'), noticias: () => import('./tabs/news.js?v=7feadaa0'), analistas: () => import('./tabs/analysts.js?v=7feadaa0'),
+  riesgos: () => import('./tabs/risks.js?v=7feadaa0'), scoring: () => import('./tabs/scoring.js?v=7feadaa0'), informe: () => import('./tabs/report.js?v=7feadaa0'), simulador: () => import('./tabs/simulator.js?v=7feadaa0'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -64,17 +65,21 @@ async function load(sym, onProgress, late) {
     }
   }
   // Conversión de divisa si los estados están en otra moneda que la cotización (p. ej. ADR)
-  let fx = 1;
-  const rep = raw.income.ok && raw.income.data[0] ? raw.income.data[0].reportedCurrency : null;
-  const trade = raw.profile.ok ? raw.profile.data.currency : null;
-  if (rep && trade && rep !== trade) {
-    try { const f = await data.fx(`${rep}${trade}`); fx = f.data && f.data.price ? f.data.price : 1; raw.fx = { ok: true, ...f }; }
-    catch (e) { raw.fx = { ok: false, error: e }; }
-  }
+  const fx = await fxFor(raw);
   return { raw, fx };
 }
 
 // Sin cotización directa: se usa el último cierre del histórico (indicado como tal)
+// Tipo de cambio estados → cotización. Si falla, null: la valoración no se calcula (no se supone 1).
+export async function fxFor(raw) {
+  const rep = raw.income && raw.income.ok && raw.income.data[0] ? raw.income.data[0].reportedCurrency : null;
+  const trade = raw.profile && raw.profile.ok ? raw.profile.data.currency : null;
+  if (!rep || !trade || rep === trade) return 1;
+  const r = await fxRate(rep, trade);
+  raw.fx = r.rate ? r.res : { ok: false, error: r.error };
+  return r.rate;
+}
+
 function fixQuote(raw, sym) {
   if (!raw.quote.ok && raw.prices && raw.prices.ok && raw.prices.data.length) {
     const L = raw.prices.data[raw.prices.data.length - 1], P2 = raw.prices.data[raw.prices.data.length - 2];
@@ -91,7 +96,7 @@ export function compute(S) {
   const ratios = evaluateRatios(m);
   const alerts = detectAlerts(m);
   const d = dcfDefaults(m);
-  const saved = store.assumptions(m.symbol) || {};
+  const saved = S.noSaved ? {} : store.assumptions(m.symbol) || {}; // en análisis masivo, siempre supuestos por defecto
   const inputs = {
     fcf0: saved.fcf0 ?? d.fcfBase.value, growth: saved.growth ?? d.growth.value, years: saved.years ?? d.years.value, terminalGrowth: saved.terminalGrowth ?? d.terminalGrowth.value,
     rf: saved.rf ?? d.rf.value, beta: saved.beta ?? d.beta.value, erp: saved.erp ?? d.erp.value, costDebt: saved.costDebt ?? d.costDebt.value,
@@ -101,7 +106,8 @@ export function compute(S) {
   const E = m.marketCap || 0, D = m.X(m.T.debt) || 0, tax = m.market.wacc ? null : 0.21;
   const ke = isNum(inputs.rf) && isNum(inputs.beta) && isNum(inputs.erp) ? inputs.rf + inputs.beta * inputs.erp : null;
   const kd = isNum(inputs.costDebt) ? inputs.costDebt * (1 - (m.T.taxRate ?? tax ?? 0.21)) : ke;
-  const waccCalc = isNum(ke) ? (E / (E + D || 1)) * ke + (D / (E + D || 1)) * (kd ?? ke) : null;
+  const we = E > 0 ? E / (E + D) : 1; // sin capitalización: solo coste del capital propio
+  const waccCalc = isNum(ke) ? we * ke + (1 - we) * (kd ?? ke) : null;
   inputs.ke = ke; inputs.wacc = isNum(inputs.waccOverride) ? inputs.waccOverride : waccCalc;
   const dcfRes = runDcf(m, inputs);
   const mult = multiples(m, S.peers ? S.peers.rows : null);
@@ -139,7 +145,7 @@ function header(S) {
     </div>
     <div class="px"><b>${num(m.price, 2)} <small class="mute" style="font-size:14px">${esc(m.tradeCur)}</small></b><span class="${cls(ch)}">${sgnPct(isNum(ch) ? ch / 100 : null, 2)} hoy</span><div class="note">${datetime(upd)}</div></div>
   </div>
-  ${m.repCur !== m.tradeCur ? `<div class="empty" style="margin-bottom:12px">Los estados financieros están en <b>${esc(m.repCur)}</b> y la acción cotiza en <b>${esc(m.tradeCur)}</b>. Para ratios y valoración se convierten al tipo ${esc(m.repCur)}/${esc(m.tradeCur)} = ${num(m.fx, 4)}${S.raw.fx && S.raw.fx.ok ? ` (${datetime(S.raw.fx.fetchedAt)})` : ' — no se pudo obtener el tipo de cambio: las cifras por acción no son comparables'}.</div>` : ''}`;
+  ${m.repCur !== m.tradeCur ? `<div class="empty" style="margin-bottom:12px">Los estados financieros están en <b>${esc(m.repCur)}</b> y la acción cotiza en <b>${esc(m.tradeCur)}</b>. ${isNum(m.fx) ? `Para ratios y valoración se convierten al tipo ${esc(m.repCur)}/${esc(m.tradeCur)} = ${num(m.fx, 4)}${S.raw.fx && S.raw.fx.ok ? ` (${datetime(S.raw.fx.fetchedAt)})` : ''}.` : '<b class="neg">No se pudo obtener el tipo de cambio:</b> la valoración, el PER y todo lo que cruza precio con cuentas queda sin calcular para no darte cifras falsas. Pulsa «Actualizar» en unos minutos.'}</div>` : ''}`;
 }
 
 function tabs(sym, cur) {
@@ -159,7 +165,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
           const St = cache.get(sym); if (!St || !r.ok) return;
           St.raw[k] = r; if (k === 'prices') fixQuote(St.raw, sym);
           clearTimeout(lateTimer);
-          lateTimer = setTimeout(() => { compute(St); if (view.dataset.loaded === sym) { const t = location.hash.split('/')[3] || 'resumen'; view.dataset.loaded = ''; render(view, [sym, t]); toast('Datos completados'); } }, 800);
+          lateTimer = setTimeout(async () => { if (k === 'income' || k === 'profile' || !isNum(St.fx)) St.fx = await fxFor(St.raw); compute(St); if (view.dataset.loaded === sym) { const t = location.hash.split('/')[3] || 'resumen'; view.dataset.loaded = ''; render(view, [sym, t]); toast('Datos completados'); } }, 800);
         };
         const { raw, fx } = await load(sym, (i, t) => { if (meta) meta.textContent = `Descargando datos… ${i} de ${t}`; }, late);
         S = { sym, raw, fx, extra: {} };
@@ -167,7 +173,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=ca0e8ce3').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=7feadaa0').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -203,14 +209,14 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=ca0e8ce3');
+      const { exportAll } = await import('../exportall.js?v=7feadaa0');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=ca0e8ce3');
-    await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
+    const { clearCache } = await import('../providers/http.js?v=7feadaa0');
+    await clearCache(m.symbol); cache.delete(m.symbol); // solo esta empresa view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);
   };

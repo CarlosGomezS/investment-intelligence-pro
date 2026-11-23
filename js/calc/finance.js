@@ -88,7 +88,8 @@ export function deriveYear(y, taxFallback = 0.21) {
   const capEmployed = isNum(b.totalAssets) && isNum(b.totalCurrentLiabilities) ? b.totalAssets - b.totalCurrentLiabilities : null;
   return {
     year: y.year, date: i.date, revenue: i.revenue, grossProfit: i.grossProfit, operatingIncome: i.operatingIncome, ebit, ebitda, netIncome: i.netIncome,
-    eps: (() => { const rep = i.epsDiluted ?? i.eps, calc = div(i.netIncome, shares); return isNum(rep) && isNum(calc) && Math.abs(rep / calc - 1) > 0.15 ? calc : rep ?? calc; })(), shares, fcf, ocf: c.operatingCashFlow ?? c.netCashProvidedByOperatingActivities,
+    // BPA publicado salvo error grosero (unidades, acciones sin ajustar): doble clase o preferentes justifican pequeñas diferencias
+    eps: (() => { const rep = i.epsDiluted ?? i.eps, calc = div(i.netIncome, shares); return isNum(rep) && isNum(calc) && (Math.abs(rep / calc - 1) > 0.5 || Math.sign(rep) !== Math.sign(calc)) ? calc : rep ?? calc; })(), shares, fcf, ocf: c.operatingCashFlow ?? c.netCashProvidedByOperatingActivities,
     capex: c.capitalExpenditure, debt, cash, netDebt: b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), equity: b.totalStockholdersEquity,
     assets: b.totalAssets, inventory: b.inventory, receivables: b.netReceivables ?? b.accountsReceivables, deferredRevenue: b.deferredRevenue ?? null, goodwill: b.goodwill, ppe: b.propertyPlantEquipmentNet ?? null, retainedEarnings: b.retainedEarnings ?? null, liabilities: b.totalLiabilities ?? (isNum(b.totalAssets) && isNum(b.totalStockholdersEquity) ? b.totalAssets - b.totalStockholdersEquity : null),
     currentAssets: b.totalCurrentAssets, currentLiabilities: b.totalCurrentLiabilities, shortTermDebt: b.shortTermDebt, longTermDebt: b.longTermDebt,
@@ -97,13 +98,15 @@ export function deriveYear(y, taxFallback = 0.21) {
     acquisitions: isNum(c.acquisitionsNet) ? Math.abs(c.acquisitionsNet) : null, sbc: c.stockBasedCompensation ?? null, rnd: i.researchAndDevelopmentExpenses,
     grossMargin: div(i.grossProfit, i.revenue), operatingMargin: div(i.operatingIncome, i.revenue), netMargin: div(i.netIncome, i.revenue),
     fcfMargin: div(fcf, i.revenue), roe: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(i.netIncome, b.totalStockholdersEquity) : null, roa: div(i.netIncome, b.totalAssets),
-    roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: div(ebit, capEmployed), taxRate: t,
+    roic: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : null, roce: isNum(capEmployed) && capEmployed > 0 ? div(ebit, capEmployed) : null, taxRate: t,
     negCapital: isNum(invested) && invested <= 0,
     // Rentabilidad del capital usada en puntuación y foso: ROIC; si el capital invertido es negativo, ROCE
     rc: isNum(invested) && invested > 0 ? div(isNum(ebit) ? ebit * (1 - t) : null, invested) : div(ebit, capEmployed),
-    netDebtToEbitda: div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda), debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
+    // Denominadores negativos invierten el signo: sin EBITDA positivo el ratio no tiene sentido (se marca aparte)
+    netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda) : null,
+    ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && (b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : 0)) > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
     currentRatio: div(b.totalCurrentAssets, b.totalCurrentLiabilities), interestCoverage: isNum(i.interestExpense) && i.interestExpense !== 0 ? div(ebit, Math.abs(i.interestExpense)) : null,
-    fcfConversion: div(fcf, i.netIncome), incomeQuality: div(c.operatingCashFlow, i.netIncome), capexToOcf: div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, c.operatingCashFlow),
+    fcfConversion: isNum(i.netIncome) && i.netIncome > 0 ? div(fcf, i.netIncome) : null, incomeQuality: isNum(i.netIncome) && i.netIncome > 0 ? div(c.operatingCashFlow, i.netIncome) : null, capexToOcf: isNum(c.operatingCashFlow) && c.operatingCashFlow > 0 ? div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, c.operatingCashFlow) : null,
     fcfPerShare: div(fcf, shares), costOfDebt: div(isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, debt),
   };
 }
@@ -184,9 +187,12 @@ export function splitAdjustRows(rows, splitsAdj) {
   });
 }
 
-export function adjustSplits(years, knownSplits = []) {
+export function adjustSplits(years, knownSplits = null) {
   const COMMON = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
   const found = [];
+  // Con la lista real de splits del proveedor, solo se ajusta un salto que coincida con un split conocido
+  // (fecha entre el cierre del año anterior y el del año del salto, y factor parecido).
+  const known = Array.isArray(knownSplits) ? knownSplits.filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0).map((s) => ({ date: String(s.date), f: s.numerator / s.denominator })) : null;
   for (let i = years.length - 1; i > 0; i--) {
     const a = years[i], b = years[i - 1];
     if (!isNum(a.shares) || !isNum(b.shares) || b.shares <= 0) continue;
@@ -197,6 +203,13 @@ export function adjustSplits(years, knownSplits = []) {
     // Confirmación: el beneficio neto no cambia en esa proporción (si cambiara, sería otra cosa)
     const ni = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
     if (Math.abs(ni / f - 1) < 0.25 && f !== 1) continue;
+    if (known) {
+      const from = String(b.date || b.year), to = String(a.date || `${a.year}-12-31`);
+      const k = known.filter((s) => s.date > from && s.date <= to).reduce((x, s) => x * s.f, 1);
+      if (!(Math.abs(k / f - 1) < 0.15)) continue; // no hubo split ese año: es una ampliación de capital (dilución real)
+    } else if (isNum(a.issuance) && a.issuance > 0 && isNum(a.equity) && a.equity > 0 && a.issuance > 0.2 * a.equity) {
+      continue; // emitió acciones por un importe relevante: el salto de acciones es dilución, no un split
+    }
     found.push({ year: a.year, factor: f });
     for (let j = 0; j < i; j++) {
       const y = years[j];

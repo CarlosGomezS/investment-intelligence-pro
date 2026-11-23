@@ -1,14 +1,22 @@
 // Simulaciones de rentabilidad: histórica (con y sin reinversión de dividendos) y prospectiva por supuestos.
-import { isNum } from './finance.js?v=ca0e8ce3';
+import { isNum } from './finance.js?v=7feadaa0';
 
 /** Rentabilidad histórica: precios ajustados por dividendo (= reinversión) frente a precios sin ajustar. */
 export function historical(adjAsc, rawAsc, indexAsc, years, amount = 10000) {
   const start = new Date(); start.setFullYear(start.getFullYear() - years);
   const s = start.toISOString().slice(0, 10);
   const pick = (arr) => { const a = (arr || []).filter((p) => p.date >= s && isNum(p.close)); return a.length > 20 ? a : null; };
-  const A = pick(adjAsc), R = pick(rawAsc), I = pick(indexAsc);
-  const res = (a) => (a ? { final: amount * (a[a.length - 1].close / a[0].close), cagr: (a[a.length - 1].close / a[0].close) ** (1 / years) - 1, from: a[0].date } : null);
-  return { drip: res(A), noDrip: res(R), index: res(I), amount, years };
+  const A = pick(adjAsc), R = pick(rawAsc);
+  // Si la acción tiene menos historia (salida a bolsa reciente o fuente corta), se usan los años reales
+  // y el índice se mide desde la misma fecha para que la comparación sea justa.
+  const first = (A || R) ? (A || R)[0].date : s;
+  const I = (() => { const a = (indexAsc || []).filter((p) => p.date >= first && isNum(p.close)); return a.length > 20 ? a : null; })();
+  const yrs = (a) => Math.max(1 / 365, (new Date(a[a.length - 1].date) - new Date(a[0].date)) / (365.25 * 864e5));
+  const res = (a) => (a ? { final: amount * (a[a.length - 1].close / a[0].close), cagr: (a[a.length - 1].close / a[0].close) ** (1 / yrs(a)) - 1, from: a[0].date, years: yrs(a) } : null);
+  const out = { drip: res(A), noDrip: res(R), index: res(I), amount, years };
+  out.actualYears = (out.drip || out.noDrip || {}).years ?? null;
+  out.partial = isNum(out.actualYears) && out.actualYears < years * 0.95;
+  return out;
 }
 
 /**

@@ -1,5 +1,5 @@
 // Utilidades de interfaz: escape, formato numérico en español, tablas, estados de carga/error.
-import { isNum } from '../calc/finance.js?v=ca0e8ce3';
+import { isNum } from '../calc/finance.js?v=7feadaa0';
 
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -45,7 +45,7 @@ export function source(...provs) {
   const p = provs.filter((x) => x && x.source);
   if (!p.length) return '';
   const uniq = [...new Map(p.map((x) => [x.source + x.endpoint, x])).values()];
-  return `<p class="src">Fuente: ${uniq.map((x) => `${esc(x.source)} <code>${esc(x.endpoint || '')}</code> · ${datetime(x.fetchedAt)}${x.cached ? ' (caché)' : ''}`).join(' · ')}</p>`;
+  return `<p class="src">Fuente: ${uniq.map((x) => `${esc(x.source)} <code>${esc(x.endpoint || '')}</code> · ${datetime(x.fetchedAt)}${x.stale ? ' <b class="warn">(caché caducada: la fuente no respondió o se agotó su cuota)</b>' : x.cached ? ' (caché)' : ''}`).join(' · ')}</p>`;
 }
 
 /**

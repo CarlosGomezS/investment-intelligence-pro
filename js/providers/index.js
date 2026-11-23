@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=ca0e8ce3';
-import { alphavantage } from './alphavantage.js?v=ca0e8ce3';
-import { finnhub } from './finnhub.js?v=ca0e8ce3';
-import { twelvedata } from './twelvedata.js?v=ca0e8ce3';
-import { roic } from './roic.js?v=ca0e8ce3';
-import { sec } from './sec.js?v=ca0e8ce3';
-import { esef } from './esef.js?v=ca0e8ce3';
-import { config } from '../config.js?v=ca0e8ce3';
-import { ApiError, usage, queueDelay } from './http.js?v=ca0e8ce3';
-import { setHint } from './hints.js?v=ca0e8ce3';
+import { fmp } from './fmp.js?v=7feadaa0';
+import { alphavantage } from './alphavantage.js?v=7feadaa0';
+import { finnhub } from './finnhub.js?v=7feadaa0';
+import { twelvedata } from './twelvedata.js?v=7feadaa0';
+import { roic } from './roic.js?v=7feadaa0';
+import { sec } from './sec.js?v=7feadaa0';
+import { esef } from './esef.js?v=7feadaa0';
+import { config } from '../config.js?v=7feadaa0';
+import { ApiError, usage, queueDelay } from './http.js?v=7feadaa0';
+import { setHint } from './hints.js?v=7feadaa0';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -76,17 +76,22 @@ async function complete(method, args, base, rest) {
     try {
       const r = await Promise.race([P[id][method](...args), new Promise((_, rej) => setTimeout(() => rej(new Error('lento')), Math.max(1000, deadline - Date.now())))]);
       if (!Array.isArray(r.data) || !r.data.length) continue;
-      if (cur && r.data[0].reportedCurrency && r.data[0].reportedCurrency !== cur) continue;
+      // Misma moneda obligatoria (si alguna no la indica, no se mezcla)
+      if (!cur || !r.data[0].reportedCurrency || r.data[0].reportedCurrency !== cur) continue;
       let added = false;
+      // Se emparejan ejercicios por fecha de cierre (±45 días), no por la etiqueta del año: hay fuentes que llaman
+      // «2024» al ejercicio que cierra en enero de 2025 y otras «2025»
+      const endOf = (x) => (x.date ? new Date(x.date).getTime() : null);
       for (const o of r.data) {
-        const fy = fyOf(o); const mine = rows.find((x) => fyOf(x) === fy);
+        const eo = endOf(o);
+        const mine = rows.find((x) => (eo && endOf(x) ? Math.abs(endOf(x) - eo) < 45 * 864e5 : fyOf(x) === fyOf(o)));
         if (!mine) { rows.push({ ...o, _from: id }); added = true; continue; }
         for (const [k, v] of Object.entries(o)) if (mine[k] == null && v != null) { mine[k] = v; added = true; }
       }
       if (added) used.push(id);
     } catch (e) { /* la fuente secundaria no aporta: se sigue con lo que hay */ }
   }
-  rows.sort((a, b) => (fyOf(a) < fyOf(b) ? 1 : -1));
+  rows.sort((a, b) => (String(b.date || fyOf(b)) > String(a.date || fyOf(a)) ? 1 : -1));
   const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
   return used.length > 1 ? { ...base, data: rows.slice(0, Math.max(args[2] || 15, base.data.length)), source: used.map((u) => names[u] || u).join(' + '), merged: used } : base;
 }

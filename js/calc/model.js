@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=ca0e8ce3';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=ca0e8ce3';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=7feadaa0';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=7feadaa0';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -13,10 +13,13 @@ export function buildModel(raw, fxRate = 1) {
   const tradeCur = profile.currency || quote.currency || 'USD';
   const inc = asc(val(raw.income) || []), bal = asc(val(raw.balance) || []), cf = asc(val(raw.cashflow) || []);
   const repCur = (inc[inc.length - 1] || {}).reportedCurrency || tradeCur;
-  const fx = repCur === tradeCur ? 1 : fxRate; // unidades de moneda de cotización por 1 unidad de moneda de reporte
+  // Unidades de moneda de cotización por 1 unidad de moneda de reporte. Sin tipo de cambio válido NO se supone 1:
+  // fx = null deja sin calcular todo lo que cruza precio con estados (valoración, PER, rentabilidades…).
+  const fx = repCur === tradeCur ? 1 : isNum(fxRate) && fxRate > 0 ? fxRate : null;
+  const fxMissing = fx === null;
 
   const years = buildAnnual(inc, bal, cf).map((y) => deriveYear(y));
-  const splitsAdj = adjustSplits(years); // acciones y BPA comparables entre años
+  const splitsAdj = adjustSplits(years, raw.splits && raw.splits.ok ? val(raw.splits) || [] : null); // acciones y BPA comparables entre años
   const last = years[years.length - 1] || {};
   const prices = asc(val(raw.prices) || []);
   let ratiosHist = asc(val(raw.ratios) || []);
@@ -27,6 +30,9 @@ export function buildModel(raw, fxRate = 1) {
   // TTM: estados TTM del proveedor si existen; si no, último ejercicio anual (se indica en la interfaz).
   const iT = val(raw.incomeTTM), bT = val(raw.balanceTTM), cT = val(raw.cashflowTTM);
   const ttmYear = iT ? deriveYear({ year: 'TTM', i: iT, b: bT || (bal[bal.length - 1] || {}), c: cT || {} }) : null;
+  // TTM con algún estado sin llegar (p. ej. flujos de caja por tiempo de espera): esas partidas se toman del último anual
+  const ttmFilled = [];
+  if (ttmYear && isNum(ttmYear.revenue)) for (const [k, v] of Object.entries(last)) if (ttmYear[k] == null && v != null && k !== 'year') { ttmYear[k] = v; ttmFilled.push(k); }
   const T = ttmYear && isNum(ttmYear.revenue) ? ttmYear : last;
   const ttmIsReal = !!(ttmYear && isNum(ttmYear.revenue));
 
@@ -34,17 +40,22 @@ export function buildModel(raw, fxRate = 1) {
   // Split posterior al último ejercicio (p. ej. ejecutado este año): las acciones actuales son k veces las del último
   // informe. Se ajustan acciones y BPA de todos los años (y del TTM si viene sin ajustar) para que PER y múltiplos cuadren.
   {
+    // También contrasplits y ADR (1 ADR = k acciones ordinarias): factores 1/k
     const COMMON = [2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50];
-    const near = (r) => COMMON.find((c) => Math.abs(r / c - 1) < 0.12);
+    const near = (r) => COMMON.find((c) => Math.abs(r / c - 1) < 0.12) || (() => { const c = COMMON.find((k) => Math.abs(r * k - 1) < 0.12); return c ? 1 / c : null; })();
     const fix = (y, f) => { if (isNum(y.shares)) y.shares *= f; if (isNum(y.eps)) y.eps /= f; if (isNum(y.fcfPerShare)) y.fcfPerShare /= f; };
     const f = isNum(shares) && isNum(last.shares) && last.shares > 0 && shares !== last.shares ? near(shares / last.shares) : null;
     if (f) { years.forEach((y) => fix(y, f)); splitsAdj.push({ year: String(Number(last.year) + 1), factor: f, recent: true }); }
     if (ttmYear && ttmYear !== last && isNum(ttmYear.shares) && isNum(shares)) { const g = near(shares / ttmYear.shares); if (g) fix(ttmYear, g); }
   }
   const marketCap = quote.marketCap ?? profile.marketCap ?? (isNum(shares) && isNum(price) ? shares * price : null);
-  const netDebtT = isNum(T.netDebt) ? T.netDebt * fx : isNum(last.netDebt) ? last.netDebt * fx : null;
-  const ev = isNum(marketCap) ? marketCap + (netDebtT || 0) : null;
-  const X = (v) => (isNum(v) ? v * fx : null); // a moneda de cotización
+  // Deuda neta: si el último balance no ha llegado, la del último balance disponible (nunca se supone 0 sin decirlo)
+  const ndYear = [...years].reverse().find((y) => isNum(y.netDebt));
+  const ndRep = isNum(T.netDebt) ? T.netDebt : ndYear ? ndYear.netDebt : null;
+  const netDebtT = isNum(ndRep) && isNum(fx) ? ndRep * fx : null;
+  const netDebtFrom = isNum(T.netDebt) ? (T === last ? last.year : 'TTM') : ndYear ? ndYear.year : null;
+  const ev = isNum(marketCap) && isNum(netDebtT) ? marketCap + netDebtT : null; // sin deuda neta conocida no hay EV
+  const X = (v) => (isNum(v) && isNum(fx) ? v * fx : null); // a moneda de cotización (null si falta el tipo de cambio)
 
   const estimates = asc(val(raw.estimates) || []);
   const lastFY = last.year;
@@ -65,11 +76,11 @@ export function buildModel(raw, fxRate = 1) {
 
   // Dividendos
   // Si el proveedor no da el dividendo ajustado, se ajusta con los splits conocidos (los de antes del split se dividen).
-  const splitList = (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.denominator > 0 && s.numerator / s.denominator > 1);
+  const splitList = (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.denominator > 0 && s.numerator > 0 && s.numerator !== s.denominator); // splits y contrasplits
   const divs = asc(val(raw.dividends) || []).filter((d) => isNum(d.adjDividend ?? d.dividend)).map((d) => {
     if (isNum(d.adjDividend) && d.adjDividend !== d.dividend) return d;
     const f = splitList.filter((s) => String(s.date) > String(d.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
-    return f > 1 ? { ...d, adjDividend: d.dividend / f } : d;
+    return f !== 1 ? { ...d, adjDividend: d.dividend / f } : d;
   });
   const byYear = {};
   for (const d of divs) { const y = String(d.date).slice(0, 4); byYear[y] = (byYear[y] || 0) + (d.adjDividend ?? d.dividend); }
@@ -86,7 +97,8 @@ export function buildModel(raw, fxRate = 1) {
   const country = profile.country || 'US';
   const rpRow = Array.isArray(rp) ? rp.find((r) => r.country === countryName(country)) || rp.find((r) => r.country === 'United States') : null;
   const erpAssumed = !rpRow; const erp = rpRow ? rpRow.totalEquityRiskPremium / 100 : 0.045;
-  const costDebt = lastAvg(series('costOfDebt').filter((v) => isNum(v) && v > 0 && v < 0.25), 3);
+  // Coste de la deuda: el histórico (intereses/deuda) puede ser de préstamos antiguos más baratos; nunca por debajo del bono a 10 años
+  const costDebtHist = lastAvg(series('costOfDebt').filter((v) => isNum(v) && v > 0 && v < 0.25), 3);
   const spy = asc(val(raw.spy) || []);
   const betaCalc = !isNum(profile.beta) && prices.length > 500 && spy.length > 500 ? betaFrom(prices, spy) : null;
   const betaAssumed = !isNum(profile.beta) && !isNum(betaCalc);
@@ -94,6 +106,7 @@ export function buildModel(raw, fxRate = 1) {
   // Beta ajustada de Blume (0,67·beta + 0,33): la beta histórica tiende a volver a 1; evita costes de capital extremos.
   const beta = betaAssumed ? 1 : 0.67 * betaRaw + 0.33;
   if (isNum(betaCalc)) derived.push('beta');
+  const costDebt = isNum(costDebtHist) ? Math.max(costDebtHist, rf10) : null;
   const w = waccCalc({ rf: rf10, beta, erp, costDebtPre: costDebt, taxRate: lastAvg(series('taxRate'), 3), equityValue: marketCap, debtValue: X(T.debt ?? last.debt) });
 
   // ---- Cálculos propios cuando el proveedor no da el dato (se marcan como «calculado») ----
@@ -101,7 +114,7 @@ export function buildModel(raw, fxRate = 1) {
     const R = [], K = [];
     for (const y of years) {
       const p = closeAt(prices, String(y.date || '').slice(0, 10)); if (!p || !isNum(y.shares)) continue;
-      const mc = p.close * y.shares, Xv = (v) => (isNum(v) ? v * fx : null);
+      const mc = p.close * y.shares, Xv = (v) => (isNum(v) && isNum(fx) ? v * fx : null);
       const evv = mc + (Xv(y.netDebt) || 0), dps = (dpsSeries.find((d) => d.year === y.year) || {}).dps;
       R.push({ fiscalYear: y.year, date: y.date, priceToEarningsRatio: div(p.close, Xv(y.eps)), priceToSalesRatio: div(mc, Xv(y.revenue)), priceToBookRatio: div(mc, Xv(y.equity)), dividendYield: isNum(dps) && dps / p.close < 0.25 ? dps / p.close : null, _derived: true });
       K.push({ fiscalYear: y.year, date: y.date, enterpriseValue: evv, evToEBITDA: div(evv, Xv(y.ebitda)), evToFreeCashFlow: div(evv, Xv(y.fcf)), freeCashFlowYield: div(Xv(y.fcf), mc), earningsYield: div(Xv(y.netIncome), mc), _derived: true });
@@ -113,7 +126,7 @@ export function buildModel(raw, fxRate = 1) {
   if (!Object.keys(change).length && prices.length > 2) { change = priceChanges(prices); derived.push('variaciones de precio'); }
   let scores = val(raw.scores) || {};
   if (!isNum(scores.piotroskiScore) && years.length >= 2) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } }
-  if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
+  if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) && isNum(fx) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
 
   // PER coherente con el resto del análisis: precio / BPA del mismo periodo que los estados (TTM o último ejercicio).
   const peRatio = div(price, X(T.eps));
@@ -121,7 +134,7 @@ export function buildModel(raw, fxRate = 1) {
   const periodLabel = ttmIsReal ? 'últimos 12 meses (TTM)' : `último ejercicio cerrado (${last.year || '—'}${last.date ? ', cierre ' + String(last.date).slice(0, 10) : ''})`;
 
   return {
-    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, shares, marketCap, ev, netDebt: netDebtT,
+    symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, fxMissing, ttmFilled, netDebtFrom, shares, marketCap, ev, netDebt: netDebtT,
     years, last, T, ttmIsReal, ratiosHist, kmHist, rTTM, kTTM, scores, estimates, forwardEps,
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),

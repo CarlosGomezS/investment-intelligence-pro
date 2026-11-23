@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=ca0e8ce3';
-import { fmtB } from './alerts.js?v=ca0e8ce3';
+import { isNum } from './finance.js?v=7feadaa0';
+import { fmtB } from './alerts.js?v=7feadaa0';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -22,7 +22,7 @@ export function buildReport(m, sc, val, alerts) {
   A('¿Está cara o barata?', vs == null ? 'sin datos suficientes' : vs >= 65 ? 'barata' : vs >= 45 ? 'precio razonable' : 'cara', `PER ${N(m.pe, 1)}×, rentabilidad FCF ${P(isNum(T.fcf) && m.marketCap ? m.X(T.fcf) / m.marketCap : null)}.`, vs);
   const c = val.composite;
   A('¿Cuál es su valor intrínseco estimado?', isNum(c.value) ? `${N(c.value)} ${cur}` : 'no calculable', isNum(c.value) ? `Mediana de ${c.n} estimaciones (DCF base con doble peso, múltiplos históricos y de competidores${val.ddm && val.ddm.applicable ? ', DDM' : ''}). Rango central ${N(c.low)}–${N(c.high)} ${cur}. DCF base: ${val.dcf && isNum(val.dcf.perShare) ? N(val.dcf.perShare) + ' ' + cur : 'no aplicable'}.` : 'Faltan datos (FCF negativo o sin historial).', null);
-  A('¿Qué margen de seguridad ofrece?', isNum(c.mos) ? P(c.mos, 0) : 'sin dato', isNum(c.mos) ? (c.mos > 0.25 ? 'Holgado: el precio deja colchón ante errores de estimación.' : c.mos > 0 ? 'Escaso: poco colchón ante errores de estimación.' : `Negativo: el precio supera el valor estimado en un ${P(-c.up, 0)}.`) : '', null);
+  A('¿Qué margen de seguridad ofrece?', isNum(c.mos) ? P(c.mos, 0) : 'sin dato', isNum(c.mos) ? (c.mos > 0.25 ? 'Holgado: el precio deja colchón ante errores de estimación.' : c.mos > 0 ? 'Escaso: poco colchón ante errores de estimación.' : `Negativo: el precio supera el valor estimado en un ${P(isNum(c.value) && c.value > 0 ? m.price / c.value - 1 : null, 0)}.`) : '', null);
   const risks = alerts.slice(0, 5).map((a) => a.title.toLowerCase());
   A('¿Cuáles son sus principales riesgos?', risks.length ? `${alerts.length} alertas` : 'sin alertas cuantitativas', risks.length ? 'Detectados en los datos: ' + risks.join('; ') + '.' : 'Los estados no muestran anomalías; revisa riesgos de negocio, regulación y noticias.', null);
   A('¿Qué tendría que pasar para que la inversión saliera mal?', '', badCase(m, val), null);
@@ -33,8 +33,9 @@ export function buildReport(m, sc, val, alerts) {
   const total = sc.total, qual = mean3(cat(sc, 'calidad'), cat(sc, 'rentabilidad'), cat(sc, 'caja'), cat(sc, 'solidez'));
   let conclusion;
   if (sc.coverage < 0.45 || total == null) conclusion = 'Empresa difícil de valorar por falta de información';
-  else if (qual >= 70 && isNum(c.mos) && c.mos >= 0.2) conclusion = 'Empresa de gran calidad a precio atractivo';
-  else if (qual >= 60 && isNum(c.mos) && c.mos >= -0.1) conclusion = 'Empresa de calidad a precio razonable';
+  else if (qual >= 60 && !isNum(c.mos)) conclusion = 'Empresa de calidad, sin valoración fiable';
+  else if (qual >= 70 && c.mos >= 0.2 && !alerts.some((a) => a.sev === 'alta') && total >= 60) conclusion = 'Empresa de gran calidad a precio atractivo';
+  else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad a precio razonable';
   else if (qual >= 60) conclusion = 'Empresa de calidad, pero sobrevalorada';
   else conclusion = 'Empresa mediocre o con riesgos elevados';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);

@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=ca0e8ce3';
+import { isNum, div, mean, median, cagr } from './finance.js?v=7feadaa0';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -8,7 +8,7 @@ export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtVal
   const kd = isNum(costDebtPre) ? costDebtPre * (1 - (isNum(taxRate) ? taxRate : 0.21)) : null;
   const E = isNum(equityValue) && equityValue > 0 ? equityValue : 0;
   const D = isNum(debtValue) && debtValue > 0 ? debtValue : 0;
-  const we = E + D > 0 ? E / (E + D) : 1, wd = 1 - we;
+  const we = E > 0 ? E / (E + D) : 1, wd = 1 - we; // sin capitalización conocida no se pondera solo con deuda
   const w = we * ke + wd * (kd ?? ke);
   return { ke, kd, we, wd, wacc: w };
 }
@@ -18,8 +18,9 @@ export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtVal
  * Años 1-5 crecen a `growth`; si years=10, los años 6-10 convergen linealmente hacia `terminalGrowth`.
  * Valor terminal por Gordon: FCF_n·(1+g)/(WACC−g).
  */
-export function dcf({ fcf0, growth, years = 5, terminalGrowth = 0.025, discount, netDebt = 0, shares }) {
+export function dcf({ fcf0, growth, years = 5, terminalGrowth = 0.025, discount, netDebt, shares }) {
   if (![fcf0, growth, discount, shares].every(isNum) || shares <= 0) return null;
+  if (!isNum(netDebt)) return { error: 'Falta la deuda neta (balance no disponible): no se supone cero' };
   if (discount <= terminalGrowth) return { error: 'El WACC debe ser mayor que el crecimiento terminal' };
   const rows = []; let f = fcf0, pvSum = 0;
   for (let t = 1; t <= years; t++) {
@@ -32,7 +33,7 @@ export function dcf({ fcf0, growth, years = 5, terminalGrowth = 0.025, discount,
   const tv = (f * (1 + terminalGrowth)) / (discount - terminalGrowth);
   const pvTv = tv / (1 + discount) ** years;
   const ev = pvSum + pvTv;
-  const equity = ev - (isNum(netDebt) ? netDebt : 0);
+  const equity = ev - netDebt;
   return { rows, pvSum, tv, pvTv, ev, equity, perShare: equity / shares, tvShare: pvTv / ev };
 }
 
@@ -54,8 +55,8 @@ export const impliedByPE = (eps, pe) => (isNum(eps) && eps > 0 && isNum(pe) && p
 
 /** Precio implícito por múltiplo de EV (EV/EBITDA, EV/FCF): (métrica·múltiplo − deuda neta)/acciones. */
 export function impliedByEV(metric, multiple, netDebt, shares) {
-  if (![metric, multiple, shares].every(isNum) || metric <= 0 || multiple <= 0 || shares <= 0) return null;
-  return (metric * multiple - (isNum(netDebt) ? netDebt : 0)) / shares;
+  if (![metric, multiple, shares, netDebt].every(isNum) || metric <= 0 || multiple <= 0 || shares <= 0) return null; // sin deuda neta conocida no se supone 0
+  return (metric * multiple - netDebt) / shares;
 }
 
 export const marginOfSafety = (intrinsic, price) => (isNum(intrinsic) && intrinsic > 0 && isNum(price) ? (intrinsic - price) / intrinsic : null);
@@ -64,9 +65,9 @@ export const upside = (intrinsic, price) => (isNum(intrinsic) && isNum(price) &&
 /** Escenarios estándar a partir del caso base (supuestos documentados en la interfaz). */
 export function scenarios(base) {
   const S = [
-    { id: 'pesimista', label: 'Pesimista', growth: base.growth * 0.5, discount: base.discount + 0.01, terminalGrowth: Math.max(0.01, base.terminalGrowth - 0.005) },
+    { id: 'pesimista', label: 'Pesimista', growth: base.growth - Math.abs(base.growth) * 0.5, discount: base.discount + 0.01, terminalGrowth: Math.max(0.01, base.terminalGrowth - 0.005) },
     { id: 'base', label: 'Base', growth: base.growth, discount: base.discount, terminalGrowth: base.terminalGrowth },
-    { id: 'optimista', label: 'Optimista', growth: base.growth * 1.5, discount: Math.max(base.terminalGrowth + 0.02, base.discount - 0.01), terminalGrowth: base.terminalGrowth + 0.005 },
+    { id: 'optimista', label: 'Optimista', growth: base.growth + Math.abs(base.growth) * 0.5, discount: Math.max(base.terminalGrowth + 0.02, base.discount - 0.01), terminalGrowth: base.terminalGrowth + 0.005 },
   ];
   return S.map((s) => ({ ...s, result: dcf({ ...base, ...s }) }));
 }
@@ -74,7 +75,7 @@ export function scenarios(base) {
 /**
  * Crecimiento base sugerido para el DCF. Regla documentada:
  * mediana de (CAGR 5a del FCF, CAGR 5a de ventas, crecimiento anual de ventas previsto por analistas),
- * acotada entre 0 % y 30 %. Devuelve también de dónde sale cada componente.
+ * acotada entre −10 % y 30 %. Devuelve también de dónde sale cada componente.
  */
 export function suggestGrowth({ fcfCagr5, revCagr5, analystRevGrowth, rev1, rev10 }) {
   const parts = [['FCF histórico (CAGR 5a)', fcfCagr5], ['Ventas históricas (CAGR 5a)', revCagr5], ['Ventas previstas por analistas', analystRevGrowth]].filter(([, v]) => isNum(v));
@@ -85,7 +86,8 @@ export function suggestGrowth({ fcfCagr5, revCagr5, analystRevGrowth, rev1, rev1
   const ref = [rev1, rev10, analystRevGrowth].filter(isNum);
   let capped = null;
   if (ref.length && m > Math.max(...ref)) { capped = Math.max(...ref); m = capped; }
-  return { value: Math.min(0.3, Math.max(0, m)), parts, capped };
+  // Empresas en declive: se proyecta el declive (hasta −10 % anual), no un 0 % optimista
+  return { value: Math.min(0.3, Math.max(-0.1, m)), parts, capped };
 }
 
 /** Crecimiento anual medio de ventas previsto por analistas desde el último año real. */

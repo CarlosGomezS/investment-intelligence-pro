@@ -5,7 +5,7 @@
 //   Fractal inferior: vela cuyo mínimo es menor que el de las dos anteriores y las dos siguientes (superior: al revés).
 // Uso de Williams: solo se opera cuando el cocodrilo «come» (líneas separadas y ordenadas); entrada al romper el
 // fractal por encima de los dientes, stop tras el fractal contrario y salida cuando las líneas vuelven a juntarse.
-import { isNum } from './finance.js?v=ca0e8ce3';
+import { isNum } from './finance.js?v=7feadaa0';
 
 export function smma(values, n) {
   const out = new Array(values.length).fill(null);
@@ -28,7 +28,7 @@ export function fractals(bars) {
 
 /** Estado del cocodrilo en la última vela y niveles técnicos de entrada y stop. bars: [{date, high, low, close}] ascendente. */
 export function alligator(rows) {
-  const bars = (rows || []).filter((b) => isNum(b.close)).map((b) => ({ date: b.date, close: b.close, high: isNum(b.high) ? b.high : b.close, low: isNum(b.low) ? b.low : b.close }));
+  const bars = [...(rows || [])].filter((b) => isNum(b.close)).sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-300).map((b) => ({ date: b.date, close: b.close, high: isNum(b.high) ? b.high : b.close, low: isNum(b.low) ? b.low : b.close }));
   if (bars.length < 40) return null;
   const med = bars.map((b) => (b.high + b.low) / 2);
   const J = smma(med, 13), T = smma(med, 8), L = smma(med, 5);
@@ -43,8 +43,9 @@ export function alligator(rows) {
   else state = 'dormido';
   const { up, down } = fractals(bars);
   const lastUp = up.length ? up[up.length - 1] : null;
-  const lastDown = [...down].reverse().find((f) => f.price < close) || null;
-  // Entrada de Williams: rotura del último fractal superior si está por encima de los dientes
-  const entry = lastUp && lastUp.price > teeth ? lastUp.price : null;
+  // Stop: el fractal inferior más reciente bajo el precio, solo de los últimos 3 meses (un soporte de hace un año no sirve)
+  const lastDown = [...down].reverse().find((f) => f.price < close && f.i >= n - 63) || null;
+  // Entrada de Williams: rotura del último fractal superior, solo con el cocodrilo comiendo al alza y si aún no se ha roto
+  const entry = state.startsWith('come al alza') || state.startsWith('al alza') ? (lastUp && lastUp.price > teeth && lastUp.price > close ? lastUp.price : null) : null;
   return { state, jaw, teeth, lips, close, date: bars[n].date, entry, entryDate: lastUp ? lastUp.date : null, stop: lastDown ? lastDown.price : null, stopDate: lastDown ? lastDown.date : null, spread };
 }

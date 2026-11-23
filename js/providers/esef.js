@@ -1,10 +1,10 @@
 // filings.xbrl.org: informes anuales oficiales en formato ESEF (IFRS) de empresas cotizadas europeas.
 // Gratuito y sin clave. Se localiza la entidad por nombre (y país si se conoce) y se leen los hechos xBRL-JSON
 // de los últimos informes. Cada informe trae el ejercicio y el anterior. Solo datos anuales.
-import { getJSON } from './http.js?v=ca0e8ce3';
-import { config } from '../config.js?v=ca0e8ce3';
-import { toStatements } from './xbrl.js?v=ca0e8ce3';
-import { hint } from './hints.js?v=ca0e8ce3';
+import { getJSON } from './http.js?v=7feadaa0';
+import { config } from '../config.js?v=7feadaa0';
+import { toStatements } from './xbrl.js?v=7feadaa0';
+import { hint } from './hints.js?v=7feadaa0';
 
 const H = () => config.get().cacheHours;
 const GENERIC = /^(banco|bank|group|grupo|holding|holdings|international|industria|industrie|societe|sociedad|compania|company|corporation|anonima|aktiengesellschaft|limited|public|europe|european|global|the)$/i;
@@ -25,11 +25,15 @@ async function filingsFor(sym) {
   const filter = JSON.stringify([{ name: 'country', op: 'eq', val: cc }, { name: 'entity.name', op: 'ilike', val: `%${kw}%` }]);
   const r = await getJSON('esef', 'api/filings', { filter, include: 'entity', sort: '-period_end', 'page[size]': 20 }, H().fundamentals, (b) => b && Array.isArray(b.data) && b.data.length);
   const ents = Object.fromEntries((r.data.included || []).filter((x) => x.type === 'entity').map((e) => [e.id, e.attributes && e.attributes.name]));
-  // Si hay varias entidades, la que más se parece al nombre completo
-  const target = String(h.name || '').toLowerCase();
+  // Se elige la entidad cuyo nombre más se parece al de la empresa, y solo si se parece de verdad:
+  // con un parecido débil se devuelve «sin datos» antes que arriesgarse a cargar las cuentas de OTRA empresa.
+  const LEGAL = /^(sa|s\.a\.|se|ag|nv|plc|spa|s\.p\.a\.|ab|asa|oyj|as|bv|gmbh|kgaa|inc|corp|ltd|co|the|de|del|la|el|y|and|et|group|grupo|holding|holdings)$/i;
+  const toks = (x) => new Set(String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((w) => w.length >= 2 && !LEGAL.test(w)));
+  const T = toks(h.name);
+  const sim = (id) => { const E = toks(ents[id]); if (!T.size || !E.size) return 0; let k = 0; for (const w of T) if (E.has(w)) k++; return k / Math.max(T.size, E.size); };
   const list = r.data.data.map((f) => ({ ...f.attributes, entityId: f.relationships && f.relationships.entity && f.relationships.entity.data && f.relationships.entity.data.id }));
-  const score = (id) => { const n = String(ents[id] || '').toLowerCase(); return n === target ? 3 : target && n.includes(target.split(' ')[0]) ? 2 : 1; };
-  const best = list.reduce((a, f) => (score(f.entityId) > score(a.entityId) ? f : a), list[0]);
+  const best = list.reduce((a, f) => (sim(f.entityId) > sim(a.entityId) ? f : a), list[0]);
+  if (sim(best.entityId) < 0.6) throw Object.assign(new Error(`ESEF no tiene un emisor que coincida con «${h.name}» (el más parecido es «${ents[best.entityId] || '—'}»)`), { code: 'not_found' });
   const mine = list.filter((f) => f.entityId === best.entityId && f.json_url);
   // un informe por fecha de cierre (el primero suele ser el idioma principal)
   const seen = new Set(), uniq = [];

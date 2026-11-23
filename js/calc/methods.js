@@ -2,13 +2,15 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=ca0e8ce3';
+import { isNum, mean, stdev, median } from './finance.js?v=7feadaa0';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const lin = (x, x0, x1) => clamp((x - x0) / (x1 - x0), 0, 1); // 0..1
 const C = (t, ok, v, rule) => ({ t, ok: ok == null ? null : !!ok, v, rule });
 const pctS = (v, d = 1) => (isNum(v) ? (v * 100).toFixed(d).replace('.', ',') + ' %' : 'sin dato');
+// Bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas: su balance no se lee igual (caja, deuda, circulante)
+const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const nS = (v, d = 1) => (isNum(v) ? v.toFixed(d).replace('.', ',') : 'sin dato');
 
 function base(S) {
@@ -57,13 +59,15 @@ export const METHODS = {
         C('No diluye', c6, `acciones ${pctS(m.growth.shares5)}/año en 5 años`, this.rules[5]),
         C('Margen de seguridad', c7, isNum(mos) ? `${pctS(mos)} (valor ${nS(iv, 2)} vs precio ${nS(price, 2)})` : 'sin valor intrínseco', this.rules[6]),
       ];
+      const fin = FIN.test(base(S).sector);
+      if (fin) checks.unshift(C('Sector analizable con estos criterios', false, `${base(S).sector.trim() || 'financiero'}: FCF, deuda neta/EBITDA y DCF no tienen sentido en bancos, aseguradoras, inmobiliarias o eléctricas`, 'Analízala en su ficha con ROE, solvencia regulatoria y valor contable.'));
       const W = [25, 15, 15, 15, 15, 15];
       const quality = [c1, c2, c3, c4, c5, c6].reduce((a, c, i) => a + (c ? W[i] : 0), 0);
       const priceSc = isNum(mos) ? lin(mos, -0.5, 0.35) * 100 : 0;
       const score = Math.round(0.7 * quality + 0.3 * priceSc);
       const qOk = c1 && [c2, c3, c4, c5, c6].filter(Boolean).length >= 4;
-      const verdict = qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
-      return { score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: 'años (largo plazo)' };
+      const verdict = fin ? 'no' : qOk && c7 ? 'entra' : qOk ? 'vigilar' : 'no';
+      return { score: fin ? Math.min(score, 40) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: 'años (largo plazo)' };
     },
   },
 
@@ -86,14 +90,16 @@ export const METHODS = {
       const { m, Y, s, price } = base(S);
       const X = m.X;
       const rev = X(m.last.revenue);
-      const g1 = isNum(rev) ? rev >= 7.7e8 : null;
+      const usd = m.tradeCur === 'USD';
+      const g1 = isNum(rev) && usd ? rev >= 7.7e8 : null; // el umbral está en dólares
       const cr = m.last.currentRatio, wc = isNum(m.last.currentAssets) && isNum(m.last.currentLiabilities) ? m.last.currentAssets - m.last.currentLiabilities : null;
       const ltd = m.last.longTermDebt;
-      const g2 = isNum(cr) && isNum(wc) ? cr >= 2 && (isNum(ltd) ? ltd <= wc : true) : null;
+      const g2 = isNum(cr) && isNum(wc) && isNum(ltd) ? cr >= 2 && ltd <= wc : isNum(cr) && cr < 2 ? false : null; // sin dato de deuda a largo no se aprueba
       const ni = last(s('netIncome').filter(isNum), 10);
       const g3 = ni.length >= 10 ? ni.every((v) => v > 0) : ni.length && ni.some((v) => v <= 0) ? false : null;
-      const dp = last(Y.map((y) => y.dividendsPaid), 20).filter((v) => v != null);
-      const g4 = dp.length >= 10 ? dp.every((v) => v > 0) : dp.length && dp.some((v) => !(v > 0)) ? false : null;
+      const dpAll = last(Y.map((y) => y.dividendsPaid), 20); const dp = dpAll.filter((v) => v != null);
+      // Un año sin la partida puede ser un año sin dividendo: no se da por pagado
+      const g4 = dp.some((v) => !(v > 0)) ? false : dpAll.length >= 10 && dpAll.every((v) => v != null && v > 0) ? true : null;
       const eps = s('eps').filter(isNum); const w = last(eps, 10);
       const e3 = mean(last(eps, 3)), e0 = w.length >= 7 ? mean(w.slice(0, 3)) : null;
       const g5 = isNum(e3) && isNum(e0) && e0 > 0 ? e3 >= e0 * 1.33 : null;
@@ -105,17 +111,19 @@ export const METHODS = {
       const g7 = isNum(pb) ? pb <= 1.5 || (isNum(pe3) && pe3 * pb <= 22.5) : null;
       const gnum = isNum(eps3) && eps3 > 0 && isNum(bvps) && bvps > 0 ? Math.sqrt(22.5 * eps3 * bvps) : null;
       const checks = [
-        C('Tamaño adecuado', g1, `ventas ${isNum(rev) ? (rev / 1e9).toFixed(1).replace('.', ',') + ' mil M' : 'sin dato'}`, this.rules[0]),
+        C('Tamaño adecuado', g1, `ventas ${isNum(rev) ? (rev / 1e9).toFixed(1).replace('.', ',') + ' mil M ' + m.tradeCur : 'sin dato'}${!usd ? ' (umbral en USD: no comparable sin convertir)' : ''}`, this.rules[0]),
         C('Situación financiera fuerte', g2, `liquidez ${nS(cr, 2)} · deuda LP ${isNum(ltd) && isNum(wc) ? (ltd <= wc ? '≤' : '>') + ' capital circulante' : 'sin dato'}`, this.rules[1]),
         C('Beneficios estables 10 años', g3, `${ni.filter((v) => v > 0).length} de ${ni.length} años con beneficio${ni.length < 10 ? ' (tus fuentes no dan 10 años)' : ''}`, this.rules[2]),
-        C('Historial de dividendos', g4, `${dp.filter((v) => v > 0).length} de ${dp.length} años verificables con dividendo (Graham pide 20)`, this.rules[3]),
+        C('Historial de dividendos', g4, `${dp.filter((v) => v > 0).length} de ${dpAll.length} años con dividendo informado${dpAll.length > dp.length ? ` (${dpAll.length - dp.length} sin dato)` : ''} · Graham pide 20`, this.rules[3]),
         C('Crecimiento del BPA ≥ 33 %', g5, isNum(e0) ? `BPA medio ${nS(e0, 2)} → ${nS(e3, 2)} (${pctS(e3 / e0 - 1, 0)})` : 'menos de 7 años de BPA', this.rules[4]),
         C('PER moderado', g6, `PER sobre BPA medio 3 años: ${nS(pe3)}`, this.rules[5]),
         C('Precio/valor contable moderado', g7, `P/VC ${nS(pb, 2)}${isNum(pe3) && isNum(pb) ? ` · PER×P/VC ${nS(pe3 * pb)}` : ''}`, this.rules[6]),
       ];
+      const finG = FIN.test(base(S).sector);
+      if (finG) checks.unshift(C('Sector analizable', false, 'financiera, inmobiliaria o eléctrica: el criterio de liquidez de Graham no aplica', 'Graham trataba aparte bancos y eléctricas.'));
       const passed = [g1, g2, g3, g4, g5, g6, g7].filter(Boolean).length;
       const score = Math.round((passed / 7) * 100);
-      const verdict = passed === 7 ? 'entra' : passed >= 5 && g6 !== false && g7 !== false ? 'vigilar' : 'no';
+      const verdict = finG ? 'no' : passed === 7 ? 'entra' : passed >= 5 && g6 !== false && g7 !== false ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: gnum, entryNote: 'número de Graham √(22,5 × BPA × valor contable): precio máximo', target: isNum(gnum) ? Math.min(gnum, price) * 1.5 : null, targetNote: '+50 % sobre la compra', stop: null, stopNote: 'sin stop de precio: venta obligada al final del 2.º año natural', horizon: 'máx. 2 años' };
     },
   },
@@ -125,9 +133,9 @@ export const METHODS = {
     author: 'Joel Greenblatt, «El pequeño libro que bate al mercado»',
     summary: 'Clasifica todas las empresas por dos números: rentabilidad del beneficio (EBIT / valor de empresa) y rendimiento del capital (EBIT / (capital circulante + activo fijo neto)). Compra las mejor clasificadas en conjunto.',
     rules: [
-      'Excluye bancos, aseguradoras y eléctricas (estructura financiera distinta).',
+      'Excluye bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas (estructura financiera distinta).',
       'Rentabilidad del beneficio = EBIT / valor de empresa (más alta = más barata).',
-      'Rendimiento del capital = EBIT / (capital circulante neto + activo fijo neto) (más alto = mejor negocio).',
+      'Rendimiento del capital = EBIT / (capital circulante neto + activo fijo neto) (más alto = mejor negocio). Capital circulante sin caja ni deuda a corto.',
       'Se ordena por la suma de ambos puestos dentro del universo analizado; se compran las primeras (20-30 en cartera).',
     ],
     exit: 'Se mantiene cada posición un año y se vuelve a pasar la fórmula. No usa stop de precio ni objetivo.',
@@ -135,13 +143,18 @@ export const METHODS = {
     prepare(all) {
       const rows = all.map((r) => {
         const { m, sector } = base(r.S);
-        const excluded = /financ|bank|insur|utilit|banco|asegur|eléctric/i.test(sector);
-        const ebit = m.X(m.T.ebit ?? m.last.ebit);
+        const excluded = FIN.test(sector);
+        const Y0 = m.T; // mismo periodo para los dos ratios (TTM si existe; si no, último ejercicio)
+        const ebitR = Y0.ebit ?? m.last.ebit, ebit = m.X(ebitR);
         const ey = isNum(ebit) && isNum(m.ev) && m.ev > 0 ? ebit / m.ev : null;
-        const wc = isNum(m.last.currentAssets) && isNum(m.last.currentLiabilities) ? m.last.currentAssets - m.last.currentLiabilities : null;
-        const cap = isNum(wc) && isNum(m.last.ppe) ? Math.max(0, wc) + m.last.ppe : null;
-        const roc = isNum(m.last.ebit) && isNum(cap) && cap > 0 ? m.last.ebit / cap : null;
-        return { r, excluded, ey, roc, wc, ppe: m.last.ppe };
+        // Capital circulante operativo: sin la caja (no hace falta para operar) ni la deuda a corto (es financiación)
+        const ca = Y0.currentAssets ?? m.last.currentAssets, cl = Y0.currentLiabilities ?? m.last.currentLiabilities;
+        const cash = Y0.cash ?? m.last.cash ?? 0, std = Y0.shortTermDebt ?? m.last.shortTermDebt ?? 0;
+        const wc = isNum(ca) && isNum(cl) ? (ca - cash) - (cl - std) : null;
+        const ppe = Y0.ppe ?? m.last.ppe;
+        const cap = isNum(wc) && isNum(ppe) ? Math.max(0, wc) + ppe : null;
+        const roc = isNum(ebitR) && isNum(cap) && cap > 0 ? ebitR / cap : null;
+        return { r, excluded, ey, roc, wc, ppe };
       });
       const ok = rows.filter((x) => !x.excluded && isNum(x.ey) && isNum(x.roc));
       const rk = (k) => { const s = [...ok].sort((a, b) => b[k] - a[k]); s.forEach((x, i) => (x['rank_' + k] = i + 1)); };
@@ -156,10 +169,10 @@ export const METHODS = {
         C('Sector admitido', !g.excluded, g.excluded ? 'financiera o eléctrica: excluida' : 'sí', this.rules[0]),
         C('Rentabilidad del beneficio', isNum(g.ey) ? g.ey > (rf || 0.04) : null, isNum(g.ey) ? `${pctS(g.ey)} (puesto ${g.rank_ey || '—'} de ${g.n}) · bono 10a ${pctS(rf)}` : 'sin dato', this.rules[1]),
         C('Rendimiento del capital', isNum(g.roc) ? g.roc >= 0.25 : null, isNum(g.roc) ? `${pctS(g.roc, 0)} (puesto ${g.rank_roc || '—'} de ${g.n})` : 'sin dato (falta activo fijo o capital circulante)', this.rules[2]),
-        C('Clasificación conjunta', isNum(g.pos) ? g.pos <= Math.max(3, Math.ceil(g.n * 0.3)) : null, isNum(g.pos) ? `puesto ${g.pos} de ${g.n}` : 'no clasificada', this.rules[3]),
+        C('Clasificación conjunta', isNum(g.pos) ? g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) : null, isNum(g.pos) ? `puesto ${g.pos} de ${g.n}` : 'no clasificada', this.rules[3]),
       ];
       const score = isNum(g.pos) && g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 0;
-      const verdict = !g.excluded && isNum(g.pos) && g.pos <= Math.max(3, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
+      const verdict = !g.excluded && isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de clasificación, no de precio objetivo)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
   },
@@ -169,7 +182,7 @@ export const METHODS = {
     author: 'Peter Lynch, «Un paso por delante de Wall Street»',
     summary: 'Una empresa a precio justo tiene un PER igual a su crecimiento. Lynch suma la rentabilidad por dividendo al crecimiento: PER / (crecimiento del BPA + dividendo).',
     rules: [
-      'PEGY = PER / (crecimiento anual del BPA en 5 años % + rentabilidad por dividendo %).',
+      'PEGY = PER / (crecimiento anual del BPA en 5 años % + rentabilidad por dividendo %), con la suma limitada a 30 para no premiar rebotes puntuales.',
       'PEGY ≤ 0,5 muy atractivo · ≤ 1 razonable · > 1 caro.',
       'Solo aplicable con beneficio y crecimiento positivos.',
       'Precio justo = BPA × (crecimiento % + dividendo %), es decir, el precio con PEGY = 1.',
@@ -182,15 +195,18 @@ export const METHODS = {
       const g = m.growth.eps5;
       const dy = isNum(m.rTTM && m.rTTM.dividendYieldTTM) ? m.rTTM.dividendYieldTTM : isNum(m.dpsTTM) && price ? m.dpsTTM / price : 0;
       const gy = isNum(g) ? (g + (dy || 0)) * 100 : null;
-      const pegy = isNum(pe) && isNum(gy) && gy > 0 ? pe / gy : null;
-      const fair = isNum(eps) && eps > 0 && isNum(gy) && gy > 0 ? eps * Math.min(gy, 30) : null;
+      const okG = isNum(pe) && isNum(g) && g > 0;
+      const gyC = isNum(gy) ? Math.min(gy, 30) : null; // mismo tope (30) para el PEGY y el precio justo: coherentes entre sí
+      const pegy = okG && gyC > 0 ? pe / gyC : null;
+      const fair = okG && gyC > 0 ? eps * gyC : null;
       const checks = [
         C('Beneficio y crecimiento positivos', isNum(pe) && isNum(g) && g > 0, `PER ${nS(pe)} · BPA 5a ${pctS(g)}/año · dividendo ${pctS(dy, 2)}`, this.rules[2]),
         C('PEGY ≤ 1', isNum(pegy) ? pegy <= 1 : null, `PEGY ${nS(pegy, 2)}`, this.rules[1]),
         C('PEGY ≤ 0,5 (muy atractivo)', isNum(pegy) ? pegy <= 0.5 : null, `PEGY ${nS(pegy, 2)}`, this.rules[1]),
       ];
+      if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: el BPA puede ser muy volátil', 'Compruébala en su ficha.'));
       const score = isNum(pegy) ? Math.round(pegy <= 0.5 ? 100 : pegy <= 1 ? 100 - (pegy - 0.5) * 80 : Math.max(0, 60 - (pegy - 1) * 60)) : 0;
-      const verdict = isNum(pegy) && pegy <= 1 ? 'entra' : isNum(pegy) && pegy <= 1.5 ? 'vigilar' : 'no';
+      const verdict = !okG ? 'no' : pegy <= 1 ? 'entra' : pegy <= 1.5 ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: fair, entryNote: 'precio con PEGY = 1 (crecimiento limitado al 30 %)', target: fair, targetNote: 'precio justo (PEGY = 1)', stop: null, stopNote: 'sin stop de precio: se vende si cambia la historia', horizon: '1-5 años' };
     },
   },
@@ -219,6 +235,7 @@ export const METHODS = {
         C('Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n})` : 'sin valor contable positivo', this.rules[0]),
         C('F-Score ≥ 8', isNum(f) ? f >= 8 : null, isNum(f) ? `${f}/9` : 'sin dato', this.rules[2]),
       ];
+      if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: varias pruebas del F-Score (liquidez, margen bruto) no se leen igual', 'Compruébala en su ficha.'));
       const score = isNum(f) ? Math.round((f / 9) * (p.cheap ? 100 : 60)) : 0;
       const verdict = p.cheap && f >= 8 ? 'entra' : f >= 8 || (p.cheap && f >= 6) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de selección)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };

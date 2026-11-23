@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js?v=ca0e8ce3';
+import { config, KEYS } from '../config.js?v=7feadaa0';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }
@@ -30,9 +30,18 @@ async function idbSet(k, v) {
   const d = await db(); if (!d) return;
   return new Promise((res) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(v, k); t.oncomplete = res; t.onerror = res; });
 }
-export async function clearCache() {
+/** Borra la caché. Con símbolo, solo las entradas de esa empresa (no gasta cuota del resto). */
+export async function clearCache(sym) {
   const d = await db(); if (!d) return;
-  return new Promise((res) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).clear(); t.oncomplete = res; t.onerror = res; });
+  if (!sym) return new Promise((res) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).clear(); t.oncomplete = res; t.onerror = res; });
+  const S = String(sym), E = encodeURIComponent(S);
+  const hits = [`symbol=${E}&`, `symbols=${E}&`, `ticker=${E}&`, `q=${E}&`, `/${S}?`, `/${S}/`];
+  return new Promise((res) => {
+    const t = d.transaction(STORE, 'readwrite'); const st = t.objectStore(STORE);
+    const req = st.openCursor();
+    req.onsuccess = () => { const c = req.result; if (!c) return; const k = String(c.key) + '&'; if (hits.some((h) => k.includes(h))) c.delete(); c.continue(); };
+    t.oncomplete = res; t.onerror = res;
+  });
 }
 
 // ---------- Contador de uso diario por proveedor ----------

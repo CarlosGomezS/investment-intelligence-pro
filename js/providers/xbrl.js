@@ -39,8 +39,16 @@ export const MAP = {
     longTermInvestments: [...G('LongTermInvestments', 'MarketableSecuritiesNoncurrent')],
     totalAssets: [...G('Assets'), ...I('Assets')],
     totalCurrentLiabilities: [...G('LiabilitiesCurrent'), ...I('CurrentLiabilities')],
-    shortTermDebt: [...G('LongTermDebtCurrent', 'DebtCurrent', 'ShortTermBorrowings', 'CommercialPaper'), ...I('CurrentBorrowings', 'ShorttermBorrowings', 'CurrentPortionOfLongtermBorrowings')],
-    longTermDebt: [...G('LongTermDebtNoncurrent', 'LongTermDebt'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    // Deuda: se suman sus componentes en el posproceso (ver más abajo); aquí cada uno por separado
+    debtCurrentTotal: [...G('DebtCurrent'), ...I('CurrentBorrowings', 'ShorttermBorrowings')],
+    ltdCurrent: [...G('LongTermDebtCurrent'), ...I('CurrentPortionOfLongtermBorrowings')],
+    stBorrowings: [...G('ShortTermBorrowings')],
+    commercialPaper: [...G('CommercialPaper')],
+    longTermDebt: [...G('LongTermDebtNoncurrent'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    longTermDebtTotal: [...G('LongTermDebt')], // en US-GAAP incluye la parte a corto
+    leaseCurrent: [...G('OperatingLeaseLiabilityCurrent'), ...I('CurrentLeaseLiabilities')],
+    leaseNoncurrent: [...G('OperatingLeaseLiabilityNoncurrent'), ...I('NoncurrentLeaseLiabilities')],
+    financeLease: [...G('FinanceLeaseLiability')],
     deferredRevenue: [...G('ContractWithCustomerLiabilityCurrent', 'DeferredRevenueCurrent'), ...I('CurrentContractLiabilities')],
     totalLiabilities: [...G('Liabilities'), ...I('Liabilities')],
     retainedEarnings: [...G('RetainedEarningsAccumulatedDeficit'), ...I('RetainedEarnings')],
@@ -68,14 +76,20 @@ const n = (v) => (typeof v === 'number' ? v : v == null || v === '' ? null : Num
  * Devuelve {income, balance, cashflow} en orden descendente de fecha (como los demás proveedores).
  */
 export function toStatements(facts, symbol, maxYears = 15) {
+  // Una sola moneda: algunos 20-F dan cifras en moneda local y su equivalente en USD con la misma fecha
+  const money = (u) => u && !/shares|pure|\//i.test(String(u));
+  const cnt = {}; for (const f of facts) if (money(f.unit) && /Revenue|Assets$|ProfitLoss|NetIncomeLoss/.test(f.concept)) cnt[f.unit] = (cnt[f.unit] || 0) + 1;
+  const mainUnit = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0];
   const by = new Map(); // concepto → (fecha fin → hecho)
   for (const f of facts) {
     const v = n(f.val); if (v == null || !Number.isFinite(v)) continue;
+    if (mainUnit && money(f.unit) && f.unit !== mainUnit) continue;
     const isFlow = !!f.start;
     if (isFlow) { const d = days(f.start, f.end); if (d < 330 || d > 400) continue; }
     if (!by.has(f.concept)) by.set(f.concept, new Map());
     const m = by.get(f.concept), prev = m.get(f.end);
-    if (!prev || (f.filed || '') > (prev.filed || '')) m.set(f.end, { ...f, val: v });
+    // Más reciente; con la misma fecha de presentación, el mayor en valor absoluto (el total, no un desglose)
+    if (!prev || (f.filed || '') > (prev.filed || '') || ((f.filed || '') === (prev.filed || '') && Math.abs(v) > Math.abs(prev.val))) m.set(f.end, { ...f, val: v });
   }
   const pick = (cands) => { const out = new Map(); for (const c of cands) { const m = by.get(c); if (!m) continue; for (const [end, f] of m) if (!out.has(end)) out.set(end, f); } return out; };
   // Fechas de cierre anual: las del concepto de ingresos/beneficio (flujos) y activos (balance)
@@ -96,16 +110,22 @@ export function toStatements(facts, symbol, maxYears = 15) {
     r.ebit = r.operatingIncome; r.ebitda = r.operatingIncome != null && r.depreciationAndAmortization != null ? r.operatingIncome + Math.abs(r.depreciationAndAmortization) : null;
     if (r.interestExpense != null) r.interestExpense = Math.abs(r.interestExpense);
     if (r.sellingGeneralAndAdministrativeExpenses == null && (r.sellingAndMarketingExpenses != null || r.generalAndAdministrativeExpenses != null)) r.sellingGeneralAndAdministrativeExpenses = (r.sellingAndMarketingExpenses || 0) + (r.generalAndAdministrativeExpenses || 0);
-    // BPA: si el valor publicado no cuadra con beneficio / acciones (redondeos, unidades), se recalcula
+    // BPA: se respeta el publicado (doble clase de acciones, preferentes…); solo si falta se calcula beneficio / acciones
     for (const [k, sh] of [['eps', 'weightedAverageShsOut'], ['epsDiluted', 'weightedAverageShsOutDil']]) {
-      const c = r.netIncome != null && r[sh] ? r.netIncome / r[sh] : null;
-      if (c != null && (r[k] == null || Math.abs(r[k] / c - 1) > 0.15)) r[k] = Math.round(c * 100) / 100;
+      if (r[k] == null && r.netIncome != null && r[sh]) r[k] = r.netIncome / r[sh];
     }
     return r;
   });
   const balance = mk('balance', bEnds).map((r) => {
-    const debt = (r.shortTermDebt || 0) + (r.longTermDebt || 0);
-    r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null ? null : debt;
+    // Deuda a corto: el total si se publica; si no, la suma de sus partes (vencimientos a corto + préstamos + pagarés)
+    r.shortTermDebt = r.debtCurrentTotal != null ? r.debtCurrentTotal : [r.ltdCurrent, r.stBorrowings, r.commercialPaper].some((x) => x != null) ? (r.ltdCurrent || 0) + (r.stBorrowings || 0) + (r.commercialPaper || 0) : null;
+    // Deuda a largo: la no corriente; si solo hay el total US-GAAP (que incluye la parte a corto), se le resta esa parte
+    if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = r.longTermDebtTotal - (r.ltdCurrent || 0);
+    // Arrendamientos (NIIF 16 / ASC 842): son deuda a efectos de apalancamiento
+    const lease = [r.leaseCurrent, r.leaseNoncurrent, r.financeLease].some((x) => x != null) ? (r.leaseCurrent || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0) : null;
+    r.capitalLeaseObligations = lease;
+    const debt = (r.shortTermDebt || 0) + (r.longTermDebt || 0) + (lease || 0);
+    r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null && lease == null ? null : debt;
     r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null ? r.cashAndCashEquivalents + (r.shortTermInvestments || 0) : null;
     r.netDebt = r.totalDebt != null ? r.totalDebt - (r.cashAndShortTermInvestments || 0) : null;
     return r;

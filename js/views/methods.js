@@ -1,15 +1,15 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica del «cocodrilo» (Alligator de Bill Williams) para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=ca0e8ce3';
-import { compute } from './company.js?v=ca0e8ce3';
-import { METHODS, rankMethod } from '../calc/methods.js?v=ca0e8ce3';
-import { alligator } from '../calc/alligator.js?v=ca0e8ce3';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=ca0e8ce3';
-import { logoHTML } from '../app.js?v=ca0e8ce3';
-import { isNum } from '../calc/finance.js?v=ca0e8ce3';
-import { store } from '../store.js?v=ca0e8ce3';
-import { exportCSV } from '../export.js?v=ca0e8ce3';
+import { data } from '../providers/index.js?v=7feadaa0';
+import { compute, fxFor } from './company.js?v=7feadaa0';
+import { METHODS, rankMethod } from '../calc/methods.js?v=7feadaa0';
+import { alligator } from '../calc/alligator.js?v=7feadaa0';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=7feadaa0';
+import { logoHTML } from '../app.js?v=7feadaa0';
+import { isNum } from '../calc/finance.js?v=7feadaa0';
+import { store } from '../store.js?v=7feadaa0';
+import { exportCSV } from '../export.js?v=7feadaa0';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',
@@ -17,7 +17,7 @@ const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA
   'HON', 'IBM', 'CAT', 'UPS', 'LOW', 'SBUX', 'BKNG', 'GILD', 'ADP', 'MDLZ', 'MO', 'PM', 'ISRG', 'VRTX', 'ZTS', 'SPGI', 'DE', 'MMM', 'CL', 'HSY'];
 
 // Análisis masivo: Finnhub primero (60/min, sin tope diario) para no gastar la cuota diaria de FMP.
-const VIA = { profile: ['finnhub', 'fmp', 'roic'], quote: ['finnhub', 'td', 'fmp'], st: ['finnhub', 'fmp', 'sec', 'roic'], ttm: ['finnhub', 'fmp'], px: ['td', 'fmp', 'roic', 'av'] };
+const VIA = { profile: ['finnhub', 'fmp', 'roic'], quote: ['finnhub', 'td', 'fmp'], st: ['finnhub', 'fmp', 'sec', 'roic'], ttm: ['finnhub', 'fmp'], px: ['fmp', 'td', 'roic', 'av'] }; // precios: 1 petición por empresa (también sirven para el cocodrilo)
 const results = new Map(); // símbolo → { sym, S } | { sym, error }
 let state = { method: 'buffett', universe: 'grandes', n: 40, manual: '', running: false, done: 0, total: 0, techs: new Map() };
 const SAVE = 'iip.methods.v1';
@@ -34,15 +34,19 @@ async function sharedMarket() {
 async function analyzeOne(sym) {
   const [treasury, riskPremium] = await sharedMarket();
   const lim = (p, ms = 25000) => Promise.race([p, new Promise((res) => setTimeout(() => res({ ok: false, error: { code: 'network', message: 'tarda demasiado' } }), ms))]);
-  const [profile, quote, income, balance, cashflow, ratiosTTM, keyMetricsTTM] = await Promise.all([
+  const from = new Date(Date.now() - 6 * 365 * 864e5).toISOString().slice(0, 10);
+  const [profile, quote, income, balance, cashflow, ratiosTTM, keyMetricsTTM, prices] = await Promise.all([
     lim(wrap(data.via(VIA.profile, 'profile', sym))), lim(wrap(data.via(VIA.quote, 'quote', sym))),
     lim(wrap(data.via(VIA.st, 'income', sym, 'annual', 12))), lim(wrap(data.via(VIA.st, 'balance', sym, 'annual', 12))), lim(wrap(data.via(VIA.st, 'cashflow', sym, 'annual', 12))),
     lim(wrap(data.via(VIA.ttm, 'ratiosTTM', sym))), lim(wrap(data.via(VIA.ttm, 'keyMetricsTTM', sym))),
+    lim(wrap(data.via(VIA.px, 'pricesDaily', sym, from)), 40000), // múltiplos históricos propios (segundo método de valoración) y cocodrilo
   ]);
   const raw = Object.fromEntries(KEYS.map((k) => [k, { ok: false, error: { code: 'not_found' } }]));
-  Object.assign(raw, { profile, quote, income, balance, cashflow, ratiosTTM, keyMetricsTTM, treasury, riskPremium });
+  Object.assign(raw, { profile, quote, income, balance, cashflow, ratiosTTM, keyMetricsTTM, treasury, riskPremium, prices });
   if (!income.ok || !quote.ok) throw Object.assign(new Error(!quote.ok ? 'sin cotización' : 'sin estados financieros en tus fuentes gratuitas'), { code: 'not_found' });
-  const S = compute({ sym, raw, fx: 1 });
+  const fx = await fxFor(raw); // moneda de los estados ≠ moneda de cotización (ADR, Londres en peniques…)
+  if (fx === null) throw new Error('sin tipo de cambio entre la moneda de sus cuentas y la de cotización');
+  const S = compute({ sym, raw, fx, noSaved: true });
   if (S.m.profile.isEtf || S.m.profile.isFund) throw new Error('es un ETF o fondo');
   if (!isNum(S.m.price)) throw new Error('sin precio');
   return S;
@@ -119,7 +123,7 @@ async function techTop(view) {
   for (const { r } of top) {
     if (state.techs.has(r.sym)) continue;
     state.techs.set(r.sym, { loading: true });
-    try { const p = await data.via(VIA.px, 'pricesDaily', r.sym, from); const a = alligator(p.data); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: (e && e.message) || 'sin precios' }); }
+    try { const pd = r.S.raw.prices && r.S.raw.prices.ok ? r.S.raw.prices.data : (await data.via(VIA.px, 'pricesDaily', r.sym, from)).data; const a = alligator(pd); if (a && isNum(a.stop) && isNum(r.S.m.price) && a.stop >= r.S.m.price) a.stop = null; /* el stop siempre por debajo del precio actual */ state.techs.set(r.sym, a || { error: 'pocas velas' }); } catch (e) { state.techs.set(r.sym, { error: (e && e.message) || 'sin precios' }); }
     if (document.body.contains(view)) draw(view);
   }
 }
@@ -163,7 +167,7 @@ function detail(box, item) {
       <div class="kpi"><span>Entrada (método)</span><b>${isNum(res.entry) ? num(res.entry) + ' ' + esc(cur) : '—'}</b><small>${esc(res.entryNote)}</small></div>
       <div class="kpi"><span>Objetivo (método)</span><b>${isNum(res.target) ? num(res.target) + ' ' + esc(cur) : '—'}</b><small>${esc(res.targetNote)}</small></div>
       <div class="kpi"><span>Salida según el método</span><b>${esc(res.horizon)}</b><small>${esc(res.stopNote)}</small></div>
-      <div class="kpi"><span>Cocodrilo (técnico)</span><b>${t && t.state ? esc(t.state) : '—'}</b><small>${t && t.state ? `entrada al romper ${isNum(t.entry) ? num(t.entry) : '— (sin fractal sobre los dientes)'} · stop ${isNum(t.stop) ? num(t.stop) + ` (fractal del ${esc(t.stopDate)})` : '—'} · cierre ${num(t.close)} del ${esc(t.date)}` : 'se calcula solo para las 10 primeras'}</small></div>
+      <div class="kpi"><span>Cocodrilo (técnico)</span><b>${t && t.state ? esc(t.state) : '—'}</b><small>${t && t.state ? `entrada ${isNum(t.entry) ? 'al romper ' + num(t.entry) : t.state.includes('alza') ? '— (el último fractal ya está superado: tendencia en marcha)' : '— (el cocodrilo no come al alza: no hay entrada técnica)'} · stop ${isNum(t.stop) ? num(t.stop) + ` (fractal del ${esc(t.stopDate)})` : '—'} · cierre ${num(t.close)} del ${esc(t.date)}` : 'se calcula solo para las 10 primeras'}</small></div>
     </div>
     ${t && isNum(t.stop) && isNum(res.target) && isNum(m.price) && m.price > t.stop ? `<p class="note">Con entrada al precio actual: riesgo hasta el stop ${pct((m.price - t.stop) / m.price)} · recorrido hasta el objetivo ${pct(res.target / m.price - 1)} · relación ${num((res.target - m.price) / (m.price - t.stop), 1)} a 1.</p>` : ''}
   </div></div>`;

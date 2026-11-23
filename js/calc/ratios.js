@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=ca0e8ce3';
+import { isNum, div, mean } from './finance.js?v=7feadaa0';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -31,7 +31,7 @@ export const RATIOS = [
     interp: (v, avg) => v == null ? 'EBITDA negativo.' : `${fx(v, 1)}×${avg ? ` frente a una media de ${fx(avg, 1)}×` : ''}. Incluye la deuda, por eso compara mejor empresas con distinto apalancamiento.`, alert: (v) => v > 30 && 'EV/EBITDA superior a 30.' },
   { id: 'evebit', label: 'EV / EBIT', group: 'Valoración', fmt: 'x', better: 'low', formula: '(Capitalización + deuda neta) / EBIT TTM',
     cur: (m) => (isNum(m.T.ebit) && m.T.ebit > 0 ? div(m.ev, m.X(m.T.ebit)) : null),
-    hist: (m) => m.kmHist.map((k) => { const y = m.years.find((d) => d.year === yr(k)); return { year: yr(k), v: y && y.ebit > 0 ? div(k.enterpriseValue, y.ebit) : null }; }).filter((p) => isNum(p.v) && p.v > 0),
+    hist: (m) => m.kmHist.map((k) => { const y = m.years.find((d) => d.year === yr(k)); return { year: yr(k), v: y && y.ebit > 0 ? div(k.enterpriseValue, k._derived ? m.X(y.ebit) : y.ebit) : null }; }) /* EV calculado por la app está en moneda de cotización */.filter((p) => isNum(p.v) && p.v > 0),
     interp: (v) => v == null ? '—' : `${fx(v, 1)}×. A diferencia del EBITDA, descuenta amortizaciones: más exigente con negocios intensivos en capital.`, alert: () => false },
   { id: 'evfcf', label: 'EV / FCF', group: 'Valoración', fmt: 'x', better: 'low', formula: '(Capitalización + deuda neta) / flujo de caja libre TTM',
     cur: (m) => (isNum(m.T.fcf) && m.T.fcf > 0 ? div(m.ev, m.X(m.T.fcf)) : null), hist: (m) => histFrom(m.kmHist, 'evToFreeCashFlow').filter((p) => p.v > 0),

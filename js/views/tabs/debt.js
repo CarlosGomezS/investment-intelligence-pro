@@ -1,14 +1,14 @@
 // Deuda y solvencia: estructura, vencimientos, coste, cobertura, apalancamiento, liquidez y riesgo de refinanciación.
-import { fundamentals } from '../../ui/charts.js?v=ca0e8ce3';
-import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=ca0e8ce3';
-import { isNum, div, lin, mean } from '../../calc/finance.js?v=ca0e8ce3';
-import { gauge } from './overview.js?v=ca0e8ce3';
+import { fundamentals } from '../../ui/charts.js?v=7feadaa0';
+import { esc, card, pct, big, num, scoreColor } from '../../ui/dom.js?v=7feadaa0';
+import { isNum, div, lin, mean } from '../../calc/finance.js?v=7feadaa0';
+import { gauge } from './overview.js?v=7feadaa0';
 
 export function solvency(m) {
   const T = m.T, L = m.last;
   const cash = T.cash ?? L.cash, std = T.shortTermDebt ?? L.shortTermDebt, fcf = T.fcf ?? L.fcf, debt = T.debt ?? L.debt;
   const F = [
-    { k: 'Deuda neta / EBITDA', v: T.netDebtToEbitda ?? L.netDebtToEbitda, d: (v) => num(v, 2) + '×', s: (v) => lin(v, [[-1, 100], [1, 85], [2.5, 50], [4.5, 0]]), w: 25, why: (v) => (v < 0 ? 'Más caja que deuda.' : v < 2 ? 'Deuda asumible con menos de 2 años de EBITDA.' : v < 3.5 ? 'Apalancamiento exigente.' : 'Apalancamiento alto.') },
+    { k: 'Deuda neta / EBITDA', v: (T.netDebtToEbitda ?? L.netDebtToEbitda) ?? ((T.ebitdaNegWithDebt || L.ebitdaNegWithDebt) ? 99 : null), d: (v) => (v === 99 ? 'EBITDA negativo con deuda' : num(v, 2) + '×'), s: (v) => lin(v, [[-1, 100], [1, 85], [2.5, 50], [4.5, 0]]), w: 25, why: (v) => (v < 0 ? 'Más caja que deuda.' : v < 2 ? 'Deuda asumible con menos de 2 años de EBITDA.' : v < 3.5 ? 'Apalancamiento exigente.' : 'Apalancamiento alto.') },
     { k: 'Cobertura de intereses (EBIT/intereses)', v: T.interestCoverage ?? L.interestCoverage, d: (v) => num(v, 1) + '×', s: (v) => lin(v, [[1, 0], [4, 55], [12, 100]]), w: 20, why: (v) => (v > 8 ? 'Paga los intereses con holgura.' : v > 3 ? 'Cobertura suficiente.' : 'Cobertura débil ante subidas de tipos o caída de beneficios.') },
     { k: 'Años de FCF para pagar toda la deuda', v: isNum(debt) && isNum(fcf) && fcf > 0 ? debt / fcf : null, d: (v) => num(v, 1) + ' años', s: (v) => lin(v, [[0, 100], [3, 80], [7, 40], [12, 0]]), w: 20, why: (v) => (v < 3 ? 'Podría amortizar la deuda rápidamente con su caja.' : v < 7 ? 'Plazo razonable.' : 'Necesitaría muchos años de caja para devolver la deuda.') },
     { k: 'Liquidez corriente', v: T.currentRatio ?? L.currentRatio, d: (v) => num(v, 2), s: (v) => lin(v, [[0.6, 0], [1, 50], [1.8, 100]]), w: 10, why: (v) => (v >= 1 ? 'Cubre el pasivo a corto con activos a corto.' : 'El activo corriente no cubre el pasivo corriente.') },
