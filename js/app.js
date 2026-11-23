@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=d0e839aa';
-import { data, setHint } from './providers/index.js?v=d0e839aa';
-import { usage } from './providers/http.js?v=d0e839aa';
-import { config } from './config.js?v=d0e839aa';
-import { store } from './store.js?v=d0e839aa';
-import { destroyAll } from './ui/charts.js?v=d0e839aa';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=0a5702cc';
+import { data, setHint } from './providers/index.js?v=0a5702cc';
+import { usage } from './providers/http.js?v=0a5702cc';
+import { config, restoreConfig } from './config.js?v=0a5702cc';
+import { store } from './store.js?v=0a5702cc';
+import { destroyAll } from './ui/charts.js?v=0a5702cc';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=d0e839aa'),
-  c: () => import('./views/company.js?v=d0e839aa'),
-  watchlist: () => import('./views/watchlist.js?v=d0e839aa'),
-  screener: () => import('./views/screener.js?v=d0e839aa'),
-  comparar: () => import('./views/compare.js?v=d0e839aa'),
-  calendario: () => import('./views/calendar.js?v=d0e839aa'),
-  metodologia: () => import('./views/methodology.js?v=d0e839aa'),
-  ajustes: () => import('./views/settings.js?v=d0e839aa'),
+  dashboard: () => import('./views/dashboard.js?v=0a5702cc'),
+  c: () => import('./views/company.js?v=0a5702cc'),
+  watchlist: () => import('./views/watchlist.js?v=0a5702cc'),
+  screener: () => import('./views/screener.js?v=0a5702cc'),
+  comparar: () => import('./views/compare.js?v=0a5702cc'),
+  calendario: () => import('./views/calendar.js?v=0a5702cc'),
+  metodologia: () => import('./views/methodology.js?v=0a5702cc'),
+  ajustes: () => import('./views/settings.js?v=0a5702cc'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -111,4 +111,5 @@ window.__iipBooted = true;
 { const bf = document.getElementById('bootfail'); if (bf) bf.hidden = true; }
 window.addEventListener('hashchange', route);
 window.addEventListener('iip:toast', (e) => toast(e.detail));
-route();
+// Recupera las claves desde las copias (IndexedDB / cookie) antes de pintar nada
+restoreConfig().then((restored) => { if (restored) toast('Claves recuperadas de la copia de seguridad'); showUsage(); route(); });

@@ -1,8 +1,8 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=d0e839aa';
-import { esc, card, pct, big, num, cls, sgnPct, table } from '../../ui/dom.js?v=d0e839aa';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=d0e839aa';
+import { fundamentals } from '../../ui/charts.js?v=0a5702cc';
+import { esc, card, pct, big, num, cls, sgnPct, table } from '../../ui/dom.js?v=0a5702cc';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=0a5702cc';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;

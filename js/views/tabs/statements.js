@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=d0e839aa';
-import { fundamentals } from '../../ui/charts.js?v=d0e839aa';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=d0e839aa';
-import { isNum, div, asc } from '../../calc/finance.js?v=d0e839aa';
-import { extra } from '../company.js?v=d0e839aa';
-import { exportCSV, exportXLSX } from '../../export.js?v=d0e839aa';
+import { data } from '../../providers/index.js?v=0a5702cc';
+import { fundamentals } from '../../ui/charts.js?v=0a5702cc';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=0a5702cc';
+import { isNum, div, asc } from '../../calc/finance.js?v=0a5702cc';
+import { extra } from '../company.js?v=0a5702cc';
+import { exportCSV, exportXLSX } from '../../export.js?v=0a5702cc';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);

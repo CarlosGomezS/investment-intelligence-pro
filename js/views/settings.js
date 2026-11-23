@@ -1,13 +1,13 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS } from '../config.js?v=d0e839aa';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=d0e839aa';
-import { fmp } from '../providers/fmp.js?v=d0e839aa';
-import { alphavantage } from '../providers/alphavantage.js?v=d0e839aa';
-import { finnhub } from '../providers/finnhub.js?v=d0e839aa';
-import { twelvedata } from '../providers/twelvedata.js?v=d0e839aa';
-import { roic } from '../providers/roic.js?v=d0e839aa';
-import { store } from '../store.js?v=d0e839aa';
-import { esc, card, toast } from '../ui/dom.js?v=d0e839aa';
+import { config, KEYS } from '../config.js?v=0a5702cc';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=0a5702cc';
+import { fmp } from '../providers/fmp.js?v=0a5702cc';
+import { alphavantage } from '../providers/alphavantage.js?v=0a5702cc';
+import { finnhub } from '../providers/finnhub.js?v=0a5702cc';
+import { twelvedata } from '../providers/twelvedata.js?v=0a5702cc';
+import { roic } from '../providers/roic.js?v=0a5702cc';
+import { store } from '../store.js?v=0a5702cc';
+import { esc, card, toast } from '../ui/dom.js?v=0a5702cc';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -44,6 +44,10 @@ export function render(view, _p, _q, firstRun) {
         <tr><td class="l">Noticias, resultados</td><td class="l">FMP → Finnhub → Alpha Vantage</td></tr>
         <tr><td class="l">Calendario de resultados</td><td class="l">Finnhub → FMP</td></tr>
         <tr><td class="l">Documentos regulatorios</td><td class="l">FMP → SEC EDGAR</td></tr></tbody></table>`)}
+      ${card('Copia de seguridad de las claves', `<p class="note" style="margin-top:0">Las claves se guardan en tres sitios de este dispositivo y se recuperan solas. Aun así, guarda este código en tus notas o en un mensaje a ti mismo: si cambias de móvil o reinstalas la app, lo pegas aquí y vuelven todas.</p>
+        <div class="row"><button class="btn" id="kcopy">Copiar código de mis claves</button></div>
+        <label class="f" style="margin-top:10px">Pegar código para restaurar<textarea class="in" id="kcode" rows="2" placeholder="IIP1:…"></textarea></label>
+        <div class="row" style="margin-top:8px"><button class="btn pri" id="kimp">Restaurar claves</button></div>`)}
       ${card('Tus datos (favoritos, listas, análisis, supuestos)', `<p class="note" style="margin-top:0">Se guardan en este navegador. Exporta una copia para pasarlos a otro dispositivo.</p><div class="row"><button class="btn" id="ex">Exportar copia (JSON)</button><label class="btn">Importar copia<input type="file" id="im" accept="application/json" hidden></label></div>`)}
     </div>
   </div>`;
@@ -57,7 +61,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js?v=d0e839aa');
+      const { sec } = await import('../providers/sec.js?v=0a5702cc');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;
@@ -68,6 +72,8 @@ export function render(view, _p, _q, firstRun) {
     config.set({ limits, cacheHours: { ...c.cacheHours, fundamentals: +view.querySelector('#chf').value, quote: +view.querySelector('#chq').value } });
     toast('Límites guardados'); window.dispatchEvent(new CustomEvent('iip:usage'));
   };
+  view.querySelector('#kcopy').onclick = async () => { const code = exportKeysCode(); try { await navigator.clipboard.writeText(code); toast('Código copiado: guárdalo en tus notas'); } catch { view.querySelector('#kcode').value = code; toast('Copia el código del recuadro'); } };
+  view.querySelector('#kimp').onclick = () => { try { importKeysCode(view.querySelector('#kcode').value); toast('Claves restauradas'); render(view); } catch (e) { toast(e.message); } };
   view.querySelector('#cc').onclick = async () => { await clearCache(); toast('Caché vaciada'); };
   view.querySelector('#ex').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([store.exportAll()], { type: 'application/json' })); a.download = 'investment-intelligence-pro.json'; a.click(); };
   view.querySelector('#im').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { store.importAll(await f.text()); toast('Datos importados'); } catch { toast('Archivo no válido'); } };

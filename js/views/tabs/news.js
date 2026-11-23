@@ -1,9 +1,9 @@
 // Noticias y eventos: noticias, notas de prensa, documentos ante el regulador y resultados trimestrales.
 // Clasificación automática por palabras clave (tema y tipo: hecho / previsión / opinión), indicada como tal.
-import { data } from '../../providers/index.js?v=d0e839aa';
-import { esc, card, num, pct, date, datetime, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=d0e839aa';
-import { isNum } from '../../calc/finance.js?v=d0e839aa';
-import { extra } from '../company.js?v=d0e839aa';
+import { data } from '../../providers/index.js?v=0a5702cc';
+import { esc, card, num, pct, date, datetime, cls, sgnPct, unavailable, source, table } from '../../ui/dom.js?v=0a5702cc';
+import { isNum } from '../../calc/finance.js?v=0a5702cc';
+import { extra } from '../company.js?v=0a5702cc';
 
 const TOPICS = [
   ['Resultados', /earnings|results|quarter|revenue|profit|EPS|beats|misses|resultados|beneficio|ventas trimestr/i],
