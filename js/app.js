@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=e6c88f56';
-import { data, setHint } from './providers/index.js?v=e6c88f56';
-import { usage } from './providers/http.js?v=e6c88f56';
-import { config, restoreConfig } from './config.js?v=e6c88f56';
-import { store } from './store.js?v=e6c88f56';
-import { destroyAll } from './ui/charts.js?v=e6c88f56';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=f01d36e2';
+import { data, setHint } from './providers/index.js?v=f01d36e2';
+import { usage } from './providers/http.js?v=f01d36e2';
+import { config, restoreConfig } from './config.js?v=f01d36e2';
+import { store } from './store.js?v=f01d36e2';
+import { destroyAll } from './ui/charts.js?v=f01d36e2';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=e6c88f56'),
-  c: () => import('./views/company.js?v=e6c88f56'),
-  watchlist: () => import('./views/watchlist.js?v=e6c88f56'),
-  screener: () => import('./views/screener.js?v=e6c88f56'),
-  comparar: () => import('./views/compare.js?v=e6c88f56'),
-  calendario: () => import('./views/calendar.js?v=e6c88f56'),
-  metodologia: () => import('./views/methodology.js?v=e6c88f56'),
-  ajustes: () => import('./views/settings.js?v=e6c88f56'),
+  dashboard: () => import('./views/dashboard.js?v=f01d36e2'),
+  c: () => import('./views/company.js?v=f01d36e2'),
+  watchlist: () => import('./views/watchlist.js?v=f01d36e2'),
+  screener: () => import('./views/screener.js?v=f01d36e2'),
+  comparar: () => import('./views/compare.js?v=f01d36e2'),
+  calendario: () => import('./views/calendar.js?v=f01d36e2'),
+  metodologia: () => import('./views/methodology.js?v=f01d36e2'),
+  ajustes: () => import('./views/settings.js?v=f01d36e2'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -53,6 +53,7 @@ function rank(list, term) {
   return list.map((r) => {
     let s = 0; const sym = (r.symbol || '').toUpperCase(), nm = (r.name || '').toUpperCase();
     if (sym === t) s += 100; else if (sym.startsWith(t)) s += 40;
+    if (r._alias) s += 200; // nombre popular (spacex → SPCX)
     if (nm.startsWith(t)) s += 50; else if (nm.includes(t)) s += 20;
     if (major.test(r.exchange || '')) s += 25;
     if (!sym.includes('.')) s += 5;

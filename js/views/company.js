@@ -1,15 +1,15 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=e6c88f56';
-import { buildModel } from '../calc/model.js?v=e6c88f56';
-import { evaluateRatios } from '../calc/ratios.js?v=e6c88f56';
-import { detectAlerts } from '../calc/alerts.js?v=e6c88f56';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=e6c88f56';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=e6c88f56';
-import { buildReport } from '../calc/report.js?v=e6c88f56';
-import { store } from '../store.js?v=e6c88f56';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=e6c88f56';
-import { logoHTML, countryOf } from '../app.js?v=e6c88f56';
-import { isNum } from '../calc/finance.js?v=e6c88f56';
+import { data, gather } from '../providers/index.js?v=f01d36e2';
+import { buildModel } from '../calc/model.js?v=f01d36e2';
+import { evaluateRatios } from '../calc/ratios.js?v=f01d36e2';
+import { detectAlerts } from '../calc/alerts.js?v=f01d36e2';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=f01d36e2';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=f01d36e2';
+import { buildReport } from '../calc/report.js?v=f01d36e2';
+import { store } from '../store.js?v=f01d36e2';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=f01d36e2';
+import { logoHTML, countryOf } from '../app.js?v=f01d36e2';
+import { isNum } from '../calc/finance.js?v=f01d36e2';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +17,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=e6c88f56'), grafico: () => import('./tabs/chart.js?v=e6c88f56'), estados: () => import('./tabs/statements.js?v=e6c88f56'), ratios: () => import('./tabs/ratios.js?v=e6c88f56'),
-  crecimiento: () => import('./tabs/growth.js?v=e6c88f56'), deuda: () => import('./tabs/debt.js?v=e6c88f56'), valoracion: () => import('./tabs/valuation.js?v=e6c88f56'), dividendos: () => import('./tabs/dividends.js?v=e6c88f56'),
-  competidores: () => import('./tabs/peers.js?v=e6c88f56'), moat: () => import('./tabs/moat.js?v=e6c88f56'), noticias: () => import('./tabs/news.js?v=e6c88f56'), analistas: () => import('./tabs/analysts.js?v=e6c88f56'),
-  riesgos: () => import('./tabs/risks.js?v=e6c88f56'), scoring: () => import('./tabs/scoring.js?v=e6c88f56'), informe: () => import('./tabs/report.js?v=e6c88f56'), simulador: () => import('./tabs/simulator.js?v=e6c88f56'),
+  resumen: () => import('./tabs/overview.js?v=f01d36e2'), grafico: () => import('./tabs/chart.js?v=f01d36e2'), estados: () => import('./tabs/statements.js?v=f01d36e2'), ratios: () => import('./tabs/ratios.js?v=f01d36e2'),
+  crecimiento: () => import('./tabs/growth.js?v=f01d36e2'), deuda: () => import('./tabs/debt.js?v=f01d36e2'), valoracion: () => import('./tabs/valuation.js?v=f01d36e2'), dividendos: () => import('./tabs/dividends.js?v=f01d36e2'),
+  competidores: () => import('./tabs/peers.js?v=f01d36e2'), moat: () => import('./tabs/moat.js?v=f01d36e2'), noticias: () => import('./tabs/news.js?v=f01d36e2'), analistas: () => import('./tabs/analysts.js?v=f01d36e2'),
+  riesgos: () => import('./tabs/risks.js?v=f01d36e2'), scoring: () => import('./tabs/scoring.js?v=f01d36e2'), informe: () => import('./tabs/report.js?v=f01d36e2'), simulador: () => import('./tabs/simulator.js?v=f01d36e2'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -56,6 +56,13 @@ async function load(sym, onProgress, late) {
   raw.profile = first;
   fixQuote(raw, sym);
   if (!raw.profile.ok && !raw.income.ok) { const e = raw.profile.error || raw.income.error; throw e; }
+  // ETF o fondo: no tiene cuentas propias que analizar (p. ej. los ETF «SpaceX» apalancados)
+  if (raw.profile.ok) {
+    const p = raw.profile.data || {};
+    if (p.isEtf || p.isFund || (!raw.income.ok && /\b(ETF|FUND|TRUST UNIT|2X|3X|DAILY TARGET|BULL|BEAR)\b/i.test(p.companyName || ''))) {
+      throw Object.assign(new Error(`${p.companyName || sym} es un fondo cotizado (ETF), no una empresa: no publica cuentas, así que el análisis fundamental no aplica. Busca la empresa en sí (por ejemplo, SpaceX es SPCX)`), { code: 'etf' });
+    }
+  }
   // Conversión de divisa si los estados están en otra moneda que la cotización (p. ej. ADR)
   let fx = 1;
   const rep = raw.income.ok && raw.income.data[0] ? raw.income.data[0].reportedCurrency : null;
@@ -160,13 +167,13 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=e6c88f56').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=f01d36e2').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
         }).catch(() => {});
       } catch (e) {
-        view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1></div></div>${unavailable('No se pudo cargar la empresa', e)}<p class="note">Comprueba el ticker (las bolsas europeas llevan sufijo: SAN.MC, SAP.DE, MC.PA, ASML.AS) o busca por nombre arriba. Para empresas de fuera de EE. UU. añade en Ajustes la clave gratuita de ROIC.AI y el Worker (SEC EDGAR y cuentas europeas ESEF).</p>`;
+        view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1></div></div>${unavailable('No se pudo cargar la empresa', e)}${e && e.tried ? `<p class="note">Respuesta de cada fuente: ${esc(e.tried)}</p>` : ''}${e && e.code === 'etf' ? '' : `<p class="note">Comprueba el ticker (las bolsas europeas llevan sufijo: SAN.MC, SAP.DE, MC.PA, ASML.AS) o busca por nombre arriba. Para empresas de fuera de EE. UU. añade en Ajustes la clave gratuita de ROIC.AI y el Worker (SEC EDGAR y cuentas europeas ESEF).</p>`}`;
         return;
       }
     }
@@ -196,13 +203,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=e6c88f56');
+      const { exportAll } = await import('../exportall.js?v=f01d36e2');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=e6c88f56');
+    const { clearCache } = await import('../providers/http.js?v=f01d36e2');
     await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);

@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=e6c88f56';
+import { isNum, div, mean, median, cagr } from './finance.js?v=f01d36e2';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {

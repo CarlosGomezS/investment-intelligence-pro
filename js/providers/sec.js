@@ -1,9 +1,9 @@
 // SEC EDGAR (oficial, gratuito, sin clave). Cubre empresas de EE. UU. y extranjeras registradas en la SEC
 // (20-F/40-F: ASML, TSMC, Santander, Novo Nordisk…). Requiere el Worker: la SEC no admite llamadas desde el navegador.
-import { getJSON } from './http.js?v=e6c88f56';
-import { config } from '../config.js?v=e6c88f56';
-import { toStatements } from './xbrl.js?v=e6c88f56';
-import { hint } from './hints.js?v=e6c88f56';
+import { getJSON } from './http.js?v=f01d36e2';
+import { config } from '../config.js?v=f01d36e2';
+import { toStatements } from './xbrl.js?v=f01d36e2';
+import { hint } from './hints.js?v=f01d36e2';
 
 const H = () => config.get().cacheHours;
 let tickers = null;
@@ -42,7 +42,7 @@ async function facts(sym) {
   for (const tax of ['us-gaap', 'ifrs-full']) {
     const g = (r.data.facts || {})[tax]; if (!g) continue;
     for (const [concept, def] of Object.entries(g)) for (const [unit, arr] of Object.entries(def.units || {})) for (const x of arr) {
-      if (!/^(10-K|20-F|40-F)/.test(x.form || '')) continue;
+      if (!/^(10-K|20-F|40-F|S-1|F-1|10-Q)/.test(x.form || '')) continue; // folletos de salida a bolsa y 10-Q: años completos de empresas recién cotizadas (el filtro de 330-400 días deja solo ejercicios)
       F.push({ concept: `${tax}:${concept}`, start: x.start, end: x.end, val: x.val, unit, filed: x.filed });
     }
   }

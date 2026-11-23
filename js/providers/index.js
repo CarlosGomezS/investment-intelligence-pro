@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=e6c88f56';
-import { alphavantage } from './alphavantage.js?v=e6c88f56';
-import { finnhub } from './finnhub.js?v=e6c88f56';
-import { twelvedata } from './twelvedata.js?v=e6c88f56';
-import { roic } from './roic.js?v=e6c88f56';
-import { sec } from './sec.js?v=e6c88f56';
-import { esef } from './esef.js?v=e6c88f56';
-import { config } from '../config.js?v=e6c88f56';
-import { ApiError, usage, queueDelay } from './http.js?v=e6c88f56';
-import { setHint } from './hints.js?v=e6c88f56';
+import { fmp } from './fmp.js?v=f01d36e2';
+import { alphavantage } from './alphavantage.js?v=f01d36e2';
+import { finnhub } from './finnhub.js?v=f01d36e2';
+import { twelvedata } from './twelvedata.js?v=f01d36e2';
+import { roic } from './roic.js?v=f01d36e2';
+import { sec } from './sec.js?v=f01d36e2';
+import { esef } from './esef.js?v=f01d36e2';
+import { config } from '../config.js?v=f01d36e2';
+import { ApiError, usage, queueDelay } from './http.js?v=f01d36e2';
+import { setHint } from './hints.js?v=f01d36e2';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -125,7 +125,17 @@ async function run(method, args) {
 }
 
 /** Búsqueda: primero fuentes sin tope diario; FMP y ROIC.AI solo si hacen falta más resultados. */
+// Nombres populares que no coinciden con el nombre oficial (las fuentes devuelven antes ETF «SpaceX» que la propia SpaceX)
+const ALIAS = { SPACEX: ['SPCX', 'Space Exploration Technologies Corp.'], GOOGLE: ['GOOGL', 'Alphabet Inc.'], FACEBOOK: ['META', 'Meta Platforms, Inc.'], INDITEX: ['ITX.MC', 'Industria de Diseño Textil, S.A.'], ZARA: ['ITX.MC', 'Industria de Diseño Textil, S.A.'], BERKSHIRE: ['BRK-B', 'Berkshire Hathaway Inc.'], BUFFETT: ['BRK-B', 'Berkshire Hathaway Inc.'], TSMC: ['TSM', 'Taiwan Semiconductor Manufacturing'], COCACOLA: ['KO', 'The Coca-Cola Company'] };
+
 async function search(query) {
+  const al = ALIAS[String(query).toUpperCase().replace(/[^A-Z]/g, '')];
+  const r = await searchRaw(query);
+  if (al && !r.data.some((x) => x.symbol === al[0])) r.data.unshift({ symbol: al[0], name: al[1], exchange: al[0].includes('.') ? 'BME' : 'NASDAQ', _alias: true });
+  return r;
+}
+
+async function searchRaw(query) {
   const tiers = [['finnhub', 'td', 'sec'], ['fmp'], ['roic', 'av']];
   const seen = new Set(), out = []; let lastErr = null; const src = [];
   for (const tier of tiers) {

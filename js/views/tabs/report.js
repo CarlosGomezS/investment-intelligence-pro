@@ -1,8 +1,8 @@
 // Informe final: 13 preguntas, conclusión razonada, argumentos a favor y en contra, exportación a PDF.
-import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=e6c88f56';
-import { store } from '../../store.js?v=e6c88f56';
-import { gauge } from './overview.js?v=e6c88f56';
-import { printReport } from '../../export.js?v=e6c88f56';
+import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=f01d36e2';
+import { store } from '../../store.js?v=f01d36e2';
+import { gauge } from './overview.js?v=f01d36e2';
+import { printReport } from '../../export.js?v=f01d36e2';
 
 export function render(el, S) {
   const { m, rep, sc, val } = S, c = val.composite;
