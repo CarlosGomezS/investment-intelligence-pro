@@ -77,15 +77,17 @@ const n = (v) => (typeof v === 'number' ? v : v == null || v === '' ? null : Num
  */
 export function toStatements(facts, symbol, maxYears = 15) {
   // Una sola moneda: algunos 20-F dan cifras en moneda local y su equivalente en USD con la misma fecha
+  // Unidades normalizadas: «usd», «USD», «iso4217:USD» y «iso4217:EUR / xbrli:shares» se comparan por su moneda en mayúsculas
+  const cur0 = (u) => String(u || '').split('/')[0].trim().replace(/^iso4217:/i, '').toUpperCase();
   const money = (u) => u && !/shares|pure|\//i.test(String(u));
-  const cnt = {}; for (const f of facts) if (money(f.unit) && /Revenue|Assets$|ProfitLoss|NetIncomeLoss/.test(f.concept)) cnt[f.unit] = (cnt[f.unit] || 0) + 1;
+  const cnt = {}; for (const f of facts) if (money(f.unit) && /Revenue|Assets$|ProfitLoss|NetIncomeLoss/.test(f.concept)) cnt[cur0(f.unit)] = (cnt[cur0(f.unit)] || 0) + 1;
   const mainUnit = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0];
   const by = new Map(); // concepto → (fecha fin → hecho)
   for (const f of facts) {
     const v = n(f.val); if (v == null || !Number.isFinite(v)) continue;
-    if (mainUnit && money(f.unit) && f.unit !== mainUnit) continue;
+    if (mainUnit && money(f.unit) && cur0(f.unit) !== mainUnit) continue;
     // Importes por acción (USD/shares, TWD/shares…): solo los de la moneda principal
-    if (mainUnit && /\//.test(String(f.unit)) && !/^pure/i.test(String(f.unit)) && String(f.unit).split('/')[0] !== mainUnit) continue;
+    if (mainUnit && /\//.test(String(f.unit)) && !/^pure/i.test(String(f.unit)) && cur0(f.unit) !== mainUnit) continue;
     const isFlow = !!f.start;
     if (isFlow) { const d = days(f.start, f.end); if (d < 330 || d > 400) continue; }
     if (!by.has(f.concept)) by.set(f.concept, new Map());
@@ -123,7 +125,9 @@ export function toStatements(facts, symbol, maxYears = 15) {
     r.shortTermDebt = r.debtCurrentTotal != null ? r.debtCurrentTotal : [r.ltdCurrent, r.stBorrowings, r.commercialPaper].some((x) => x != null) ? (r.ltdCurrent || 0) + (r.stBorrowings || 0) + (r.commercialPaper || 0) : null;
     // Deuda a largo: la no corriente; si solo hay el total US-GAAP (que incluye la parte a corto), se le resta esa parte
     // Si no se publica la parte a corto por separado, se resta la deuda corriente total (que la incluye) para no contarla dos veces
-    if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = Math.max(0, r.longTermDebtTotal - (r.ltdCurrent ?? r.debtCurrentTotal ?? 0));
+    // De la deuda corriente total solo se resta lo que está dentro de LongTermDebt (no pagarés ni préstamos a corto)
+    const ltdCur = r.ltdCurrent ?? (r.debtCurrentTotal != null ? Math.max(0, r.debtCurrentTotal - (r.commercialPaper || 0) - (r.stBorrowings || 0)) : 0);
+    if (r.longTermDebt == null && r.longTermDebtTotal != null) r.longTermDebt = Math.max(0, r.longTermDebtTotal - ltdCur);
     // Arrendamientos (NIIF 16 / ASC 842): son deuda a efectos de apalancamiento
     const lease = [r.leaseCurrent, r.leaseNoncurrent, r.financeLease].some((x) => x != null) ? (r.leaseCurrent || 0) + (r.leaseNoncurrent || 0) + (r.financeLease || 0) : null;
     r.capitalLeaseObligations = lease;

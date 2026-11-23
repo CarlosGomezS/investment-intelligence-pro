@@ -1,5 +1,5 @@
 // Modelos de valoración intrínseca. Todas las entradas son explícitas: nada se inventa aquí.
-import { isNum, div, mean, median, cagr } from './finance.js?v=cf3615ab';
+import { isNum, div, mean, median, cagr } from './finance.js?v=e06fb4a0';
 
 /** WACC por CAPM. Tasas en tanto por uno. */
 export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtValue }) {
@@ -21,6 +21,7 @@ export function wacc({ rf, beta, erp, costDebtPre, taxRate, equityValue, debtVal
 export function dcf({ fcf0, growth, years = 5, terminalGrowth = 0.025, discount, netDebt, shares }) {
   if (![fcf0, growth, discount, shares].every(isNum) || shares <= 0) return null;
   if (!isNum(netDebt)) return { error: 'Falta la deuda neta (balance no disponible): no se supone cero' };
+  if (!(discount > 0) || !(growth > -1) || !(terminalGrowth > -1)) return { error: 'Supuestos no válidos: el WACC debe ser positivo y los crecimientos mayores que −100 %' };
   if (discount <= terminalGrowth) return { error: 'El WACC debe ser mayor que el crecimiento terminal' };
   const rows = []; let f = fcf0, pvSum = 0;
   for (let t = 1; t <= years; t++) {
@@ -66,7 +67,7 @@ export const upside = (intrinsic, price) => (isNum(intrinsic) && isNum(price) &&
 /** Escenarios estándar a partir del caso base (supuestos documentados en la interfaz). */
 export function scenarios(base) {
   const S = [
-    { id: 'pesimista', label: 'Pesimista', growth: base.growth - Math.abs(base.growth) * 0.5, discount: base.discount + 0.01, terminalGrowth: Math.max(0.01, base.terminalGrowth - 0.005) },
+    { id: 'pesimista', label: 'Pesimista', growth: Math.max(-0.95, base.growth - Math.abs(base.growth) * 0.5), discount: base.discount + 0.01, terminalGrowth: Math.max(0.01, base.terminalGrowth - 0.005) },
     { id: 'base', label: 'Base', growth: base.growth, discount: base.discount, terminalGrowth: base.terminalGrowth },
     { id: 'optimista', label: 'Optimista', growth: base.growth + Math.abs(base.growth) * 0.5, discount: Math.max(base.terminalGrowth + 0.02, base.discount - 0.01), terminalGrowth: base.terminalGrowth + 0.005 },
   ];

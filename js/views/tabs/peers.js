@@ -1,10 +1,10 @@
 // Competidores: detección automática (FMP stock-peers), lista editable, tabla comparativa, gráficos y ganador por pilar.
-import { data, gather } from '../../providers/index.js?v=cf3615ab';
-import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
-import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=cf3615ab';
-import { isNum, div, asc, median } from '../../calc/finance.js?v=cf3615ab';
-import { store } from '../../store.js?v=cf3615ab';
-import { logoHTML } from '../../app.js?v=cf3615ab';
+import { data, gather } from '../../providers/index.js?v=e06fb4a0';
+import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
+import { esc, big, pct, num, mult, card, unavailable, source, table, toast } from '../../ui/dom.js?v=e06fb4a0';
+import { isNum, div, asc, median } from '../../calc/finance.js?v=e06fb4a0';
+import { store } from '../../store.js?v=e06fb4a0';
+import { logoHTML } from '../../app.js?v=e06fb4a0';
 
 async function peerRow(sym) {
   const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), inc: () => data.income(sym, 'annual', 4) }, 15000);
@@ -13,7 +13,7 @@ async function peerRow(sym) {
   const L = inc[inc.length - 1] || {}, P = inc[inc.length - 2] || {}, F = inc[0] || {};
   const n = inc.length - 1;
   return {
-    symbol: sym, name: p.companyName || sym, currency: L.reportedCurrency || p.currency, marketCap: p.marketCap,
+    symbol: sym, name: p.companyName || sym, currency: L.reportedCurrency || p.currency, tcur: p.currency || L.reportedCurrency, marketCap: p.marketCap,
     revenue: L.revenue, growth1: div(L.revenue, P.revenue) != null ? L.revenue / P.revenue - 1 : null, growth3: n >= 2 && F.revenue > 0 && L.revenue > 0 ? (L.revenue / F.revenue) ** (1 / n) - 1 : null,
     netIncome: L.netIncome, grossMargin: rt.grossProfitMarginTTM ?? div(L.grossProfit, L.revenue), opMargin: rt.operatingProfitMarginTTM ?? div(L.operatingIncome, L.revenue),
     netMargin: rt.netProfitMarginTTM ?? div(L.netIncome, L.revenue), roic: km.returnOnInvestedCapitalTTM, roe: km.returnOnEquityTTM, de: rt.debtToEquityRatioTTM,
@@ -25,7 +25,7 @@ async function peerRow(sym) {
 
 function selfRow(S) {
   const m = S.m, T = m.T;
-  return { symbol: m.symbol, name: m.profile.companyName, currency: m.repCur, marketCap: m.marketCap, revenue: T.revenue, growth1: m.growth.rev1, growth3: m.growth.rev3, netIncome: T.netIncome,
+  return { symbol: m.symbol, name: m.profile.companyName, currency: m.repCur, tcur: m.tradeCur, marketCap: m.marketCap, revenue: T.revenue, growth1: m.growth.rev1, growth3: m.growth.rev3, netIncome: T.netIncome,
     grossMargin: T.grossMargin, opMargin: T.operatingMargin, netMargin: T.netMargin, roic: m.kTTM.returnOnInvestedCapitalTTM ?? T.roic ?? m.last.roic, roe: m.kTTM.returnOnEquityTTM ?? T.roe ?? m.last.roe, de: T.debtToEquity, ndEbitda: T.netDebtToEbitda,
     pe: m.pe, evEbitda: isNum(T.ebitda) && T.ebitda > 0 ? m.ev / m.X(T.ebitda) : null, fcfYield: div(m.X(T.fcf), m.marketCap), fcf: m.X(T.fcf), self: true };
 }
@@ -43,10 +43,10 @@ export async function loadPeers(S, force) {
 }
 
 const COLS = [
-  ['marketCap', 'Capitalización', (v, r) => big(v, r && r.currency), 'high'], ['revenue', 'Ingresos', (v, r) => big(v, r && r.currency), 'high'], ['growth1', 'Crec. ventas 1a', (v) => pct(v), 'high'], ['growth3', 'Crec. ventas 3a (anual)', (v) => pct(v), 'high'],
+  ['marketCap', 'Capitalización', (v, r) => big(v, r && r.tcur), 'high'], ['revenue', 'Ingresos', (v, r) => big(v, r && r.currency), 'high'], ['growth1', 'Crec. ventas 1a', (v) => pct(v), 'high'], ['growth3', 'Crec. ventas 3a (anual)', (v) => pct(v), 'high'],
   ['netIncome', 'Beneficio neto', (v, r) => big(v, r && r.currency), 'high'], ['grossMargin', 'Margen bruto', (v) => pct(v), 'high'], ['opMargin', 'Margen operativo', (v) => pct(v), 'high'], ['netMargin', 'Margen neto', (v) => pct(v), 'high'],
   ['roic', 'ROIC', (v) => pct(v), 'high'], ['roe', 'ROE', (v) => pct(v), 'high'], ['de', 'Deuda/Patrimonio', (v) => num(v, 2), 'low'], ['ndEbitda', 'Deuda neta/EBITDA', (v) => mult(v), 'low'],
-  ['pe', 'PER', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['evEbitda', 'EV/EBITDA', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['fcf', 'FCF', (v, r) => big(v, r && r.currency), 'high'], ['fcfYield', 'Rent. FCF', (v) => pct(v), 'high'],
+  ['pe', 'PER', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['evEbitda', 'EV/EBITDA', (v) => (isNum(v) && v > 0 ? mult(v) : '—'), 'low'], ['fcf', 'FCF', (v, r) => big(v, r && r.tcur), 'high'], ['fcfYield', 'Rent. FCF', (v) => pct(v), 'high'],
 ];
 
 function rankScore(rows, keys) {

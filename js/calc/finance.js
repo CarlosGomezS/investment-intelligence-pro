@@ -64,9 +64,19 @@ export function lin(v, pts) {
 
 /** Construye series alineadas por año fiscal a partir de los tres estados. */
 export function buildAnnual(income, balance, cash) {
-  const key = (r) => r.fiscalYear || String(r.date).slice(0, 4);
+  // Se emparejan balance y flujos con la cuenta de resultados por FECHA DE CIERRE (±45 días), no por la etiqueta del
+  // año: hay fuentes que llaman «2024» al ejercicio cerrado en enero de 2025 y otras «2025».
+  const key = (r) => String(r.fiscalYear || String(r.date).slice(0, 4));
+  const t = (r) => (r && r.date ? new Date(r.date).getTime() : null);
   const map = new Map();
-  for (const [name, rows] of [['i', income], ['b', balance], ['c', cash]]) for (const r of asc(rows)) { const k = key(r); if (!map.has(k)) map.set(k, { year: k }); map.get(k)[name] = r; }
+  for (const r of asc(income)) { const k = key(r); map.set(k, { year: k, i: r }); }
+  const rowsI = [...map.values()];
+  for (const [name, rows] of [['b', balance], ['c', cash]]) for (const r of asc(rows)) {
+    const tr = t(r);
+    const y = tr ? rowsI.find((x) => t(x.i) && Math.abs(t(x.i) - tr) < 45 * 864e5) : null;
+    const target = y || (!tr || !rowsI.some((x) => t(x.i)) ? map.get(key(r)) : null);
+    if (target) target[name] = r;
+  }
   return [...map.values()].sort((a, b) => a.year.localeCompare(b.year)).filter((y) => y.i);
 }
 
@@ -82,14 +92,16 @@ export function deriveYear(y, taxFallback = 0.21) {
   const debt = b.totalDebt ?? (isNum(b.shortTermDebt) || isNum(b.longTermDebt) ? (b.shortTermDebt || 0) + (b.longTermDebt || 0) : null);
   const cash = b.cashAndShortTermInvestments ?? b.cashAndCashEquivalents;
   const invested = isNum(b.totalStockholdersEquity) && isNum(debt) ? b.totalStockholdersEquity + debt - (cash || 0) : null;
-  const fcf = c.freeCashFlow ?? (isNum(c.operatingCashFlow) && isNum(c.capitalExpenditure) ? c.operatingCashFlow + c.capitalExpenditure : null);
+  const ocf = c.operatingCashFlow ?? c.netCashProvidedByOperatingActivities;
+  // El capex se resta siempre (hay fuentes que lo dan positivo y otras negativo)
+  const fcf = c.freeCashFlow ?? (isNum(ocf) && isNum(c.capitalExpenditure) ? ocf - Math.abs(c.capitalExpenditure) : null);
   const shares = i.weightedAverageShsOutDil ?? i.weightedAverageShsOut ?? b.commonStockSharesOutstanding;
   const ebitda = i.ebitda ?? (isNum(ebit) && isNum(i.depreciationAndAmortization) ? ebit + i.depreciationAndAmortization : null);
   const capEmployed = isNum(b.totalAssets) && isNum(b.totalCurrentLiabilities) ? b.totalAssets - b.totalCurrentLiabilities : null;
   return {
-    year: y.year, date: i.date, revenue: i.revenue, grossProfit: i.grossProfit, operatingIncome: i.operatingIncome, ebit, ebitda, netIncome: i.netIncome,
+    year: y.year, date: i.date, src: i._from || 'base', revenue: i.revenue, grossProfit: i.grossProfit, operatingIncome: i.operatingIncome, ebit, ebitda, netIncome: i.netIncome,
     // BPA publicado salvo error grosero (unidades, acciones sin ajustar): doble clase o preferentes justifican pequeñas diferencias
-    eps: (() => { const rep = i.epsDiluted ?? i.eps, calc = div(i.netIncome, shares); return isNum(rep) && isNum(calc) && (Math.abs(rep / calc - 1) > 0.5 || Math.sign(rep) !== Math.sign(calc)) ? calc : rep ?? calc; })(), shares, fcf, ocf: c.operatingCashFlow ?? c.netCashProvidedByOperatingActivities,
+    eps: (() => { const rep = i.epsDiluted ?? i.eps, calc = div(i.netIncome, shares); const q = isNum(rep) && isNum(calc) && calc !== 0 ? Math.abs(rep / calc) : null; return isNum(q) && (q > 5 || q < 0.2) ? calc : rep ?? calc; })(), /* solo errores groseros (unidades, splits sin ajustar); un signo distinto puede ser legítimo (minoritarios, preferentes) */ shares, fcf, ocf,
     capex: c.capitalExpenditure, debt, cash, netDebt: b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), equity: b.totalStockholdersEquity,
     assets: b.totalAssets, inventory: b.inventory, receivables: b.netReceivables ?? b.accountsReceivables, deferredRevenue: b.deferredRevenue ?? null, goodwill: b.goodwill, ppe: b.propertyPlantEquipmentNet ?? null, retainedEarnings: b.retainedEarnings ?? null, liabilities: b.totalLiabilities ?? (isNum(b.totalAssets) && isNum(b.totalStockholdersEquity) ? b.totalAssets - b.totalStockholdersEquity : null),
     currentAssets: b.totalCurrentAssets, currentLiabilities: b.totalCurrentLiabilities, shortTermDebt: b.shortTermDebt, longTermDebt: b.longTermDebt,
@@ -106,7 +118,7 @@ export function deriveYear(y, taxFallback = 0.21) {
     netDebtToEbitda: isNum(ebitda) && ebitda > 0 ? div(b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : null), ebitda) : null,
     ebitdaNegWithDebt: isNum(ebitda) && ebitda <= 0 && (b.netDebt ?? (isNum(debt) ? debt - (cash || 0) : 0)) > 0, debtToEquity: isNum(b.totalStockholdersEquity) && b.totalStockholdersEquity > 0 ? div(debt, b.totalStockholdersEquity) : null,
     currentRatio: div(b.totalCurrentAssets, b.totalCurrentLiabilities), interestCoverage: isNum(i.interestExpense) && i.interestExpense !== 0 ? div(ebit, Math.abs(i.interestExpense)) : null,
-    fcfConversion: isNum(i.netIncome) && i.netIncome > 0 ? div(fcf, i.netIncome) : null, incomeQuality: isNum(i.netIncome) && i.netIncome > 0 ? div(c.operatingCashFlow, i.netIncome) : null, capexToOcf: isNum(c.operatingCashFlow) && c.operatingCashFlow > 0 ? div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, c.operatingCashFlow) : null,
+    fcfConversion: isNum(i.netIncome) && i.netIncome > 0 ? div(fcf, i.netIncome) : null, incomeQuality: isNum(i.netIncome) && i.netIncome > 0 ? div(ocf, i.netIncome) : null, capexToOcf: isNum(ocf) && ocf > 0 ? div(isNum(c.capitalExpenditure) ? Math.abs(c.capitalExpenditure) : null, ocf) : null,
     fcfPerShare: div(fcf, shares), costOfDebt: div(isNum(i.interestExpense) ? Math.abs(i.interestExpense) : null, debt),
   };
 }
@@ -192,15 +204,17 @@ export function splitAdjustRows(rows, splitsAdj) {
  * realmente sin ajustar (sus acciones × factor se parecen a las de la fila más reciente); así no se ajusta dos veces
  * lo que la fuente ya da ajustado.
  */
-export function splitAdjustRowsByDate(rows, splits) {
+export function splitAdjustRowsByDate(rows, splits, refShares) {
   const sp = (splits || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0);
   if (!sp.length || !rows.length) return rows;
   const shOf = (r) => r.weightedAverageShsOutDil ?? r.weightedAverageShsOut;
-  const ref = shOf(rows[rows.length - 1]);
+  const ref = isNum(refShares) ? refShares : shOf(rows[rows.length - 1]);
   return rows.map((r) => {
     const f = sp.filter((s) => String(s.date) > String(r.date)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
     if (f === 1 || !isNum(shOf(r)) || !isNum(ref)) return r;
-    const ratio = (shOf(r) * f) / ref; if (!(ratio > 0.5 && ratio < 2)) return r; // ya venía ajustada
+    // Solo si al ajustar queda MÁS cerca de la fila reciente (y casi igual): si ya venía ajustada, se deja
+    const after = (shOf(r) * f) / ref, before = shOf(r) / ref;
+    if (!(after > 0.7 && after < 1.4 && Math.abs(Math.log(after)) < Math.abs(Math.log(before)))) return r;
     const o = { ...r, _splitAdj: f };
     for (const k of SHARE_F) if (isNum(o[k])) o[k] *= f;
     for (const k of PERSHARE_F) if (isNum(o[k])) o[k] /= f;
@@ -211,34 +225,37 @@ export function splitAdjustRowsByDate(rows, splits) {
 export function adjustSplits(years, knownSplits = null) {
   const COMMON = [2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50];
   const found = [];
-  // Con la lista real de splits del proveedor, solo se ajusta un salto que coincida con un split conocido
-  // (fecha entre el cierre del año anterior y el del año del salto, y factor parecido).
-  const known = Array.isArray(knownSplits) ? knownSplits.filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0).map((s) => ({ date: String(s.date), f: s.numerator / s.denominator })) : null;
+  // Lista real de splits del proveedor (si se tiene). Cada split se usa una sola vez.
+  let known = Array.isArray(knownSplits) ? knownSplits.filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0).map((s) => ({ date: String(s.date), f: s.numerator / s.denominator })).sort((x, y) => x.date.localeCompare(y.date)) : null;
+  const near = (r, x) => Math.abs(r / x - 1) < 0.12;
   for (let i = years.length - 1; i > 0; i--) {
     const a = years[i], b = years[i - 1];
     if (!isNum(a.shares) || !isNum(b.shares) || b.shares <= 0) continue;
     const r = a.shares / b.shares;
-    let f = null;
+    let f = null, used = [];
     if (known) {
-      // Con la lista real: el salto debe coincidir con los splits posteriores al año anterior, acumulados en orden.
-      // Cubre el caso de mezclar años ya ajustados (FMP) con años antiguos sin ajustar (SEC/Finnhub): el salto
-      // entre ambos es el producto de TODOS los splits posteriores, aunque ocurrieran años después.
-      const from = String(b.date || b.year);
-      const after = known.filter((s) => s.date > from).sort((x, y) => x.date.localeCompare(y.date));
-      let acc = 1;
-      for (const s of after) { acc *= s.f; if (Math.abs(r / acc - 1) < 0.12) { f = acc; break; } }
+      const from = String(b.date || b.year), to = String(a.date || `${a.year}-12-31`);
+      // 1) Splits ocurridos entre los dos cierres (caso normal: misma fuente sin ajustar)
+      const inside = known.filter((s) => s.date > from && s.date <= to);
+      const kIn = inside.reduce((x, s) => x * s.f, 1);
+      if (inside.length && near(r, kIn)) { f = kIn; used = inside; }
+      // 2) Años de fuentes distintas (p. ej. SEC reexpresada a medias junto a FMP ajustada): el salto es el producto
+      //    de los splits POSTERIORES más recientes que una tiene y la otra no (productos desde el más reciente hacia atrás).
+      else if ((a.src || '') !== (b.src || '')) {
+        const after = known.filter((s) => s.date > from);
+        let acc = 1; const run = [];
+        for (let j = after.length - 1; j >= 0; j--) { acc *= after[j].f; run.push(after[j]); if (near(r, acc)) { f = acc; used = [...run]; break; } }
+      }
     } else {
-      for (const c of COMMON) { if (Math.abs(r / c - 1) < 0.12) f = c; else if (Math.abs(r * c - 1) < 0.12) f = 1 / c; }
+      for (const c of COMMON) { if (near(r, c)) f = c; else if (Math.abs(r * c - 1) < 0.12) f = 1 / c; }
+      // Confirmación: el beneficio neto no cambia en esa proporción (si cambiara, sería otra cosa)
+      const ni = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
+      if (f && Math.abs(ni / f - 1) < 0.25 && f !== 1) f = null;
+      // Emitió acciones por un importe relevante: el salto es dilución, no un split
+      if (f && isNum(a.issuance) && a.issuance > 0 && isNum(a.equity) && a.equity > 0 && a.issuance > 0.2 * a.equity) f = null;
     }
     if (!f) continue;
-    // Confirmación: el beneficio neto no cambia en esa proporción (si cambiara, sería otra cosa)
-    const ni = isNum(a.netIncome) && isNum(b.netIncome) && b.netIncome > 0 ? a.netIncome / b.netIncome : 1;
-    if (Math.abs(ni / f - 1) < 0.25 && f !== 1) continue;
-    if (known) {
-      // (con lista: si ningún producto de splits encaja, f ya es null y no se ajusta: es dilución real)
-    } else if (isNum(a.issuance) && a.issuance > 0 && isNum(a.equity) && a.equity > 0 && a.issuance > 0.2 * a.equity) {
-      continue; // emitió acciones por un importe relevante: el salto de acciones es dilución, no un split
-    }
+    if (used.length) known = known.filter((s) => !used.includes(s)); // un split no se aplica dos veces
     found.push({ year: a.year, factor: f });
     for (let j = 0; j < i; j++) {
       const y = years[j];

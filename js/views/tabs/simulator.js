@@ -1,10 +1,10 @@
 // Simulador: rentabilidad histórica con/sin reinversión de dividendos frente al S&P 500 y proyección a 5-10 años.
-import { data } from '../../providers/index.js?v=cf3615ab';
-import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
-import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=cf3615ab';
-import { isNum, mean } from '../../calc/finance.js?v=cf3615ab';
-import { historical, forward } from '../../calc/simulate.js?v=cf3615ab';
-import { extra } from '../company.js?v=cf3615ab';
+import { data } from '../../providers/index.js?v=e06fb4a0';
+import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
+import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=e06fb4a0';
+import { isNum, mean } from '../../calc/finance.js?v=e06fb4a0';
+import { historical, forward } from '../../calc/simulate.js?v=e06fb4a0';
+import { extra } from '../company.js?v=e06fb4a0';
 
 export async function render(el, S) {
   const m = S.m, cur = m.tradeCur;
@@ -17,7 +17,7 @@ export async function render(el, S) {
   const g0 = m.growth.analystEps ?? m.growth.eps5 ?? 0.05;
   const pe5 = mean(m.ratiosHist.slice(-5).map((r) => r.priceToEarningsRatio).filter((v) => isNum(v) && v > 0 && v < 200));
   const payout = isNum(m.T.dividendsPaid) && isNum(m.T.netIncome) && m.T.netIncome > 0 ? Math.min(1, m.T.dividendsPaid / m.T.netIncome) : 0;
-  const st = { amount: 10000, years: 10, g: g0, pe: pe5 ?? m.pe ?? 15, payout, drip: true };
+  const st = { amount: 10000, years: 10, g: g0, pe: pe5 ?? (m.pe > 0 ? m.pe : 15), payout: Math.max(0, Math.min(1, payout)), drip: true };
   el.innerHTML = `${card('Rentabilidad histórica de 10.000 invertidos', `<div class="tablewrap"><table><thead><tr><th class="l">Horizonte</th><th>Con dividendos reinvertidos</th><th>Anual</th><th>Solo precio</th><th>Anual</th><th>S&P 500 (precio)</th><th>Anual</th></tr></thead><tbody>
       ${hs.map((h) => `<tr><td class="l">${h.y} años${h.drip ? ` <span class="note">desde ${esc(h.drip.from)}${h.partial ? ` · solo hay ${num(h.actualYears, 1)} años de historia: rentabilidad anual sobre ese periodo y S&P 500 desde la misma fecha` : ''}</span>` : ''}</td><td><b>${h.drip ? big(h.drip.final) : '—'}</b></td><td class="${cls(h.drip && h.drip.cagr)}">${h.drip ? sgnPct(h.drip.cagr) : '—'}</td><td>${h.noDrip ? big(h.noDrip.final) : '—'}</td><td>${h.noDrip ? sgnPct(h.noDrip.cagr) : '—'}</td><td>${h.index ? big(h.index.final) : '—'}</td><td>${h.index ? sgnPct(h.index.cagr) : '—'}</td></tr>`).join('')}
       </tbody></table></div><p class="note">«Con dividendos reinvertidos» usa precios ajustados por dividendos (equivale a reinvertir cada dividendo en la fecha ex-dividendo). Sin comisiones ni impuestos. «—»: no hay histórico suficiente con tu plan de datos.</p>
@@ -36,10 +36,10 @@ export async function render(el, S) {
   const run = () => {
     const v = (id) => Number(el.querySelector('#' + id).value);
     const p = { price: m.price, eps, epsGrowth: v('sg') / 100, exitPE: v('sp'), payout: v('spo') / 100, years: v('sy'), drip: el.querySelector('#sd').value === '1', amount: v('sa') };
-    if (!(p.exitPE > 0) || !(p.years >= 1) || !(p.amount > 0) || p.epsGrowth <= -0.99) { el.querySelector('#sres').innerHTML = '<div class="empty">Revisa los supuestos: PER de salida y años mayores que 0, y crecimiento mayor que −99 %.</div>'; return; }
+    if (!(p.exitPE > 0) || !(p.years >= 1) || !(p.amount > 0) || p.epsGrowth <= -0.99 || !(p.payout >= 0 && p.payout <= 1)) { el.querySelector('#sres').innerHTML = '<div class="empty">Revisa los supuestos: PER de salida y años mayores que 0, crecimiento mayor que −99 % y payout entre 0 y 100 %.</div>'; return; }
     const r = forward(p);
     if (!r) { el.querySelector('#sres').innerHTML = '<div class="empty">Se necesita un BPA positivo para proyectar.</div>'; return; }
-    const gP = p.epsGrowth - Math.abs(p.epsGrowth) * 0.5, gO = p.epsGrowth + Math.abs(p.epsGrowth) * 0.5; // ordenados también con crecimiento negativo
+    const gP = Math.max(-0.95, p.epsGrowth - Math.abs(p.epsGrowth) * 0.5), gO = p.epsGrowth + Math.abs(p.epsGrowth) * 0.5; // ordenados también con crecimiento negativo
     const pes = forward({ ...p, epsGrowth: gP, exitPE: p.exitPE * 0.8 }), opt = forward({ ...p, epsGrowth: gO, exitPE: p.exitPE * 1.1 });
     if (!pes || !opt) return;
     el.querySelector('#sres').innerHTML = `<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><span>Valor final</span><b>${big(r.final, cur)}</b></div><div class="kpi"><span>Rentabilidad anual</span><b class="${cls(r.cagr)}">${sgnPct(r.cagr)}</b></div><div class="kpi"><span>Multiplicador</span><b>${num(r.multiple, 2)}×</b></div></div>

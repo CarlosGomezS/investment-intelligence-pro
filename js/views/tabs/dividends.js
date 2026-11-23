@@ -1,8 +1,8 @@
 // Dividendos: historial completo, DPA anual, rentabilidad histórica, crecimiento, payout, continuidad, recortes y próximas fechas.
-import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
-import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=cf3615ab';
-import { isNum, div, cagrN } from '../../calc/finance.js?v=cf3615ab';
-import { exportCSV } from '../../export.js?v=cf3615ab';
+import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
+import { esc, card, pct, num, date, cls, sgnPct, table, source } from '../../ui/dom.js?v=e06fb4a0';
+import { isNum, div, cagrN } from '../../calc/finance.js?v=e06fb4a0';
+import { exportCSV } from '../../export.js?v=e06fb4a0';
 
 export function render(el, S) {
   const m = S.m, cur = m.tradeCur, d = m.dpsSeries, all = m.divs;

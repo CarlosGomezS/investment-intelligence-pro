@@ -1,10 +1,10 @@
 // Screener en dos fases: 1) filtro de universo en el proveedor (capitalización, sector, país, dividendo, beta…);
 // 2) enriquecimiento con ratios TTM de los N primeros para filtrar por calidad, crecimiento y valoración.
-import { data, gather } from '../providers/index.js?v=cf3615ab';
-import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=cf3615ab';
-import { logoHTML } from '../app.js?v=cf3615ab';
-import { isNum, asc } from '../calc/finance.js?v=cf3615ab';
-import { exportCSV } from '../export.js?v=cf3615ab';
+import { data, gather } from '../providers/index.js?v=e06fb4a0';
+import { esc, card, num, pct, big, mult, unavailable, toast, source } from '../ui/dom.js?v=e06fb4a0';
+import { logoHTML } from '../app.js?v=e06fb4a0';
+import { isNum, asc } from '../calc/finance.js?v=e06fb4a0';
+import { exportCSV } from '../export.js?v=e06fb4a0';
 
 const SECTORS = ['', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Communication Services', 'Energy', 'Utilities', 'Real Estate', 'Basic Materials'];
 const SECT_ES = { Technology: 'Tecnología', Healthcare: 'Salud', 'Financial Services': 'Financiero', 'Consumer Cyclical': 'Consumo cíclico', 'Consumer Defensive': 'Consumo defensivo', Industrials: 'Industria', 'Communication Services': 'Comunicaciones', Energy: 'Energía', Utilities: 'Utilities', 'Real Estate': 'Inmobiliario', 'Basic Materials': 'Materiales' };
@@ -66,7 +66,7 @@ export function render(view) {
       return { ...c, ok: r.rt.ok || r.km.ok, roic: km.returnOnInvestedCapitalTTM, gm: rt.grossProfitMarginTTM, pe: rt.priceToEarningsRatioTTM, fcfy: km.freeCashFlowYieldTTM, nde: km.netDebtToEBITDATTM, dy: rt.dividendYieldTTM, payout: rt.dividendPayoutRatioTTM, losing: (isNum(rt.netProfitMarginTTM) && rt.netProfitMarginTTM <= 0) || (isNum(rt.operatingProfitMarginTTM) && rt.operatingProfitMarginTTM <= 0), om: rt.operatingProfitMarginTTM,
         revG: inc.length === 2 && inc[0].revenue > 0 ? inc[1].revenue / inc[0].revenue - 1 : null, fcfUp: cf.length >= 4 ? cf.every((v, i) => isNum(v) && v > 0 && (i === 0 || (isNum(cf[i - 1]) && v > cf[i - 1]))) : null }; // FCF positivo y creciente
     }));
-    const pass = (c) => c.ok && (F.roic == null || c.roic >= F.roic / 100) && (F.gm == null || c.gm >= F.gm / 100) && (F.revG == null || c.revG >= F.revG / 100) && (F.pe == null || (c.pe > 0 && c.pe <= F.pe)) && (F.fcfy == null || c.fcfy >= F.fcfy / 100) && (F.nde == null || (isNum(c.nde) && c.nde <= F.nde && !(c.nde < 0 && c.losing))) && (F.dy == null || c.dy >= F.dy / 100) && (F.payout == null || (isNum(c.payout) && c.payout >= 0 && !c.losing && c.payout <= F.payout / 100)) && (!F.fcfUp || c.fcfUp === true);
+    const pass = (c) => c.ok && (F.roic == null || (isNum(c.roic) && c.roic >= F.roic / 100)) && (F.gm == null || (isNum(c.gm) && c.gm >= F.gm / 100)) && (F.revG == null || (isNum(c.revG) && c.revG >= F.revG / 100)) && (F.pe == null || (c.pe > 0 && c.pe <= F.pe)) && (F.fcfy == null || (isNum(c.fcfy) && c.fcfy >= F.fcfy / 100)) && (F.nde == null || (isNum(c.nde) && c.nde <= F.nde && !(c.nde < 0 && c.losing))) && (F.dy == null || (isNum(c.dy) && c.dy >= F.dy / 100)) && (F.payout == null || (isNum(c.payout) && c.payout >= 0 && !c.losing && c.payout <= F.payout / 100)) && (!F.fcfUp || c.fcfUp === true);
     last.rich = rich.map((c) => ({ ...c, pass: pass(c) })).sort((a, b) => b.pass - a.pass || (b.roic || 0) - (a.roic || 0));
     last.failed = rich.filter((c) => !c.ok).length;
     show(res);

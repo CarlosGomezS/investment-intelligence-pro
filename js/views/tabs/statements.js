@@ -1,10 +1,10 @@
 // Estados financieros completos: anual, trimestral y TTM móvil, con variación interanual, gráficos y exportación.
-import { data } from '../../providers/index.js?v=cf3615ab';
-import { fundamentals } from '../../ui/charts.js?v=cf3615ab';
-import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=cf3615ab';
-import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=cf3615ab';
-import { extra } from '../company.js?v=cf3615ab';
-import { exportCSV, exportXLSX } from '../../export.js?v=cf3615ab';
+import { data } from '../../providers/index.js?v=e06fb4a0';
+import { fundamentals } from '../../ui/charts.js?v=e06fb4a0';
+import { esc, big, pct, num, cls, sgnPct, card, unavailable, source } from '../../ui/dom.js?v=e06fb4a0';
+import { isNum, div, asc, splitAdjustRows, splitAdjustRowsByDate } from '../../calc/finance.js?v=e06fb4a0';
+import { extra } from '../company.js?v=e06fb4a0';
+import { exportCSV, exportXLSX } from '../../export.js?v=e06fb4a0';
 
 const neg = (v) => (isNum(v) ? -v : null);
 const abs = (v) => (isNum(v) ? Math.abs(v) : null);
@@ -32,7 +32,7 @@ export const DEFS = {
   ] },
 };
 const get = (r, f) => (r ? (typeof f === 'function' ? f(r) : r[f]) : null);
-const label = (r, period) => (period === 'quarter' ? `${r.period || ''} ${r.fiscalYear || String(r.date).slice(0, 4)}` : r.fiscalYear || String(r.date).slice(0, 4));
+const label = (r, period) => (period === 'quarter' || period === 'ttm' ? `${r.period || ''} ${r.fiscalYear || String(r.date).slice(0, 4)}`.trim() : r.fiscalYear || String(r.date).slice(0, 4));
 const st = { period: 'annual', stmt: 'income', chartRows: { income: ['revenue', 'netIncome'], balance: ['totalAssets', 'totalDebt'], cashflow: ['Free Cash Flow (FCF)', 'Flujo de caja operativo'] } };
 
 function rollingTTM(qAsc, defs, isStock) {
@@ -42,6 +42,8 @@ function rollingTTM(qAsc, defs, isStock) {
     // Solo 4 trimestres consecutivos (unos 9 meses entre el primer y el último cierre); con huecos no es un TTM
     const span = (new Date(w[3].date) - new Date(w[0].date)) / 864e5;
     if (!(span > 240 && span < 310)) continue;
+    // y cada salto entre trimestres de unos 3 meses (sin duplicados ni huecos)
+    if (![1, 2, 3].every((j) => { const d = (new Date(w[j].date) - new Date(w[j - 1].date)) / 864e5; return d > 60 && d < 120; })) continue;
     for (const k of Object.keys(qAsc[i])) {
       if (typeof qAsc[i][k] !== 'number') continue;
       r[k] = isStock || /eps|Shs|shares/i.test(k) ? qAsc[i][k] : (w.every((x) => isNum(x[k])) ? w.reduce((a, x) => a + x[k], 0) : null);
@@ -59,7 +61,7 @@ async function rowsFor(S, stmt, period) {
     if (!r.ok) return { error: r.error };
     const rows = splitAdjustRows(asc(r.data), S.m.splitsAdj);
     const ttm = S.raw[stmt + 'TTM'];
-    if (ttm && ttm.ok && ttm.data) rows.push({ ...ttm.data, fiscalYear: 'TTM', _ttm: true });
+    if (ttm && ttm.ok && ttm.data) { const [t] = splitAdjustRowsByDate([{ ...ttm.data, fiscalYear: 'TTM' }], S.raw.splits && S.raw.splits.ok ? S.raw.splits.data : null, S.m.shares); /* TTM con el mismo ajuste de splits */ rows.push({ ...t, _ttm: true }); }
     const adj = rows.some((x) => x._splitAdj);
     return { rows, prov: [r, ttm && ttm.ok ? ttm : null], note: adj ? 'Acciones y BPA de los años anteriores a cada split detectado están ajustados al número de acciones actual (comparables entre años). Los importes no cambian.' : '' };
   }

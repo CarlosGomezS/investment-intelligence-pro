@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js?v=cf3615ab';
+import { config, KEYS } from '../config.js?v=e06fb4a0';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }
@@ -31,11 +31,12 @@ async function idbSet(k, v) {
   return new Promise((res) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(v, k); t.oncomplete = res; t.onerror = res; });
 }
 /** Borra la caché. Con símbolo, solo las entradas de esa empresa (no gasta cuota del resto). */
-export async function clearCache(sym) {
+export async function clearCache(sym, more = []) {
   const d = await db(); if (!d) return;
   if (!sym) return new Promise((res) => { const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).clear(); t.oncomplete = res; t.onerror = res; });
   const S = String(sym), E = encodeURIComponent(S);
-  const hits = [`symbol=${E}&`, `symbols=${E}&`, `ticker=${E}&`, `q=${E}&`, `/${S}?`, `/${S}/`];
+  // También identificadores alternativos de la misma empresa: símbolo sin sufijo de bolsa, CIK, ISIN, palabra de ESEF…
+  const hits = [`symbol=${E}&`, `symbols=${E}&`, `ticker=${E}&`, `tickers=${E}&`, `q=${E}&`, `/${S}?`, `/${S}/`, ...more.filter(Boolean).map(String)];
   return new Promise((res) => {
     const t = d.transaction(STORE, 'readwrite'); const st = t.objectStore(STORE);
     const req = st.openCursor();

@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=cf3615ab';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=cf3615ab';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=e06fb4a0';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=e06fb4a0';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -54,13 +54,19 @@ export function buildModel(raw, fxRate = 1) {
     // (si no, es una ampliación de capital o un desajuste de clases de acciones: no se toca). Un factor < 1 sin
     // contrasplit solo se acepta en ADR (1 ADR = k acciones ordinarias), donde la moneda de cuentas y cotización difiere.
     const known = raw.splits && raw.splits.ok ? (val(raw.splits) || []).filter((s) => isNum(s.numerator) && isNum(s.denominator) && s.numerator > 0 && s.denominator > 0) : null;
-    if (f && known) {
-      const k = known.filter((s) => String(s.date) > String(last.date || last.year)).reduce((a, s) => a * (s.numerator / s.denominator), 1);
-      const adr = profile.isAdr || repCur !== tradeCur;
-      if (!(Math.abs(k / f - 1) < 0.12) && !(f < 1 && adr)) f = null;
-    } else if (f && f > 1 && !known && isNum(last.issuance) && last.issuance > 0) f = null; // sin lista y con emisiones: prudencia
+    // ADR: emisor extranjero que cotiza en EE. UU. (incluye los que presentan cuentas en USD, como BP o Shell)
+    const adr = !!profile.isAdr || repCur !== tradeCur || (!!profile.country && !/^(US|USA|United States)$/i.test(profile.country) && /NYSE|NASDAQ|AMEX|US/i.test(profile.exchange || profile.exchangeFullName || ''));
+    const verify = (g, since) => {
+      if (!g) return null;
+      if (known) { const k = known.filter((s) => String(s.date) > String(since)).reduce((a, s) => a * (s.numerator / s.denominator), 1); return Math.abs(k / g - 1) < 0.12 || (g < 1 && adr) ? g : null; }
+      // Sin lista: un salto hacia arriba con una emisión de acciones relevante es dilución, no split
+      if (g > 1 && isNum(last.issuance) && isNum(last.equity) && last.equity > 0 && last.issuance > 0.2 * last.equity) return null;
+      return g;
+    };
+    f = verify(f, last.date || last.year);
     if (f) { years.forEach((y) => fix(y, f)); splitsAdj.push({ year: String(Number(last.year) + 1), factor: f, recent: true }); }
-    if (ttmYear && ttmYear !== last && isNum(ttmYear.shares) && isNum(shares)) { const g = near(shares / ttmYear.shares); if (g) fix(ttmYear, g); }
+    // El TTM pasa por la misma comprobación que los años
+    if (ttmYear && ttmYear !== last && isNum(ttmYear.shares) && isNum(shares)) { const g = verify(near(shares / ttmYear.shares), ttmYear.date || last.date || last.year); if (g) fix(ttmYear, g); }
   }
   // En vivo: acciones × precio actual (la capitalización del perfil puede tener días de antigüedad)
   const marketCap = isNum(shares) && isNum(price) && price > 0 ? shares * price : mcProv ?? null;
@@ -104,7 +110,16 @@ export function buildModel(raw, fxRate = 1) {
   const dpsYears = Object.keys(byYear).filter((y) => y < curYear).sort();
   const dpsSeries = dpsYears.map((y) => ({ year: y, dps: byYear[y] }));
   const last12 = divs.filter((d) => new Date(d.date) > new Date(Date.now() - 365 * 864e5)).reduce((a, d) => a + (d.adjDividend ?? d.dividend), 0);
-  const dpsTTM = last12 || (isNum(profile.lastDividend) ? profile.lastDividend : 0);
+  let dpsTTM = last12 || (isNum(profile.lastDividend) ? profile.lastDividend : 0);
+  // Cotización en subunidades (peniques…) con dividendos en la unidad principal (libras): se comprueban contra los
+  // dividendos pagados del flujo de caja y, si salen 100 veces menores, se pasan a la moneda de cotización
+  let dpsScale = 1;
+  if (/^(GBp|GBX|ILA|ZAc|ZAC)$/.test(tradeCur) && dpsTTM > 0 && isNum(last.dividendsPaid) && last.dividendsPaid > 0 && isNum(fx) && isNum(last.shares) && last.shares > 0) {
+    const expected = (last.dividendsPaid * fx) / last.shares; const r = dpsTTM / expected;
+    if (r > 0.004 && r < 0.025) dpsScale = 100;
+  }
+  dpsTTM *= dpsScale;
+  if (dpsScale !== 1) for (const d of dpsSeries) d.dps *= dpsScale;
 
   // Datos de mercado para el WACC (todos con su origen)
   const tr = asc(val(raw.treasury) || []); const rfReal = tr.length ? tr[tr.length - 1].year10 / 100 : null;

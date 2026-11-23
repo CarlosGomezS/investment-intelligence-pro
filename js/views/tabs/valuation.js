@@ -1,9 +1,9 @@
 // Valoración intrínseca: DCF editable con WACC por CAPM, sensibilidad, escenarios, múltiplos, DDM y resumen.
-import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=cf3615ab';
-import { isNum } from '../../calc/finance.js?v=cf3615ab';
-import { store } from '../../store.js?v=cf3615ab';
-import { loadPeers } from './peers.js?v=cf3615ab';
-import { exportXLSX } from '../../export.js?v=cf3615ab';
+import { esc, card, pct, big, num, cls, sgnPct, origin, toast } from '../../ui/dom.js?v=e06fb4a0';
+import { isNum } from '../../calc/finance.js?v=e06fb4a0';
+import { store } from '../../store.js?v=e06fb4a0';
+import { loadPeers } from './peers.js?v=e06fb4a0';
+import { exportXLSX } from '../../export.js?v=e06fb4a0';
 
 const P = (v, d = 2) => (isNum(v) ? (v * 100).toFixed(d) : '');
 
@@ -49,7 +49,7 @@ export async function render(el, S, ctx) {
     ${d.growth.parts && d.growth.parts.length ? `<p class="note">Crecimiento sugerido = mediana de: ${d.growth.parts.map(([k, v]) => `${esc(k)} ${pct(v)}`).join(' · ')}${isNum(d.growth.capped) ? `, limitada a ${pct(d.growth.capped)} (el mayor de: crecimiento del último año, CAGR 10a y previsión de analistas) para no extrapolar rebotes de años anómalos` : ''}, acotada entre −10 % y 30 %.</p>` : ''}
     <div class="kpis" style="margin-top:10px;grid-template-columns:repeat(3,1fr)">
       <div class="kpi"><span>Coste del capital propio (CAPM)</span><b>${pct(ke, 2)}</b><small>rf + β × prima</small></div>
-      <div class="kpi"><span>Peso capital / deuda</span><b>${pct(E / (E + D || 1), 0)} / ${pct(D / (E + D || 1), 0)}</b><small>a valor de mercado</small></div>
+      <div class="kpi"><span>Peso capital / deuda</span><b>${E > 0 ? `${pct(E / (E + D), 0)} / ${pct(D / (E + D), 0)}` : '100 % / 0 %'}</b><small>${E > 0 ? 'a valor de mercado' : 'sin capitalización: solo coste del capital propio'}</small></div>
       <div class="kpi"><span>WACC aplicado</span><b>${pct(w, 2)}</b><small>${isNum(I.waccOverride) ? 'manual' : 'calculado'}</small></div></div>`)}
     ${card('DCF · resultado', R && R.error ? `<div class="empty">${esc(R.error)}</div>` : `<div class="tablewrap"><table class="dense" id="dcfT"><thead><tr><th class="l">Año</th><th>Crecimiento</th><th>FCF proyectado</th><th>Factor desc.</th><th>Valor presente</th></tr></thead><tbody>
       ${R.rows.map((r) => `<tr><td class="l">${new Date().getFullYear() + r.t}</td><td>${pct(r.g)}</td><td>${big(r.fcf)}</td><td>${num(r.df, 3)}</td><td>${big(r.pv)}</td></tr>`).join('')}</tbody></table></div>

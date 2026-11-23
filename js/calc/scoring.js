@@ -1,7 +1,7 @@
 // Scoring de inversión 0-100. Cada métrica se puntúa por interpolación lineal entre umbrales
 // documentados (columna `pts`: pares [valor, puntos]). Una categoría es la media de sus métricas
 // disponibles; el total es la media ponderada de las categorías con datos. Los datos faltantes se listan.
-import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=cf3615ab';
+import { isNum, lin, mean, stdev, cagrN, div, maxDrawdown, median } from './finance.js?v=e06fb4a0';
 
 export const DEFAULT_WEIGHTS = { calidad: 12, crecimiento: 12, rentabilidad: 12, solidez: 12, caja: 12, moat: 10, valoracion: 15, riesgo: 8, estabilidad: 7 };
 
@@ -27,6 +27,8 @@ export function metricsFor(m, ctx) {
   const roicAvg5 = mean(s('rc').slice(-5));
   const RC = last.negCapital ? 'ROCE (capital invertido negativo por recompras)' : 'ROIC';
   const highAlerts = (ctx.alerts || []).filter((a) => a.sev === 'alta').length;
+  // Mismo dato para la nota y para lo que se muestra; solo con ventas positivas
+  const sbcR = isNum(T.sbc) && T.revenue > 0 ? T.sbc / T.revenue : isNum(last.sbc) && last.revenue > 0 ? last.sbc / last.revenue : null;
   // Paso de beneficios (o FCF) a pérdidas: el CAGR no se puede calcular, pero no es «sin dato»: puntúa 0
   // También pérdidas crónicas (último dato ≤ 0, aunque nunca hubiera beneficio): puntúa 0, no se excluye
   const toLoss = (k) => { const v = s(k).filter(isNum); return v.length >= 1 && v[v.length - 1] <= 0; };
@@ -41,7 +43,7 @@ export function metricsFor(m, ctx) {
     M('calidad', 'Piotroski F-Score', m.scores.piotroskiScore, isNum(m.scores.piotroskiScore) ? m.scores.piotroskiScore + '/9' : '—', [[2, 0], [5, 50], [8, 100]], '9 pruebas contables; 8+ = 100'),
     M('calidad', 'Calidad del beneficio (caja op./beneficio)', T.incomeQuality ?? last.incomeQuality, X(T.incomeQuality ?? last.incomeQuality, 2), [[0.5, 0], [0.9, 60], [1.2, 100]], 'CFO / beneficio neto'),
     M('calidad', 'Margen bruto', T.grossMargin, P(T.grossMargin), [[0.1, 0], [0.35, 55], [0.6, 100]], 'Beneficio bruto / ventas'),
-    M('calidad', 'Pagos en acciones / ventas', isNum(T.sbc) && isNum(T.revenue) ? T.sbc / T.revenue : (isNum(last.sbc) && last.revenue ? last.sbc / last.revenue : null), P(isNum(last.sbc) && last.revenue ? last.sbc / last.revenue : null), [[0, 100], [0.03, 75], [0.1, 0]], 'SBC / ventas (menos es mejor)'),
+    M('calidad', 'Pagos en acciones / ventas', sbcR, P(sbcR), [[0, 100], [0.03, 75], [0.1, 0]], 'SBC / ventas (menos es mejor)'),
 
     M('crecimiento', 'Ventas CAGR 5 años', m.growth.rev5, P(m.growth.rev5), [[-0.05, 0], [0.05, 55], [0.15, 100]], 'CAGR ventas 5a'),
     M('crecimiento', 'BPA CAGR 5 años', eps5, eps5 === -1 ? 'pasa a pérdidas' : P(eps5), [[-0.05, 0], [0.07, 55], [0.2, 100]], 'CAGR BPA 5a'),

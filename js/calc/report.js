@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=cf3615ab';
-import { fmtB } from './alerts.js?v=cf3615ab';
+import { isNum } from './finance.js?v=e06fb4a0';
+import { fmtB } from './alerts.js?v=e06fb4a0';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -35,7 +35,8 @@ export function buildReport(m, sc, val, alerts) {
   if (sc.coverage < 0.45 || total == null) conclusion = 'Empresa difícil de valorar por falta de información';
   else if (qual >= 60 && !isNum(c.mos)) conclusion = 'Empresa de calidad, sin valoración fiable';
   else if (qual >= 70 && c.mos >= 0.2 && !alerts.some((a) => a.sev === 'alta') && total >= 60) conclusion = 'Empresa de gran calidad a precio atractivo';
-  else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad a precio razonable';
+  else if (qual >= 60 && c.mos >= -0.1 && !alerts.some((a) => a.sev === 'alta')) conclusion = 'Empresa de calidad a precio razonable';
+  else if (qual >= 60 && c.mos >= -0.1) conclusion = 'Empresa de calidad, con riesgos graves que vigilar';
   else if (qual >= 60) conclusion = 'Empresa de calidad, pero sobrevalorada';
   else conclusion = 'Empresa mediocre o con riesgos elevados';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);

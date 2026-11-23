@@ -13,8 +13,8 @@ test('rc no sale positivo con capital empleado negativo', () => {
 test('años antiguos sin ajustar mezclados con años ajustados (split posterior): se ajustan', () => {
   // 2019-2020 de SEC sin ajustar; 2021-2025 de FMP ya ajustados al split 10:1 de 2024 (y 4:1 de 2021)
   const ys = [
-    { year: '2019', date: '2019-01-27', shares: 610, eps: 6.6, netIncome: 4100 },
-    { year: '2020', date: '2020-01-26', shares: 612, eps: 4.5, netIncome: 2800 },
+    { year: '2019', date: '2019-01-27', shares: 610, eps: 6.6, netIncome: 4100, src: 'sec' },
+    { year: '2020', date: '2020-01-26', shares: 612, eps: 4.5, netIncome: 2800, src: 'sec' },
     { year: '2021', date: '2021-01-31', shares: 24800, eps: 0.17, netIncome: 4300 },
     { year: '2022', date: '2022-01-30', shares: 25000, eps: 0.39, netIncome: 9700 },
   ];

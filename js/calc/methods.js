@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median } from './finance.js?v=cf3615ab';
+import { isNum, mean, stdev, median } from './finance.js?v=e06fb4a0';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -12,6 +12,9 @@ const pctS = (v, d = 1) => (isNum(v) ? (v * 100).toFixed(d).replace('.', ',') + 
 // Bancos, aseguradoras, brókeres, gestoras, inmobiliarias (REIT) y eléctricas: su balance no se lee igual (caja, deuda, circulante)
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const nS = (v, d = 1) => (isNum(v) ? v.toFixed(d).replace('.', ',') : 'sin dato');
+
+/** Último valor disponible de una partida (si el último balance no ha llegado, el anterior) */
+const lastVal = (m, k) => { const y = [...(m.years || [])].reverse().find((x) => isNum(x[k])); return y ? y[k] : null; };
 
 function base(S) {
   const m = S.m, Y = m.years || [], s = (f) => Y.map((y) => y[f]);
@@ -39,8 +42,9 @@ export const METHODS = {
       const { m, Y, s, iv, mos, price } = base(S);
       const rc = last(s('rc').filter(isNum), 10);
       const c1 = rc.length >= 5 ? rc.filter((v) => v >= 0.15).length / rc.length >= 0.8 : null;
-      const nde = m.last.netDebtToEbitda, nd = m.last.netDebt;
-      const c2 = isNum(nd) && nd <= 0 ? true : isNum(nde) ? nde <= 2 && nde >= 0 : null;
+      const nde = m.last.netDebtToEbitda, nd = lastVal(m, 'netDebt');
+      // EBITDA negativo con deuda: suspenso claro, no «sin dato»
+      const c2 = m.last.ebitdaNegWithDebt ? false : isNum(nd) && nd <= 0 ? true : isNum(nde) ? nde <= 2 && nde >= 0 : null;
       const ni = last(s('netIncome').filter(isNum), 10);
       const c3 = ni.length >= 5 ? ni.every((v) => v > 0) && isNum(m.growth.eps5) && m.growth.eps5 > 0 : null;
       const gm = last(s('grossMargin').filter(isNum), 10), om = last(s('operatingMargin').filter(isNum), 10);
@@ -52,7 +56,7 @@ export const METHODS = {
       const c7 = isNum(mos) ? mos >= 0.25 : null;
       const checks = [
         C('Rentabilidad del capital alta y sostenida', c1, rc.length ? `${rc.filter((v) => v >= 0.15).length} de ${rc.length} años ≥ 15 % (media ${pctS(mean(rc))})` : 'sin dato', this.rules[0]),
-        C('Poca deuda', c2, isNum(nd) && nd <= 0 ? 'caja neta' : `deuda neta/EBITDA ${nS(nde)}×`, this.rules[1]),
+        C('Poca deuda', c2, m.last.ebitdaNegWithDebt ? 'EBITDA negativo con deuda' : isNum(nd) && nd <= 0 ? 'caja neta' : `deuda neta/EBITDA ${nS(nde)}×`, this.rules[1]),
         C('Beneficios constantes y crecientes', c3, ni.length ? `${ni.filter((v) => v > 0).length} de ${ni.length} años con beneficio · BPA 5a ${pctS(m.growth.eps5)}/año` : 'sin dato', this.rules[2]),
         C('Márgenes estables', c4, isNum(sd) ? `desviación ${nS(sd * 100)} puntos (${gm.length >= 5 ? 'bruto' : 'operativo'})` : 'sin dato', this.rules[3]),
         C('Genera caja', c5, fcf.length ? `${fcf.filter((v) => v > 0).length} de ${fcf.length} años con FCF positivo · conversión ${pctS(mean(conv), 0)}` : 'sin dato', this.rules[4]),
@@ -93,8 +97,9 @@ export const METHODS = {
       const usdR = m.tradeCur === 'USD' ? 1 : S.usdRate; // tipo a dólares (lo descarga Métodos)
       const usd = isNum(usdR);
       const g1 = isNum(rev) && usd ? rev * usdR >= 7.7e8 : null; // el umbral está en dólares
-      const cr = m.last.currentRatio, wc = isNum(m.last.currentAssets) && isNum(m.last.currentLiabilities) ? m.last.currentAssets - m.last.currentLiabilities : null;
-      const ltd = m.last.longTermDebt;
+      const ca = lastVal(m, 'currentAssets'), cl = lastVal(m, 'currentLiabilities');
+      const cr = isNum(ca) && isNum(cl) && cl > 0 ? ca / cl : null, wc = isNum(ca) && isNum(cl) ? ca - cl : null;
+      const ltd = lastVal(m, 'longTermDebt');
       const g2 = isNum(cr) && isNum(wc) && isNum(ltd) ? cr >= 2 && ltd <= wc : isNum(cr) && cr < 2 ? false : null; // sin dato de deuda a largo no se aprueba
       const ni = last(s('netIncome').filter(isNum), 10);
       const g3 = ni.length >= 10 ? ni.every((v) => v > 0) : ni.length && ni.some((v) => v <= 0) ? false : null;
@@ -107,7 +112,7 @@ export const METHODS = {
       const eps3 = isNum(e3) ? X(e3) : null;
       const pe3 = isNum(eps3) && eps3 > 0 ? price / eps3 : null;
       const g6 = isNum(pe3) ? pe3 <= 15 : eps3 != null ? false : null;
-      const bvps = isNum(m.last.equity) && isNum(m.last.shares) && m.last.shares > 0 ? X(m.last.equity) / m.last.shares : null;
+      const eqL = lastVal(m, 'equity'); const bvps = isNum(eqL) && isNum(m.last.shares) && m.last.shares > 0 ? X(eqL) / m.last.shares : null;
       const pb = isNum(bvps) && bvps > 0 ? price / bvps : null;
       const g7 = isNum(pb) ? pb <= 1.5 || (isNum(pe3) && pe3 * pb <= 22.5) : null;
       const gnum = isNum(eps3) && eps3 > 0 && isNum(bvps) && bvps > 0 ? Math.sqrt(22.5 * eps3 * bvps) : null;
@@ -123,7 +128,7 @@ export const METHODS = {
       const finG = FIN.test(base(S).sector);
       if (finG) checks.unshift(C('Sector analizable', false, 'financiera, inmobiliaria o eléctrica: el criterio de liquidez de Graham no aplica', 'Graham trataba aparte bancos y eléctricas.'));
       const passed = [g1, g2, g3, g4, g5, g6, g7].filter(Boolean).length;
-      const score = Math.round((passed / 7) * 100);
+      const score = finG ? Math.min(40, Math.round((passed / 7) * 100)) : Math.round((passed / 7) * 100);
       const verdict = finG ? 'no' : passed === 7 ? 'entra' : passed >= 5 && g6 !== false && g7 !== false ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: gnum, entryNote: 'número de Graham √(22,5 × BPA × valor contable): precio máximo', target: isNum(gnum) ? Math.min(gnum, price) * 1.5 : null, targetNote: '+50 % sobre la compra', stop: null, stopNote: 'sin stop de precio: venta obligada al final del 2.º año natural', horizon: 'máx. 2 años' };
     },
@@ -172,7 +177,7 @@ export const METHODS = {
         C('Rendimiento del capital', isNum(g.roc) ? g.roc >= 0.25 : null, isNum(g.roc) ? `${pctS(g.roc, 0)} (puesto ${g.rank_roc || '—'} de ${g.n})` : 'sin dato (falta activo fijo o capital circulante)', this.rules[2]),
         C('Clasificación conjunta', isNum(g.pos) ? g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) : null, isNum(g.pos) ? `puesto ${g.pos} de ${g.n}` : 'no clasificada', this.rules[3]),
       ];
-      const score = isNum(g.pos) && g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 0;
+      const score = isNum(g.pos) ? (g.n > 1 ? Math.round(100 * (1 - (g.pos - 1) / (g.n - 1))) : 100) : 0;
       const verdict = !g.excluded && isNum(g.pos) && g.pos <= Math.max(1, Math.ceil(g.n * 0.3)) && checks[1].ok ? 'entra' : isNum(g.pos) && g.pos <= Math.ceil(g.n * 0.5) ? 'vigilar' : 'no';
       return { score, verdict, checks, entry: verdict === 'entra' ? m.price : null, entryNote: 'precio actual (método de clasificación, no de precio objetivo)', target: null, targetNote: 'sin objetivo: se revisa a los 12 meses', stop: null, stopNote: 'sin stop de precio', horizon: '12 meses y rotar' };
     },
@@ -194,7 +199,8 @@ export const METHODS = {
       const { m, price } = base(S);
       const eps = m.X(m.T.eps ?? m.last.eps), pe = isNum(eps) && eps > 0 ? price / eps : null;
       const g = m.growth.eps5;
-      const dy = isNum(m.rTTM && m.rTTM.dividendYieldTTM) ? m.rTTM.dividendYieldTTM : isNum(m.dpsTTM) && price ? m.dpsTTM / price : 0;
+      const dy0 = isNum(m.rTTM && m.rTTM.dividendYieldTTM) ? m.rTTM.dividendYieldTTM : isNum(m.dpsTTM) && price ? m.dpsTTM / price : 0;
+      const dy = isNum(dy0) && dy0 >= 0 && dy0 < 0.25 ? dy0 : 0; // > 25 % = dato sin ajustar a splits: no se suma
       const gy = isNum(g) ? (g + (dy || 0)) * 100 : null;
       const okG = isNum(pe) && isNum(g) && g > 0;
       const gyC = isNum(gy) ? Math.min(gy, 30) : null; // mismo tope (30) para el PEGY y el precio justo: coherentes entre sí
@@ -224,7 +230,8 @@ export const METHODS = {
     exit: 'En el estudio se mantiene cada posición 12 meses y se rehace la selección. No usa stop de precio.',
     thresholdsNote: 'El 20 % se calcula sobre el universo que analizas en la app, no sobre todo el mercado.',
     prepare(all) {
-      const v = all.map((r) => { const { m } = base(r.S); const bv = isNum(m.last.equity) && m.last.equity > 0 ? m.X(m.last.equity) : null; return { r, pb: isNum(bv) && isNum(m.marketCap) ? m.marketCap / bv : null }; });
+      // Bancos y aseguradoras cotizan siempre a P/VC bajo: no compiten por el 20 % barato con el resto
+      const v = all.map((r) => { const { m, sector } = base(r.S); const eq = lastVal(m, 'equity'); const bv = isNum(eq) && eq > 0 ? m.X(eq) : null; return { r, pb: !FIN.test(sector) && isNum(bv) && isNum(m.marketCap) ? m.marketCap / bv : null, fin: FIN.test(sector) }; });
       const ok = v.filter((x) => isNum(x.pb)).sort((a, b) => a.pb - b.pb);
       const cut = Math.max(1, Math.ceil(ok.length * 0.2));
       ok.forEach((x, i) => (x.r._pi = { pb: x.pb, cheap: i < cut, pos: i + 1, n: ok.length }));
@@ -233,7 +240,7 @@ export const METHODS = {
     evaluate(S, r) {
       const { m } = base(S); const p = r._pi || {}; const f = m.scores.piotroskiScore;
       const checks = [
-        C('Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n})` : 'sin valor contable positivo', this.rules[0]),
+        C('Entre el 20 % más barato (P/VC)', p.cheap, isNum(p.pb) ? `P/VC ${nS(p.pb, 2)} (puesto ${p.pos} de ${p.n})` : FIN.test(base(S).sector) ? 'financiera: se compara aparte' : 'sin valor contable positivo', this.rules[0]),
         C('F-Score ≥ 8', isNum(f) ? f >= 8 : null, isNum(f) ? `${f}/9` : 'sin dato', this.rules[2]),
       ];
       if (FIN.test(base(S).sector)) checks.push(C('Aviso de sector', null, 'financiera o inmobiliaria: varias pruebas del F-Score (liquidez, margen bruto) no se leen igual', 'Compruébala en su ficha.'));
