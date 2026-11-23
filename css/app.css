@@ -170,7 +170,7 @@ details.method summary{cursor:pointer;color:var(--acc);font-size:13px}
   .side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;flex-direction:row;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);background:var(--bg);z-index:30;gap:0}
   .side a{flex-direction:column;gap:2px;padding:5px 4px;font-size:10px;flex:1;justify-content:center;text-align:center}
   .side a.on{box-shadow:inset 0 2px 0 var(--acc)}
-  .side a[data-r=metodologia]{display:none}
+  .side a[data-r=metodologia],.side a[data-r=calendario]{display:none}
   .bn{display:none}.usage{display:none}.search kbd{display:none}
   .g2,.g3,.g4{grid-template-columns:minmax(0,1fr)}.span2{grid-column:auto}
   .chead{grid-template-columns:auto minmax(0,1fr)}.chead .px{grid-column:1/-1;text-align:left;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}

@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=f01d36e2';
+import { isNum, div, mean } from './finance.js?v=ca0e8ce3';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));

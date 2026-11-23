@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=f01d36e2';
-import { alphavantage } from './alphavantage.js?v=f01d36e2';
-import { finnhub } from './finnhub.js?v=f01d36e2';
-import { twelvedata } from './twelvedata.js?v=f01d36e2';
-import { roic } from './roic.js?v=f01d36e2';
-import { sec } from './sec.js?v=f01d36e2';
-import { esef } from './esef.js?v=f01d36e2';
-import { config } from '../config.js?v=f01d36e2';
-import { ApiError, usage, queueDelay } from './http.js?v=f01d36e2';
-import { setHint } from './hints.js?v=f01d36e2';
+import { fmp } from './fmp.js?v=ca0e8ce3';
+import { alphavantage } from './alphavantage.js?v=ca0e8ce3';
+import { finnhub } from './finnhub.js?v=ca0e8ce3';
+import { twelvedata } from './twelvedata.js?v=ca0e8ce3';
+import { roic } from './roic.js?v=ca0e8ce3';
+import { sec } from './sec.js?v=ca0e8ce3';
+import { esef } from './esef.js?v=ca0e8ce3';
+import { config } from '../config.js?v=ca0e8ce3';
+import { ApiError, usage, queueDelay } from './http.js?v=ca0e8ce3';
+import { setHint } from './hints.js?v=ca0e8ce3';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -44,8 +44,8 @@ function demoted(id) {
   const lim = (config.get().limits || {})[id];
   return lim ? (usage()[id] || 0) >= lim * 0.7 : false;
 }
-function chain(method, args) {
-  let ids = ORDER[method] || ['fmp'];
+function chain(method, args, order) {
+  let ids = order || ORDER[method] || ['fmp'];
   if (['income', 'balance', 'cashflow'].includes(method) && args[1] === 'quarter') ids = QUARTERLY;
   ids = ids.filter((id) => config.canUse(id) && typeof P[id][method] === 'function' && !isBlocked(id, args));
   return [...ids.filter((id) => !demoted(id)), ...ids.filter(demoted)];
@@ -91,8 +91,8 @@ async function complete(method, args, base, rest) {
   return used.length > 1 ? { ...base, data: rows.slice(0, Math.max(args[2] || 15, base.data.length)), source: used.map((u) => names[u] || u).join(' + '), merged: used } : base;
 }
 
-async function run(method, args) {
-  const list = chain(method, args);
+async function run(method, args, order) {
+  const list = chain(method, args, order);
   if (!list.length) {
     const anyBlocked = (ORDER[method] || ['fmp']).some((id) => isBlocked(id, args));
     const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
@@ -164,6 +164,8 @@ const METHODS = ['profile', 'quote', 'priceChange', 'pricesDaily', 'pricesAdjust
 export const data = Object.fromEntries(METHODS.map((m) => [m, (...a) => run(m, a)]));
 data.search = search;
 data.profileLite = (sym) => run('profile', [sym]); // sin completar con otras fuentes (competidores, screener)
+/** Igual que data[method] pero con otro orden de fuentes (p. ej. análisis masivo: Finnhub primero para no gastar FMP). */
+data.via = (order, method, ...args) => run(method, args, order);
 
 /** Perfil combinado: se toma el mejor y se completan los campos que falten con las demás fuentes. */
 const PROFILE_FIELDS = ['description', 'beta', 'range', 'sector', 'industry', 'ceo', 'website', 'currency', 'country', 'exchange', 'marketCap', 'sharesOutstanding', 'fullTimeEmployees', 'ipoDate', 'isin', 'cik'];

@@ -95,3 +95,7 @@ Estructura y modelo de datos: [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Fór
 ## Despliegue
 
 GitHub Pages desde la rama `main`, carpeta raíz. Cada `git push` publica la nueva versión.
+
+## Métodos de inversión (`#/metodos`)
+
+Desplegable con cinco métodos aplicados con sus reglas publicadas: Buffett (foso con cocodrilos: rentabilidad del capital sostenida, poca deuda, beneficios y caja constantes, sin dilución y margen de seguridad ≥ 25 %), Graham (los 7 criterios del inversor defensivo, número de Graham y venta al +50 % o a los 2 años), Greenblatt (fórmula mágica: EBIT/EV y EBIT/(capital circulante + activo fijo), excluye financieras y eléctricas, rotación anual), Lynch (PEGY = PER / (crecimiento del BPA + dividendo)) y Piotroski (F-Score ≥ 8 en el 20 % más barato por P/VC). Ordena el universo elegido por nota y muestra las 10 primeras con entrada y objetivo según el método. El «cocodrilo» técnico (Alligator de Bill Williams: SMMA 13/8, 8/5, 5/3 del precio mediano y fractales) da el estado de la tendencia, la entrada por rotura de fractal y el stop técnico. Si un método no fija stop u objetivo, la app lo dice en vez de inventarlo.

@@ -1,9 +1,9 @@
 // «Descargar todo»: todo el análisis de una empresa en Excel (una hoja por bloque), CSV (un ZIP con un archivo
 // por bloque), TXT (informe legible) o JSON (datos en bruto). En apps empaquetadas (WebView) donde las
 // descargas no funcionan, se intenta compartir el archivo y, si tampoco, se ofrece copiarlo.
-import { DEFS } from './views/tabs/statements.js?v=f01d36e2';
-import { toCSV } from './export.js?v=f01d36e2';
-import { asc, isNum, splitAdjustRows } from './calc/finance.js?v=f01d36e2';
+import { DEFS } from './views/tabs/statements.js?v=ca0e8ce3';
+import { toCSV } from './export.js?v=ca0e8ce3';
+import { asc, isNum, splitAdjustRows } from './calc/finance.js?v=ca0e8ce3';
 
 const g = (r, f) => (r ? (typeof f === 'function' ? f(r) : r[f]) : null);
 const clean = (v) => (v == null || (typeof v === 'number' && !Number.isFinite(v)) ? '' : v);
