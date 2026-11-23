@@ -1,10 +1,10 @@
 // Simulador: rentabilidad histórica con/sin reinversión de dividendos frente al S&P 500 y proyección a 5-10 años.
-import { data } from '../../providers/index.js?v=e1106417';
-import { fundamentals } from '../../ui/charts.js?v=e1106417';
-import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=e1106417';
-import { isNum, mean } from '../../calc/finance.js?v=e1106417';
-import { historical, forward } from '../../calc/simulate.js?v=e1106417';
-import { extra } from '../company.js?v=e1106417';
+import { data } from '../../providers/index.js?v=c2b29189';
+import { fundamentals } from '../../ui/charts.js?v=c2b29189';
+import { esc, card, num, pct, big, cls, sgnPct, origin, unavailable, source } from '../../ui/dom.js?v=c2b29189';
+import { isNum, mean } from '../../calc/finance.js?v=c2b29189';
+import { historical, forward } from '../../calc/simulate.js?v=c2b29189';
+import { extra } from '../company.js?v=c2b29189';
 
 export async function render(el, S) {
   const m = S.m, cur = m.tradeCur;

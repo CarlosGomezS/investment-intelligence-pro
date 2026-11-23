@@ -1,15 +1,15 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=e1106417';
-import { buildModel } from '../calc/model.js?v=e1106417';
-import { evaluateRatios } from '../calc/ratios.js?v=e1106417';
-import { detectAlerts } from '../calc/alerts.js?v=e1106417';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=e1106417';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=e1106417';
-import { buildReport } from '../calc/report.js?v=e1106417';
-import { store } from '../store.js?v=e1106417';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=e1106417';
-import { logoHTML, countryOf } from '../app.js?v=e1106417';
-import { isNum } from '../calc/finance.js?v=e1106417';
+import { data, gather } from '../providers/index.js?v=c2b29189';
+import { buildModel } from '../calc/model.js?v=c2b29189';
+import { evaluateRatios } from '../calc/ratios.js?v=c2b29189';
+import { detectAlerts } from '../calc/alerts.js?v=c2b29189';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=c2b29189';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=c2b29189';
+import { buildReport } from '../calc/report.js?v=c2b29189';
+import { store } from '../store.js?v=c2b29189';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=c2b29189';
+import { logoHTML, countryOf } from '../app.js?v=c2b29189';
+import { isNum } from '../calc/finance.js?v=c2b29189';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +17,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=e1106417'), grafico: () => import('./tabs/chart.js?v=e1106417'), estados: () => import('./tabs/statements.js?v=e1106417'), ratios: () => import('./tabs/ratios.js?v=e1106417'),
-  crecimiento: () => import('./tabs/growth.js?v=e1106417'), deuda: () => import('./tabs/debt.js?v=e1106417'), valoracion: () => import('./tabs/valuation.js?v=e1106417'), dividendos: () => import('./tabs/dividends.js?v=e1106417'),
-  competidores: () => import('./tabs/peers.js?v=e1106417'), moat: () => import('./tabs/moat.js?v=e1106417'), noticias: () => import('./tabs/news.js?v=e1106417'), analistas: () => import('./tabs/analysts.js?v=e1106417'),
-  riesgos: () => import('./tabs/risks.js?v=e1106417'), scoring: () => import('./tabs/scoring.js?v=e1106417'), informe: () => import('./tabs/report.js?v=e1106417'), simulador: () => import('./tabs/simulator.js?v=e1106417'),
+  resumen: () => import('./tabs/overview.js?v=c2b29189'), grafico: () => import('./tabs/chart.js?v=c2b29189'), estados: () => import('./tabs/statements.js?v=c2b29189'), ratios: () => import('./tabs/ratios.js?v=c2b29189'),
+  crecimiento: () => import('./tabs/growth.js?v=c2b29189'), deuda: () => import('./tabs/debt.js?v=c2b29189'), valoracion: () => import('./tabs/valuation.js?v=c2b29189'), dividendos: () => import('./tabs/dividends.js?v=c2b29189'),
+  competidores: () => import('./tabs/peers.js?v=c2b29189'), moat: () => import('./tabs/moat.js?v=c2b29189'), noticias: () => import('./tabs/news.js?v=c2b29189'), analistas: () => import('./tabs/analysts.js?v=c2b29189'),
+  riesgos: () => import('./tabs/risks.js?v=c2b29189'), scoring: () => import('./tabs/scoring.js?v=c2b29189'), informe: () => import('./tabs/report.js?v=c2b29189'), simulador: () => import('./tabs/simulator.js?v=c2b29189'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -160,7 +160,7 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
         // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
-        import('./tabs/peers.js?v=e1106417').then(({ loadPeers }) => loadPeers(S)).then(() => {
+        import('./tabs/peers.js?v=c2b29189').then(({ loadPeers }) => loadPeers(S)).then(() => {
           compute(S);
           const t = location.hash.split('/')[3] || 'resumen';
           if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
@@ -196,13 +196,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=e1106417');
+      const { exportAll } = await import('../exportall.js?v=c2b29189');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=e1106417');
+    const { clearCache } = await import('../providers/http.js?v=c2b29189');
     await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);

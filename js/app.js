@@ -1,20 +1,20 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=e1106417';
-import { data, setHint } from './providers/index.js?v=e1106417';
-import { usage } from './providers/http.js?v=e1106417';
-import { config, restoreConfig } from './config.js?v=e1106417';
-import { store } from './store.js?v=e1106417';
-import { destroyAll } from './ui/charts.js?v=e1106417';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=c2b29189';
+import { data, setHint } from './providers/index.js?v=c2b29189';
+import { usage } from './providers/http.js?v=c2b29189';
+import { config, restoreConfig } from './config.js?v=c2b29189';
+import { store } from './store.js?v=c2b29189';
+import { destroyAll } from './ui/charts.js?v=c2b29189';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=e1106417'),
-  c: () => import('./views/company.js?v=e1106417'),
-  watchlist: () => import('./views/watchlist.js?v=e1106417'),
-  screener: () => import('./views/screener.js?v=e1106417'),
-  comparar: () => import('./views/compare.js?v=e1106417'),
-  calendario: () => import('./views/calendar.js?v=e1106417'),
-  metodologia: () => import('./views/methodology.js?v=e1106417'),
-  ajustes: () => import('./views/settings.js?v=e1106417'),
+  dashboard: () => import('./views/dashboard.js?v=c2b29189'),
+  c: () => import('./views/company.js?v=c2b29189'),
+  watchlist: () => import('./views/watchlist.js?v=c2b29189'),
+  screener: () => import('./views/screener.js?v=c2b29189'),
+  comparar: () => import('./views/compare.js?v=c2b29189'),
+  calendario: () => import('./views/calendar.js?v=c2b29189'),
+  metodologia: () => import('./views/methodology.js?v=c2b29189'),
+  ajustes: () => import('./views/settings.js?v=c2b29189'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -56,6 +56,8 @@ function rank(list, term) {
     if (nm.startsWith(t)) s += 50; else if (nm.includes(t)) s += 20;
     if (major.test(r.exchange || '')) s += 25;
     if (!sym.includes('.')) s += 5;
+    if (/\b(ETF|FUND|TRUST UNIT|PREFERRED|DEPOSITARY|ENHANCED|INCOME SHARES)\b/.test(nm)) s -= 30; // fondos y preferentes detrás
+    s -= sym.length * 0.2; // a igualdad, la acción ordinaria (ticker más corto)
     return { r, s };
   }).sort((a, b) => b.s - a.s).map((x) => x.r);
 }
@@ -67,6 +69,18 @@ function renderSugg(list, title) {
   sugg.hidden = false; q.parentElement.setAttribute('aria-expanded', 'true');
 }
 function closeSugg() { sugg.hidden = true; q.parentElement.setAttribute('aria-expanded', 'false'); }
+// Intro sin sugerencias todavía: se busca ya y se abre el mejor resultado (p. ej. «broadcom» → AVGO);
+// solo si no hay ninguno se trata el texto como ticker.
+async function enterFree(text) {
+  ++seq; q.blur();
+  try {
+    const r = await data.search(text);
+    const best = rank(r.data || [], text)[0];
+    if (best) return choose(best);
+  } catch {}
+  choose({ symbol: text.toUpperCase().replace(/\s+/g, '') });
+}
+
 function choose(r) { if (r.name) setHint(r.symbol, { name: r.name, country: r.country }); closeSugg(); q.value = ''; q.blur(); store.pushHistory(r); go(`c/${encodeURIComponent(r.symbol)}/resumen`); }
 
 async function doSearch(term) {
@@ -90,7 +104,7 @@ q.addEventListener('focus', () => { if (q.value.trim().length < 2) showHistory()
 q.addEventListener('keydown', (e) => {
   if (sugg.hidden) return;
   const n = items.length;
-  if (e.key === 'ArrowDown') { sel = (sel + 1) % n; e.preventDefault(); } else if (e.key === 'ArrowUp') { sel = (sel - 1 + n) % n; e.preventDefault(); } else if (e.key === 'Enter') { e.preventDefault(); if (items[sel >= 0 ? sel : 0]) choose(items[sel >= 0 ? sel : 0]); else if (q.value.trim()) choose({ symbol: q.value.trim().toUpperCase() }); return; } else if (e.key === 'Escape') { closeSugg(); return; } else return;
+  if (e.key === 'ArrowDown') { sel = (sel + 1) % n; e.preventDefault(); } else if (e.key === 'ArrowUp') { sel = (sel - 1 + n) % n; e.preventDefault(); } else if (e.key === 'Enter') { e.preventDefault(); if (items[sel >= 0 ? sel : 0]) choose(items[sel >= 0 ? sel : 0]); else if (q.value.trim()) enterFree(q.value.trim()); return; } else if (e.key === 'Escape') { closeSugg(); return; } else return;
   $$('#sugg li[role=option]').forEach((li, i) => li.setAttribute('aria-selected', i === sel));
   const cur = $(`#s${sel}`); if (cur) { cur.scrollIntoView({ block: 'nearest' }); q.setAttribute('aria-activedescendant', cur.id); }
 });

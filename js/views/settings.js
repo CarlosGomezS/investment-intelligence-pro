@@ -1,13 +1,13 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS } from '../config.js?v=e1106417';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=e1106417';
-import { fmp } from '../providers/fmp.js?v=e1106417';
-import { alphavantage } from '../providers/alphavantage.js?v=e1106417';
-import { finnhub } from '../providers/finnhub.js?v=e1106417';
-import { twelvedata } from '../providers/twelvedata.js?v=e1106417';
-import { roic } from '../providers/roic.js?v=e1106417';
-import { store } from '../store.js?v=e1106417';
-import { esc, card, toast } from '../ui/dom.js?v=e1106417';
+import { config, KEYS } from '../config.js?v=c2b29189';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=c2b29189';
+import { fmp } from '../providers/fmp.js?v=c2b29189';
+import { alphavantage } from '../providers/alphavantage.js?v=c2b29189';
+import { finnhub } from '../providers/finnhub.js?v=c2b29189';
+import { twelvedata } from '../providers/twelvedata.js?v=c2b29189';
+import { roic } from '../providers/roic.js?v=c2b29189';
+import { store } from '../store.js?v=c2b29189';
+import { esc, card, toast } from '../ui/dom.js?v=c2b29189';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -65,7 +65,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js?v=e1106417');
+      const { sec } = await import('../providers/sec.js?v=c2b29189');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;
