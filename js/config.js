@@ -59,10 +59,14 @@ function normalize(s) {
   return { ...DEFAULTS, ...s, limits, cacheHours: { ...DEFAULTS.cacheHours, ...(s.cacheHours || {}) } };
 }
 
+// Claves incrustadas al publicar desde GitHub (secretos del repositorio). Las que escribas en Ajustes tienen prioridad.
+const ENV = (typeof window !== 'undefined' && window.__IIP_KEYS) || {};
+function withEnv(o) { const r = { ...o }; for (const k of SECRET_FIELDS) if (!r[k] && ENV[k]) r[k] = ENV[k]; return r; }
+
 function read() {
   let s = readLocal();
   if (!hasSecrets(s)) { const c = readCookie(); if (hasSecrets(c)) { s = { ...(s || {}), ...c }; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} } }
-  return normalize(s);
+  return withEnv(normalize(s));
 }
 
 function persist(o) {
@@ -93,7 +97,11 @@ export function importKeysCode(code) {
 
 export const config = {
   get() { return read(); },
-  set(patch) { const next = { ...read(), ...patch }; persist(next); return next; },
+  set(patch) {
+    const next = { ...read(), ...patch };
+    const own = { ...next }; for (const k of SECRET_FIELDS) if (ENV[k] && own[k] === ENV[k]) own[k] = ''; // las de GitHub no se copian
+    persist(own); return next;
+  },
   canUse(p) {
     const c = read();
     if (p === 'sec') return !!c.proxyUrl;
