@@ -1,9 +1,9 @@
 // Finnhub (gratis: 60 peticiones/minuto, sin tope diario; datos de EE. UU.).
 // Se usa para cotización, perfil, ratios TTM, competidores, recomendaciones, resultados, noticias y calendario,
 // y así se reserva la cuota diaria de FMP para lo que solo da FMP.
-import { getJSON } from './http.js?v=f2479787';
-import { config } from '../config.js?v=f2479787';
-import { toStatements } from './xbrl.js?v=f2479787';
+import { getJSON } from './http.js?v=5cb10694';
+import { config } from '../config.js?v=5cb10694';
+import { toStatements } from './xbrl.js?v=5cb10694';
 
 const H = () => config.get().cacheHours;
 const q = (path, params, ttl, v) => getJSON('finnhub', path, params, ttl, v);
@@ -64,7 +64,7 @@ export const finnhub = {
   async keyMetricsTTM(sym) {
     const r = await this._metric(sym), m = r.data.metric;
     const pfcf = m.pfcfShareTTM; // (EV/FCF no es precio/FCF: no se usa como sustituto)
-    return { ...r, data: { returnOnEquityTTM: pc(m.roeTTM), returnOnAssetsTTM: pc(m.roaTTM), returnOnInvestedCapitalTTM: pc(m.roiTTM), freeCashFlowYieldTTM: pfcf > 0 ? 1 / pfcf : null, evToEBITDATTM: m.evEbitdaTTM ?? null, netDebtToEBITDATTM: null, _source: 'Finnhub' } };
+    return { ...r, data: { returnOnEquityTTM: pc(m.roeTTM), returnOnAssetsTTM: pc(m.roaTTM), returnOnInvestedCapitalTTM: null, returnOnInvestmentTTM: pc(m.roiTTM), /* el «ROI» de Finnhub no es el ROIC (otro denominador): no se mezcla */ freeCashFlowYieldTTM: pfcf > 0 ? 1 / pfcf : null, evToEBITDATTM: m.evEbitdaTTM ?? null, netDebtToEBITDATTM: null, _source: 'Finnhub' } };
   },
   async peers(sym) {
     const r = await q('stock/peers', { symbol: sym }, H().static, (b) => Array.isArray(b) && b.length > 1);

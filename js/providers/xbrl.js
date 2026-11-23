@@ -115,7 +115,7 @@ export function toStatements(facts, symbol, maxYears = 15) {
     if (r.grossProfit == null && r.revenue != null && r.costOfRevenue != null) r.grossProfit = r.revenue - r.costOfRevenue;
     r.ebit = r.operatingIncome; r.ebitda = r.operatingIncome != null && r.depreciationAndAmortization != null ? r.operatingIncome + Math.abs(r.depreciationAndAmortization) : null;
     if (r.interestExpense != null) r.interestExpense = Math.abs(r.interestExpense);
-    if (r.sellingGeneralAndAdministrativeExpenses == null && (r.sellingAndMarketingExpenses != null || r.generalAndAdministrativeExpenses != null)) r.sellingGeneralAndAdministrativeExpenses = (r.sellingAndMarketingExpenses || 0) + (r.generalAndAdministrativeExpenses || 0);
+    if (r.sellingGeneralAndAdministrativeExpenses == null && r.sellingAndMarketingExpenses != null && r.generalAndAdministrativeExpenses != null) r.sellingGeneralAndAdministrativeExpenses = r.sellingAndMarketingExpenses + r.generalAndAdministrativeExpenses; // con una sola parte no hay total
     // BPA: se respeta el publicado (doble clase de acciones, preferentes…); solo si falta se calcula beneficio / acciones
     for (const [k, sh] of [['eps', 'weightedAverageShsOut'], ['epsDiluted', 'weightedAverageShsOutDil']]) {
       if (r[k] == null && r.netIncome != null && r[sh]) r[k] = r.netIncome / r[sh];
@@ -138,9 +138,16 @@ export function toStatements(facts, symbol, maxYears = 15) {
     // Arrendamientos a corto con la deuda a corto y el resto con la de largo (cuentan en liquidez y en Graham)
     if (r.leaseCurrent != null) r.shortTermDebt = (r.shortTermDebt || 0) + r.leaseCurrent;
     if (r.leaseNoncurrent != null || (r.financeLease != null && !leaseIn)) r.longTermDebt = (r.longTermDebt || 0) + (r.leaseNoncurrent || 0) + (leaseIn ? 0 : r.financeLease || 0); // sin contar dos veces el financiero
-    r.totalDebt = r.shortTermDebt == null && r.longTermDebt == null ? null : (r.shortTermDebt || 0) + (r.longTermDebt || 0);
-    r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null ? r.cashAndCashEquivalents + (r.shortTermInvestments || 0) : null;
-    r.netDebt = r.totalDebt != null && r.cashAndShortTermInvestments != null ? r.totalDebt - r.cashAndShortTermInvestments : null; // sin caja no se resta cero
+    // Deuda total: con las dos partes, la suma. Solo deuda a largo: se acepta (es habitual no tener vencimientos a corto
+    // y el balance presentado es completo). Solo deuda a corto: NO, porque una empresa con deuda casi siempre tiene
+    // deuda a largo y su ausencia suele ser una etiqueta que el traductor no reconoce: mejor «sin dato» que infravalorarla.
+    r.totalDebt = r.shortTermDebt != null && r.longTermDebt != null ? r.shortTermDebt + r.longTermDebt : r.longTermDebt != null ? r.longTermDebt : null;
+    r.debtShortTermAssumedZero = r.shortTermDebt == null && r.longTermDebt != null;
+    // Caja + inversiones a corto solo si están las dos; para la deuda neta, sin inversiones a corto se resta solo la caja
+    // (prudente: nunca resta más de lo que consta)
+    r.cashAndShortTermInvestments = r.cashAndCashEquivalents != null && r.shortTermInvestments != null ? r.cashAndCashEquivalents + r.shortTermInvestments : null;
+    const cashForNet = r.cashAndShortTermInvestments ?? r.cashAndCashEquivalents;
+    r.netDebt = r.totalDebt != null && cashForNet != null ? r.totalDebt - cashForNet : null; // sin caja no se resta cero
     return r;
   });
   const cashflow = mk('cashflow', ends).map((r) => {

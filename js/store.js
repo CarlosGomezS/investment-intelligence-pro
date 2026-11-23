@@ -3,7 +3,16 @@
 const KEY = 'iip.store.v1';
 const EMPTY = { lists: { Favoritos: [] }, history: [], analyses: [], weights: null, moat: {}, assumptions: {}, alerts: {}, notes: {}, peers: {} };
 
-function load() { try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return structuredClone(EMPTY); } }
+// Cada sección con su tipo: un archivo importado o un almacenamiento dañado no puede dejar la app inservible
+const obj = (v, d) => (v && typeof v === 'object' && !Array.isArray(v) ? v : d);
+function normalize(raw) {
+  const r = obj(raw, {});
+  const lists = obj(r.lists, null);
+  const cleanLists = lists ? Object.fromEntries(Object.entries(lists).map(([k, v]) => [k, Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []])) : { Favoritos: [] };
+  if (!cleanLists.Favoritos) cleanLists.Favoritos = [];
+  return { ...structuredClone(EMPTY), ...r, lists: cleanLists, history: Array.isArray(r.history) ? r.history : [], analyses: Array.isArray(r.analyses) ? r.analyses : [], weights: obj(r.weights, null), moat: obj(r.moat, {}), assumptions: obj(r.assumptions, {}), alerts: obj(r.alerts, {}), notes: obj(r.notes, {}), peers: obj(r.peers, {}) };
+}
+function load() { try { return normalize(JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { return structuredClone(EMPTY); } }
 let S = load();
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} window.dispatchEvent(new CustomEvent('iip:store')); }
 
@@ -40,5 +49,5 @@ export const store = {
   peers: (sym) => (S.peers || {})[sym] || null,
   setPeers(sym, list) { S.peers = S.peers || {}; if (list) S.peers[sym] = list; else delete S.peers[sym]; save(); },
   exportAll: () => JSON.stringify(S, null, 2),
-  importAll(json) { S = { ...EMPTY, ...JSON.parse(json) }; save(); },
+  importAll(json) { const r = JSON.parse(json); if (!r || typeof r !== 'object' || Array.isArray(r)) throw new Error('Archivo no válido'); S = normalize(r); save(); },
 };

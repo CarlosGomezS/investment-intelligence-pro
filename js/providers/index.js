@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=f2479787';
-import { alphavantage } from './alphavantage.js?v=f2479787';
-import { finnhub, forgetFinnhub } from './finnhub.js?v=f2479787';
-import { twelvedata } from './twelvedata.js?v=f2479787';
-import { roic } from './roic.js?v=f2479787';
-import { sec, forgetSec } from './sec.js?v=f2479787';
-import { esef, forgetEsef } from './esef.js?v=f2479787';
-import { config } from '../config.js?v=f2479787';
-import { ApiError, usage, queueDelay } from './http.js?v=f2479787';
-import { setHint } from './hints.js?v=f2479787';
+import { fmp } from './fmp.js?v=5cb10694';
+import { alphavantage } from './alphavantage.js?v=5cb10694';
+import { finnhub, forgetFinnhub } from './finnhub.js?v=5cb10694';
+import { twelvedata } from './twelvedata.js?v=5cb10694';
+import { roic } from './roic.js?v=5cb10694';
+import { sec, forgetSec } from './sec.js?v=5cb10694';
+import { esef, forgetEsef } from './esef.js?v=5cb10694';
+import { config } from '../config.js?v=5cb10694';
+import { ApiError, usage, queueDelay } from './http.js?v=5cb10694';
+import { setHint } from './hints.js?v=5cb10694';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -97,7 +97,7 @@ async function complete(method, args, base, rest) {
       if (added) used.push(id);
     } catch (e) { /* la fuente secundaria no aporta: se sigue con lo que hay */ }
   }
-  rows.sort((a, b) => (String(b.date || fyOf(b)) > String(a.date || fyOf(a)) ? 1 : -1));
+  rows.sort((a, b) => String(b.date || fyOf(b)).localeCompare(String(a.date || fyOf(a)))); // iguales = 0 (orden estable)
   const names = { fmp: 'FMP', av: 'Alpha Vantage', finnhub: 'Finnhub', td: 'Twelve Data', roic: 'ROIC.AI', sec: 'SEC EDGAR', esef: 'ESEF' };
   return used.length > 1 ? { ...base, data: rows.slice(0, Math.max(args[2] || 15, base.data.length)), source: used.map((u) => names[u] || u).join(' + '), merged: used } : base;
 }

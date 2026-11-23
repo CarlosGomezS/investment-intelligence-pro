@@ -1,22 +1,22 @@
 // Punto de entrada: enrutador por hash, buscador global con autocompletado, tema y contador de uso.
-import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=f2479787';
-import { data, setHint } from './providers/index.js?v=f2479787';
-import { usage } from './providers/http.js?v=f2479787';
-import { config, restoreConfig } from './config.js?v=f2479787';
-import { store } from './store.js?v=f2479787';
-import { destroyAll } from './ui/charts.js?v=f2479787';
+import { $, $$, esc, num, sgnPct, cls, toast } from './ui/dom.js?v=5cb10694';
+import { data, setHint } from './providers/index.js?v=5cb10694';
+import { usage } from './providers/http.js?v=5cb10694';
+import { config, restoreConfig } from './config.js?v=5cb10694';
+import { store } from './store.js?v=5cb10694';
+import { destroyAll } from './ui/charts.js?v=5cb10694';
 
 const routes = {
-  dashboard: () => import('./views/dashboard.js?v=f2479787'),
-  c: () => import('./views/company.js?v=f2479787'),
-  watchlist: () => import('./views/watchlist.js?v=f2479787'),
-  comprobar: () => import('./views/selfcheck.js?v=f2479787'),
-  metodos: () => import('./views/methods.js?v=f2479787'),
-  screener: () => import('./views/screener.js?v=f2479787'),
-  comparar: () => import('./views/compare.js?v=f2479787'),
-  calendario: () => import('./views/calendar.js?v=f2479787'),
-  metodologia: () => import('./views/methodology.js?v=f2479787'),
-  ajustes: () => import('./views/settings.js?v=f2479787'),
+  dashboard: () => import('./views/dashboard.js?v=5cb10694'),
+  c: () => import('./views/company.js?v=5cb10694'),
+  watchlist: () => import('./views/watchlist.js?v=5cb10694'),
+  comprobar: () => import('./views/selfcheck.js?v=5cb10694'),
+  metodos: () => import('./views/methods.js?v=5cb10694'),
+  screener: () => import('./views/screener.js?v=5cb10694'),
+  comparar: () => import('./views/compare.js?v=5cb10694'),
+  calendario: () => import('./views/calendar.js?v=5cb10694'),
+  metodologia: () => import('./views/methodology.js?v=5cb10694'),
+  ajustes: () => import('./views/settings.js?v=5cb10694'),
 };
 
 export function go(path) { location.hash = '#/' + path; }
@@ -25,9 +25,10 @@ async function route() {
   closeSugg();
   const h = location.hash.replace(/^#\/?/, '');
   const [path, query] = h.split('?');
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
-  const name = parts[0] || 'dashboard';
   const view = $('#view');
+  let parts;
+  try { parts = path.split('/').filter(Boolean).map(decodeURIComponent); } catch { view.innerHTML = '<div class="empty">La dirección no es válida. <a href="#/">Volver al panel</a></div>'; return; }
+  const name = parts[0] || 'dashboard';
   $$('#nav a').forEach((a) => a.classList.toggle('on', a.dataset.r === (name === 'c' ? '' : name)));
   if (!routes[name]) { view.innerHTML = '<div class="empty">Página no encontrada. <a href="#/">Volver al panel</a></div>'; return; }
   if (!config.hasData() && name !== 'ajustes' && name !== 'metodologia') { (await routes.ajustes()).render(view, [], new URLSearchParams(), true); return; }

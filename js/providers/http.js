@@ -1,6 +1,6 @@
 // Capa HTTP común: caché en IndexedDB con caducidad, contador de peticiones diarias,
 // errores normalizados y deduplicación de peticiones simultáneas.
-import { config, KEYS } from '../config.js?v=f2479787';
+import { config, KEYS } from '../config.js?v=5cb10694';
 
 export class ApiError extends Error {
   constructor(code, message, meta = {}) { super(message); this.code = code; Object.assign(this, meta); }
@@ -117,9 +117,11 @@ export async function getJSON(provider, path, params, ttlHours, validate) {
     try {
       await throttle(provider);
       bump(provider);
+      // El tiempo máximo cubre también la descarga del cuerpo: un servidor que manda cabeceras y se queda colgado no
+      // deja la pantalla cargando para siempre
       const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), provider === 'esef' || provider === 'sec' ? 45000 : 15000);
-      try { res = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctl.signal }); } finally { clearTimeout(to); }
-      const text = await res.text();
+      let text;
+      try { res = await fetch(url, { headers: { Accept: 'application/json' }, signal: ctl.signal }); text = await res.text(); } finally { clearTimeout(to); }
       try { body = JSON.parse(text); } catch { body = text; }
     } catch (e) {
       if (hit) return { ...hit, cached: true, stale: true };

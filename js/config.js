@@ -4,7 +4,8 @@
 // Para que no se pierdan se guardan en TRES sitios y se restauran solas:
 //   1) localStorage            (principal)
 //   2) IndexedDB               (sobrevive a quien haga localStorage.clear(), p. ej. otras webs del mismo dominio)
-//   3) cookie de larga duración limitada a la ruta de esta app
+//   (antes también una cookie: se quitó porque el navegador la envía al servidor en cada visita; ahora la cookie solo
+//   guarda el tema y, si quedaba una antigua con claves, se sobrescribe al arrancar)
 // Además se pide al navegador almacenamiento persistente y se puede exportar un código de copia.
 const KEY = 'iip.config.v1';
 const COOKIE = 'iipcfg';
@@ -28,7 +29,7 @@ function readCookie() {
 }
 function writeCookie(o) {
   try {
-    const slim = Object.fromEntries(SECRET_FIELDS.map((k) => [k, o[k] || '']).concat([['theme', o.theme]]));
+    const slim = { theme: o.theme }; // nunca claves en una cookie: viajarían a GitHub con cada petición
     document.cookie = `${COOKIE}=${encodeURIComponent(enc(slim))}; max-age=${60 * 60 * 24 * 3650}; path=${BASE}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
   } catch {}
 }

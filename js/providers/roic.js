@@ -1,8 +1,8 @@
 // ROIC.AI API v2 (gratis: 5 peticiones/minuto, cobertura mundial, 2 años de estados anuales).
 // Respaldo para empresas fuera de EE. UU. Acepta ticker o ISIN como identificador.
-import { getJSON } from './http.js?v=f2479787';
-import { config } from '../config.js?v=f2479787';
-import { hint } from './hints.js?v=f2479787';
+import { getJSON } from './http.js?v=5cb10694';
+import { config } from '../config.js?v=5cb10694';
+import { hint } from './hints.js?v=5cb10694';
 
 const H = () => config.get().cacheHours;
 const n = (v) => (v == null || v === '' ? null : Number(v));
@@ -49,12 +49,12 @@ export const roic = {
     return { ...r, data: arr(r.data).map((x) => {
       const std = n(x.bs_st_borrow), ltd = n(x.bs_lt_borrow), cash = n(x.bs_cash_near_cash_item), sti = n(x.bs_mkt_sec_other_st_invest);
       return { date: pickDate(x), symbol: s, fiscalYear: pickFY(x), period: 'FY', reportedCurrency: x.currency,
-        cashAndCashEquivalents: cash, shortTermInvestments: sti, cashAndShortTermInvestments: n(x.bs_c_and_ce_and_sti_detailed) ?? (cash != null ? cash + (sti || 0) : null),
+        cashAndCashEquivalents: cash, shortTermInvestments: sti, cashAndShortTermInvestments: n(x.bs_c_and_ce_and_sti_detailed) ?? (cash != null && sti != null ? cash + sti : null), /* sin inversiones a corto: solo la caja cuenta (prudente) */
         netReceivables: n(x.bs_acct_note_rcv), inventory: n(x.bs_inventories), totalCurrentAssets: n(x.bs_cur_asset_report), propertyPlantEquipmentNet: n(x.bs_net_fix_asset),
         goodwill: n(x.bs_goodwill), intangibleAssets: n(x.bs_other_intangible_assets_detailed ?? x.bs_disclosed_intangibles), longTermInvestments: n(x.bs_lt_invest ?? x.bs_long_term_investments),
         totalNonCurrentAssets: n(x.bs_tot_non_cur_asset), totalAssets: n(x.bs_tot_asset), totalCurrentLiabilities: n(x.bs_cur_liab), shortTermDebt: std, longTermDebt: ltd,
         totalLiabilities: n(x.bs_tot_liab), totalStockholdersEquity: n(x.bs_eqty_bef_minority_int_detailed ?? x.bs_total_equity),
-        totalDebt: std == null && ltd == null ? null : (std || 0) + (ltd || 0), retainedEarnings: n(x.bs_pure_retained_earnings), netDebt: n(x.net_debt), commonStockSharesOutstanding: n(x.bs_sh_out), _source: 'ROIC.AI' };
+        totalDebt: std != null && ltd != null ? std + ltd : null, /* con una sola parte no hay total */ retainedEarnings: n(x.bs_pure_retained_earnings), netDebt: n(x.net_debt) ?? (std != null && ltd != null && cash != null ? std + ltd - (sti != null ? cash + sti : cash) : null), commonStockSharesOutstanding: n(x.bs_sh_out), _source: 'ROIC.AI' };
     }) };
   },
   async cashflow(s) {

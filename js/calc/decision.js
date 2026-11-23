@@ -1,7 +1,7 @@
 // Decisión en cuatro ejes independientes: calidad del negocio, valoración, potencial de rentabilidad y riesgo de
 // pérdida permanente. No se mezclan en una sola nota: una empresa excelente puede estar cara y una barata puede
 // estar deteriorándose. Todas las reglas y umbrales están aquí, a la vista, y la interfaz los explica.
-import { isNum, maxDrawdown } from './finance.js?v=f2479787';
+import { isNum, maxDrawdown } from './finance.js?v=5cb10694';
 
 const FIN = /financ|bank|banco|insur|asegur|capital market|broker|asset manag|real estate|reit|inmobil|utilit|eléctric/i;
 const cat = (sc, k) => (sc.cats.find((c) => c.key === k) || {}).score;
