@@ -1,10 +1,10 @@
 // Informe final: 13 preguntas, conclusión razonada, argumentos a favor y en contra, exportación a PDF.
-import { relBox, decisionCard } from './overview.js?v=169485d7';
-import { coverageTier } from '../../calc/reliability.js?v=169485d7';
-import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=169485d7';
-import { store } from '../../store.js?v=169485d7';
-import { gauge } from './overview.js?v=169485d7';
-import { printReport } from '../../export.js?v=169485d7';
+import { relBox, decisionCard } from './overview.js?v=69ff756a';
+import { coverageTier } from '../../calc/reliability.js?v=69ff756a';
+import { esc, card, num, pct, sgnPct, cls, datetime, scoreColor, toast } from '../../ui/dom.js?v=69ff756a';
+import { store } from '../../store.js?v=69ff756a';
+import { gauge } from './overview.js?v=69ff756a';
+import { printReport } from '../../export.js?v=69ff756a';
 
 export function render(el, S) {
   const { m, rep, sc, val } = S, c = val.composite;

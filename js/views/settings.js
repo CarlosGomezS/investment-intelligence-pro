@@ -1,14 +1,14 @@
 // Ajustes: claves de todas las fuentes gratuitas (solo en este navegador), backend proxy, límites, caché y copia de seguridad.
-import { config, KEYS, exportKeysCode, importKeysCode } from '../config.js?v=169485d7';
-import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=169485d7';
-import { fmp } from '../providers/fmp.js?v=169485d7';
-import { alphavantage } from '../providers/alphavantage.js?v=169485d7';
-import { finnhub } from '../providers/finnhub.js?v=169485d7';
-import { twelvedata } from '../providers/twelvedata.js?v=169485d7';
-import { roic } from '../providers/roic.js?v=169485d7';
-import { store } from '../store.js?v=169485d7';
-import { resetProviders } from '../providers/index.js?v=169485d7';
-import { esc, card, toast } from '../ui/dom.js?v=169485d7';
+import { config, KEYS, exportKeysCode, importKeysCode } from '../config.js?v=69ff756a';
+import { clearCache, usage, PROVIDERS } from '../providers/http.js?v=69ff756a';
+import { fmp } from '../providers/fmp.js?v=69ff756a';
+import { alphavantage } from '../providers/alphavantage.js?v=69ff756a';
+import { finnhub } from '../providers/finnhub.js?v=69ff756a';
+import { twelvedata } from '../providers/twelvedata.js?v=69ff756a';
+import { roic } from '../providers/roic.js?v=69ff756a';
+import { store } from '../store.js?v=69ff756a';
+import { resetProviders } from '../providers/index.js?v=69ff756a';
+import { esc, card, toast } from '../ui/dom.js?v=69ff756a';
 
 const SRC = [
   { id: 'fmp', label: 'Financial Modeling Prep', link: 'https://site.financialmodelingprep.com/developer/docs/pricing', free: '250/día · EE. UU.', role: 'Principal: estados, ratios históricos, estimaciones, DCF, insiders, screener.', test: () => fmp.quote('AAPL') },
@@ -66,7 +66,7 @@ export function render(view, _p, _q, firstRun) {
       try { const r = await s.test(); return `<span class="pos">✓</span> ${s.label}: OK${r.data && r.data.price ? ` (${r.data.price})` : ''}`; } catch (err) { return `<span class="neg">✕</span> ${s.label}: ${esc(err.message)}`; }
     }));
     if (config.get().proxyUrl) {
-      const { sec } = await import('../providers/sec.js?v=169485d7');
+      const { sec } = await import('../providers/sec.js?v=69ff756a');
       try { const r = await sec.search('Apple'); res.push(`<span class="pos">✓</span> SEC EDGAR: OK (${r.data.length} resultados)`); } catch (err) { res.push(`<span class="neg">✕</span> SEC EDGAR: ${esc(err.message)}`); }
     }
     out.innerHTML = `<p class="note">${res.join('<br>')}</p>`;

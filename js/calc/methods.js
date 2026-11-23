@@ -2,7 +2,7 @@
 // Cada método devuelve: nota 0-100, veredicto, comprobaciones (con el valor real de la empresa), precio de entrada,
 // objetivo y regla de salida/stop SEGÚN EL MÉTODO. Donde el autor no fija un stop de precio, se dice así.
 // Solo se usan datos reales del modelo de la empresa; si falta un dato, la comprobación queda «sin dato» (no cuenta como cumplida).
-import { isNum, mean, stdev, median, cagrN } from './finance.js?v=169485d7';
+import { isNum, mean, stdev, median, cagrN } from './finance.js?v=69ff756a';
 
 const last = (a, n) => a.slice(Math.max(0, a.length - n));
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -90,7 +90,7 @@ export const METHODS = {
       // confirmación del foso. Si falta algo, como mucho «vigilar».
       const allKnown = [c1, c2, c3, c4, c5, c6, c7].every((c) => c !== null);
       const verdict = fin || uF === false ? 'no' : qOk && c7 && allKnown && uF === true ? 'entra' : qOk ? 'vigilar' : 'no';
-      const pendB = qOk && c7 ? [!allKnown && 'criterios sin dato', uF !== true && 'tu confirmación del foso'].filter(Boolean) : [];
+      const pendB = qOk && c7 && !fin && uF !== false ? [!allKnown && 'criterios sin dato', uF !== true && 'tu confirmación del foso'].filter(Boolean) : [];
       return { score: fin ? Math.min(score, 40) : uF === false ? Math.min(score, 20) : score, verdict, checks, entry: isNum(iv) ? iv * 0.75 : null, entryNote: 'valor intrínseco − 25 %', target: iv, targetNote: 'valor intrínseco (referencia; el método no vende por objetivo)', stop: null, stopNote: 'sin stop de precio: se vende si la tesis (el foso) se rompe', horizon: pendB.length ? `cumple lo medible; para «Entraría» falta: ${pendB.join(' y ')}` : 'años (largo plazo)' };
     },
   },
@@ -191,7 +191,7 @@ export const METHODS = {
       // «Entraría» exige tus confirmaciones (entiendes el negocio y, si ha caído, que el problema es temporal)
       const userOk = user.entiendo === true && (!panic || user.temporal === true);
       const verdict = fin || userNo ? 'no' : core && c4 && !deterioro && userOk ? 'entra' : core ? 'vigilar' : 'no';
-      const pendC = core && c4 && !deterioro && !userOk ? [user.entiendo !== true && 'confirmar que entiendes el negocio', panic && user.temporal !== true && 'confirmar que el problema es temporal'].filter(Boolean) : [];
+      const pendC = core && c4 && !deterioro && !userOk && !fin && !userNo ? [user.entiendo !== true && 'confirmar que entiendes el negocio', panic && user.temporal !== true && 'confirmar que el problema es temporal'].filter(Boolean) : [];
       // Entrada: precio al que volvería a su PER medio o a su rentabilidad FCF media (la más exigente)
       const lv = [];
       if (!slowed && isNum(pe) && isNum(peAvg)) lv.push(price * (peAvg / pe));

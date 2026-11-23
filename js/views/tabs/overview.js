@@ -1,7 +1,7 @@
 // Resumen: datos clave de mercado, veredicto, valor intrínseco, alertas principales y enlaces oficiales.
-import { esc, safeUrl, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=169485d7';
-import { isNum } from '../../calc/finance.js?v=169485d7';
-import { coverageTier } from '../../calc/reliability.js?v=169485d7';
+import { esc, safeUrl, num, pct, sgnPct, big, cls, date, card, scoreColor, source } from '../../ui/dom.js?v=69ff756a';
+import { isNum } from '../../calc/finance.js?v=69ff756a';
+import { coverageTier } from '../../calc/reliability.js?v=69ff756a';
 
 export function gauge(s, size = 180) {
   const v = isNum(s) ? s : 0, a = Math.PI * (1 - v / 100), R = 80, cx = 100, cy = 92;

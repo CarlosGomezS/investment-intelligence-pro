@@ -1,8 +1,8 @@
 // Alertas y riesgos: anomalías detectadas en las cuentas, riesgo de mercado y alertas de valoración del usuario.
-import { esc, card, pct, num, toast } from '../../ui/dom.js?v=169485d7';
-import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=169485d7';
-import { store } from '../../store.js?v=169485d7';
-import { solvency } from './debt.js?v=169485d7';
+import { esc, card, pct, num, toast } from '../../ui/dom.js?v=69ff756a';
+import { isNum, maxDrawdown, volatility } from '../../calc/finance.js?v=69ff756a';
+import { store } from '../../store.js?v=69ff756a';
+import { solvency } from './debt.js?v=69ff756a';
 
 export function render(el, S) {
   const { m, alerts } = S;
@@ -16,7 +16,7 @@ export function render(el, S) {
       <div class="kpi"><span>Puntuación de solvencia</span><b>${sv.score ?? '—'}/100</b></div><div class="kpi"><span>Volatilidad anual (1a)</span><b>${pct(volatility(closes.slice(-252)))}</b></div><div class="kpi"><span>Máx. caída (5a)</span><b class="neg">${pct(maxDrawdown(closes.slice(-1260)))}</b></div>
     </div>
     <div class="grid g2">
-      <div>${card(`Anomalías detectadas (${alerts.length})`, alerts.length ? areas.map((ar) => `<h4 style="margin:12px 0 2px;font-size:12px;color:var(--mute)">${esc(ar)}</h4>` + alerts.filter((a) => a.area === ar).map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('')).join('') : '<div class="empty">Sin anomalías en los estados del último ejercicio frente a los anteriores.</div>')}
+      <div>${card(`Anomalías detectadas (${alerts.length})`, alerts.length ? areas.map((ar) => `<h4 style="margin:12px 0 2px;font-size:12px;color:var(--mute)">${esc(ar)}</h4>` + alerts.filter((a) => a.area === ar).map((a) => `<div class="alert-row"><span class="pill ${a.sev}">${a.sev}</span><div><b>${esc(a.title)}</b><p>${esc(a.detail)}</p></div></div>`).join('')).join('') : (m.years.length >= 2 ? '<div class="empty">Sin anomalías en los estados del último ejercicio frente a los anteriores.</div>' : '<div class="empty">Sin datos suficientes para buscar anomalías: hacen falta al menos dos ejercicios.</div>'))}
       <p class="note">Reglas comprobadas: caída de ingresos (&gt;10 %), deterioro de márgenes (&gt;3 p.p. vs media 3a), FCF negativo o −25 %, deuda +30 % por encima de las ventas, dilución &gt;3 %/año o &gt;2 %/año en 5a, ROIC −5 p.p., inventarios y cuentas a cobrar creciendo 15 p.p. más que las ventas, caja operativa &lt;80 % del beneficio, fondo de comercio +25 %, cambio del tipo impositivo &gt;15 p.p., liquidez &lt;1 sin caja suficiente, cobertura de intereses &lt;2, deuda neta/EBITDA &gt;3,5 y pérdidas. <a href="#/metodologia">Metodología</a>.</p></div>
       ${card('Alerta de valoración para esta empresa', `<p class="note" style="margin-top:0">Se comprueba cada vez que abres el Panel o Seguimiento (la aplicación funciona en tu navegador, no envía notificaciones con la app cerrada).</p>
         <form id="alF" class="grid" style="grid-template-columns:1fr 1fr;gap:10px">

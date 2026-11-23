@@ -8,7 +8,10 @@ const obj = (v, d) => (v && typeof v === 'object' && !Array.isArray(v) ? v : d);
 function normalize(raw) {
   const r = obj(raw, {});
   const lists = obj(r.lists, null);
-  const cleanLists = lists ? Object.fromEntries(Object.entries(lists).map(([k, v]) => [k, Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []])) : { Favoritos: [] };
+  // Cada empresa de una lista es un objeto { symbol, name, … }; se conservan esos (y un símbolo suelto se convierte).
+  // Solo se descarta lo que no identifica una empresa.
+  const item = (x) => (typeof x === 'string' && x ? { symbol: x } : x && typeof x === 'object' && typeof x.symbol === 'string' && x.symbol ? x : null);
+  const cleanLists = lists ? Object.fromEntries(Object.entries(lists).map(([k, v]) => [k, Array.isArray(v) ? v.map(item).filter(Boolean) : []])) : { Favoritos: [] };
   if (!cleanLists.Favoritos) cleanLists.Favoritos = [];
   return { ...structuredClone(EMPTY), ...r, lists: cleanLists, history: Array.isArray(r.history) ? r.history : [], analyses: Array.isArray(r.analyses) ? r.analyses : [], weights: obj(r.weights, null), moat: obj(r.moat, {}), assumptions: obj(r.assumptions, {}), alerts: obj(r.alerts, {}), notes: obj(r.notes, {}), peers: obj(r.peers, {}) };
 }

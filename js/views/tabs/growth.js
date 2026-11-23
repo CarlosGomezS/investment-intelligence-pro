@@ -1,8 +1,8 @@
 // Crecimiento y calidad del negocio: CAGR por horizontes, márgenes, ROIC, productividad del capital,
 // crecimiento orgánico vs. adquisiciones, deuda, dilución, estabilidad y generación de caja.
-import { fundamentals } from '../../ui/charts.js?v=169485d7';
-import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=169485d7';
-import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=169485d7';
+import { fundamentals } from '../../ui/charts.js?v=69ff756a';
+import { esc, card, pct, big, num, cls, sgnPct, table, unavailable } from '../../ui/dom.js?v=69ff756a';
+import { isNum, div, cagrN, stdev, yoy, sum } from '../../calc/finance.js?v=69ff756a';
 
 export function render(el, S) {
   const m = S.m, Y = m.years, cur = m.repCur;
@@ -33,11 +33,13 @@ export function render(el, S) {
     { ok: isNum(shG) ? !(shG > 0.01) : null, t: `Acciones: ${sgnPct(shG)} anual. Recompras ${big(buy, cur)}, emisiones ${big(iss, cur)}, pagos en acciones ${big(sbc, cur)} en el periodo.` },
   ];
   // Si las ventas no crecen, no hay «crecimiento de calidad» que diagnosticar
-  checks.unshift({ ok: isNum(revInc) && revInc > 0, t: isNum(revInc) ? `Ventas: ${big(first.revenue, cur)} → ${big(last.revenue, cur)} (${revInc > 0 ? 'crecen' : 'se reducen'}).` : 'Sin ventas comparables.' });
+  // Con un solo ejercicio no hay comparación: ni crece ni se estanca, falta historia
+  const oneY = Y.length < 2;
+  checks.unshift({ ok: oneY ? null : isNum(revInc) && revInc > 0, t: oneY ? 'Solo hay un ejercicio: sin años comparables para medir el crecimiento.' : isNum(revInc) ? `Ventas: ${big(first.revenue, cur)} → ${big(last.revenue, cur)} (${revInc > 0 ? 'crecen' : 'se reducen'}).` : 'Sin ventas comparables.' });
   const real = checks.filter((c) => c.ok === true).length;
   const unknown = checks.slice(1).filter((c) => c.ok === null && !c.opt).length; // adquisiciones, deuda o acciones sin dato
   el.innerHTML = `
-  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${!checks[0].ok ? 'Las ventas no crecen en el periodo: el negocio se está reduciendo o está estancado.' : unknown ? 'Las ventas crecen, pero faltan datos (adquisiciones, deuda o acciones) para saber si el crecimiento es orgánico.' : real === 5 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 4 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
+  ${card('¿Crece de verdad o crece con deuda, compras o acciones?', `<p style="margin-top:0"><b>${checks[0].ok === null ? 'Sin historia suficiente para diagnosticar el crecimiento.' : !checks[0].ok ? 'Las ventas no crecen en el periodo: el negocio se está reduciendo o está estancado.' : unknown ? 'Las ventas crecen, pero faltan datos (adquisiciones, deuda o acciones) para saber si el crecimiento es orgánico.' : real === 5 ? 'Crecimiento de calidad, mayoritariamente orgánico y sin apoyarse en deuda ni dilución.' : real >= 4 ? 'Crecimiento mayoritariamente sano, con algún punto a vigilar.' : 'Buena parte del crecimiento depende de deuda, adquisiciones o emisión de acciones.'}</b> <span class="note">Periodo ${esc(first.year)}–${esc(last.year)}.</span></p>
     ${checks.map((c) => `<div class="alert-row"><span class="pill ${c.ok === true ? 'baja' : c.ok === null ? '' : 'media'}" style="${c.ok === true ? 'color:var(--pos)' : ''}">${c.ok === true ? 'OK' : c.ok === null ? 'Sin dato' : 'Ojo'}</span><div><p style="margin:0">${esc(c.t)}</p></div></div>`).join('')}`)}
   <div class="grid g2" style="margin-top:14px">
     ${card('Tasas de crecimiento anual compuesto (CAGR)', table('cagrT', [{ k: 'l', label: 'Magnitud', align: 'left' }, ...H.map((h) => ({ k: String(h), label: h + (h === 1 ? ' año' : ' años'), f: (v) => `<span class="${cls(v)}">${pct(v)}</span>` }))], rows) + '<p class="note">«—»: no hay suficientes años o el valor inicial/final no es positivo (el CAGR no se puede calcular).</p>')}

@@ -1,10 +1,10 @@
 // filings.xbrl.org: informes anuales oficiales en formato ESEF (IFRS) de empresas cotizadas europeas.
 // Gratuito y sin clave. Se localiza la entidad por nombre (y país si se conoce) y se leen los hechos xBRL-JSON
 // de los últimos informes. Cada informe trae el ejercicio y el anterior. Solo datos anuales.
-import { getJSON } from './http.js?v=169485d7';
-import { config } from '../config.js?v=169485d7';
-import { toStatements } from './xbrl.js?v=169485d7';
-import { hint } from './hints.js?v=169485d7';
+import { getJSON } from './http.js?v=69ff756a';
+import { config } from '../config.js?v=69ff756a';
+import { toStatements } from './xbrl.js?v=69ff756a';
+import { hint } from './hints.js?v=69ff756a';
 
 const H = () => config.get().cacheHours;
 const GENERIC = /^(banco|bank|group|grupo|holding|holdings|international|industria|industrie|societe|sociedad|compania|company|corporation|anonima|aktiengesellschaft|limited|public|europe|european|global|the)$/i;

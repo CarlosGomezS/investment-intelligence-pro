@@ -1,16 +1,16 @@
 // «Métodos»: aplica el método de inversión elegido (Buffett, Graham, Greenblatt, Lynch, Piotroski) a un universo de
 // empresas, ordena por nota y da las 10 primeras con precio de entrada, objetivo y salida según el propio método,
 // más la señal técnica Alligator de Bill Williams para el momento de entrada y su stop.
-import { data } from '../providers/index.js?v=169485d7';
-import { compute, fxFor } from './company.js?v=169485d7';
-import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=169485d7';
-import { fxRate } from '../providers/fxrate.js?v=169485d7';
-import { alligator } from '../calc/alligator.js?v=169485d7';
-import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=169485d7';
-import { logoHTML } from '../app.js?v=169485d7';
-import { isNum } from '../calc/finance.js?v=169485d7';
-import { store } from '../store.js?v=169485d7';
-import { exportCSV } from '../export.js?v=169485d7';
+import { data } from '../providers/index.js?v=69ff756a';
+import { compute, fxFor } from './company.js?v=69ff756a';
+import { METHODS, rankMethod, manualStore } from '../calc/methods.js?v=69ff756a';
+import { fxRate } from '../providers/fxrate.js?v=69ff756a';
+import { alligator } from '../calc/alligator.js?v=69ff756a';
+import { esc, card, num, pct, big, toast } from '../ui/dom.js?v=69ff756a';
+import { logoHTML } from '../app.js?v=69ff756a';
+import { isNum } from '../calc/finance.js?v=69ff756a';
+import { store } from '../store.js?v=69ff756a';
+import { exportCSV } from '../export.js?v=69ff756a';
 
 // Grandes empresas de EE. UU. (solo símbolos; los datos se descargan de tus fuentes). Se usa si el screener de FMP no responde.
 const FALLBACK = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AVGO', 'TSLA', 'LLY', 'JPM', 'V', 'UNH', 'XOM', 'MA', 'JNJ', 'PG', 'HD', 'COST', 'ABBV', 'MRK',

@@ -90,3 +90,20 @@ test('BUFFETT-16-01: sin confirmar el foso, o con un criterio sin dato, no hay �
   [x] = rankMethod('buffett', [{ sym: 'BUF', S }]);
   assert.notEqual(x.res.verdict, 'entra');
 });
+
+test('STORE-16-01: las listas conservan sus empresas al cargar e importar (regresión de la ronda 15)', async () => {
+  globalThis.window = globalThis; globalThis.CustomEvent ??= class { constructor(t) { this.type = t; } }; globalThis.dispatchEvent ??= () => true;
+  const { store } = await import('../js/store.js');
+  store.toggle('Favoritos', { symbol: 'AAPL', name: 'Apple' });
+  store.importAll(store.exportAll());
+  assert.equal(store.inList('Favoritos', 'AAPL'), true);
+  store.importAll('{"lists":{"Favoritos":["MSFT", null, 3]}}'); // símbolo suelto se convierte; basura fuera
+  assert.equal(store.inList('Favoritos', 'MSFT'), true); assert.equal(store.lists().Favoritos.length, 1);
+});
+test('Flecos 16b: pendientes coherentes, un solo ejercicio, insiders sin importe y riesgos con < 2 años', () => {
+  const f = (p) => readFileSync(new URL('../js/' + p, import.meta.url), 'utf8');
+  assert.match(f('calc/methods.js'), /qOk && c7 && !fin && uF !== false \?/);
+  assert.match(f('views/tabs/growth.js'), /Solo hay un ejercicio/);
+  assert.match(f('views/tabs/analysts.js'), /isNum\(sum\(buys\)\) && isNum\(sum\(sells\)\) && !partial/);
+  assert.match(f('views/tabs/risks.js'), /hacen falta al menos dos ejercicios/);
+});
