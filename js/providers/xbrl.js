@@ -10,8 +10,10 @@ export const MAP = {
     revenue: [...G('RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet', 'RevenueFromContractWithCustomerIncludingAssessedTax', 'SalesRevenueGoodsNet'), ...I('Revenue', 'RevenueFromContractsWithCustomers')],
     costOfRevenue: [...G('CostOfRevenue', 'CostOfGoodsAndServicesSold', 'CostOfGoodsSold'), ...I('CostOfSales')],
     grossProfit: [...G('GrossProfit'), ...I('GrossProfit')],
-    researchAndDevelopmentExpenses: [...G('ResearchAndDevelopmentExpense'), ...I('ResearchAndDevelopmentExpense')],
+    researchAndDevelopmentExpenses: [...G('ResearchAndDevelopmentExpense', 'ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost', 'ResearchAndDevelopmentExpenseSoftwareExcludingAcquiredInProcessCost'), ...I('ResearchAndDevelopmentExpense')],
     sellingGeneralAndAdministrativeExpenses: [...G('SellingGeneralAndAdministrativeExpense'), ...I('SellingGeneralAndAdministrativeExpense', 'AdministrativeExpense')],
+    sellingAndMarketingExpenses: [...G('SellingAndMarketingExpense', 'MarketingAndAdvertisingExpense'), ...I('DistributionCosts', 'SellingExpense')],
+    generalAndAdministrativeExpenses: [...G('GeneralAndAdministrativeExpense'), ...I('AdministrativeExpense')],
     operatingExpenses: [...G('OperatingExpenses', 'CostsAndExpenses')],
     operatingIncome: [...G('OperatingIncomeLoss'), ...I('ProfitLossFromOperatingActivities')],
     interestExpense: [...G('InterestExpense', 'InterestExpenseNonoperating', 'InterestExpenseDebt'), ...I('FinanceCosts', 'InterestExpense')],
@@ -39,6 +41,7 @@ export const MAP = {
     totalCurrentLiabilities: [...G('LiabilitiesCurrent'), ...I('CurrentLiabilities')],
     shortTermDebt: [...G('LongTermDebtCurrent', 'DebtCurrent', 'ShortTermBorrowings', 'CommercialPaper'), ...I('CurrentBorrowings', 'ShorttermBorrowings', 'CurrentPortionOfLongtermBorrowings')],
     longTermDebt: [...G('LongTermDebtNoncurrent', 'LongTermDebt'), ...I('NoncurrentBorrowings', 'LongtermBorrowings')],
+    deferredRevenue: [...G('ContractWithCustomerLiabilityCurrent', 'DeferredRevenueCurrent'), ...I('CurrentContractLiabilities')],
     totalLiabilities: [...G('Liabilities'), ...I('Liabilities')],
     retainedEarnings: [...G('RetainedEarningsAccumulatedDeficit'), ...I('RetainedEarnings')],
     totalStockholdersEquity: [...G('StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'), ...I('EquityAttributableToOwnersOfParent', 'Equity')],
@@ -92,6 +95,12 @@ export function toStatements(facts, symbol, maxYears = 15) {
     if (r.grossProfit == null && r.revenue != null && r.costOfRevenue != null) r.grossProfit = r.revenue - r.costOfRevenue;
     r.ebit = r.operatingIncome; r.ebitda = r.operatingIncome != null && r.depreciationAndAmortization != null ? r.operatingIncome + Math.abs(r.depreciationAndAmortization) : null;
     if (r.interestExpense != null) r.interestExpense = Math.abs(r.interestExpense);
+    if (r.sellingGeneralAndAdministrativeExpenses == null && (r.sellingAndMarketingExpenses != null || r.generalAndAdministrativeExpenses != null)) r.sellingGeneralAndAdministrativeExpenses = (r.sellingAndMarketingExpenses || 0) + (r.generalAndAdministrativeExpenses || 0);
+    // BPA: si el valor publicado no cuadra con beneficio / acciones (redondeos, unidades), se recalcula
+    for (const [k, sh] of [['eps', 'weightedAverageShsOut'], ['epsDiluted', 'weightedAverageShsOutDil']]) {
+      const c = r.netIncome != null && r[sh] ? r.netIncome / r[sh] : null;
+      if (c != null && (r[k] == null || Math.abs(r[k] / c - 1) > 0.15)) r[k] = Math.round(c * 100) / 100;
+    }
     return r;
   });
   const balance = mk('balance', bEnds).map((r) => {

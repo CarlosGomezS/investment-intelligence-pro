@@ -1,6 +1,6 @@
 // Catálogo de ratios: cómo se calcula cada uno, su serie histórica, interpretación y umbral de alerta.
 // Valor actual: TTM cuando el proveedor lo da; si no, último ejercicio (la interfaz lo indica).
-import { isNum, div, mean } from './finance.js?v=b26089cc';
+import { isNum, div, mean } from './finance.js?v=d0e839aa';
 
 const yr = (r) => r.fiscalYear || String(r.date).slice(0, 4);
 const histFrom = (rows, f) => rows.map((r) => ({ year: yr(r), v: r[f] })).filter((p) => isNum(p.v));
@@ -10,7 +10,7 @@ const histDerived = (years, f) => years.map((y) => ({ year: y.year, v: y[f] })).
 export const RATIOS = [
   { id: 'pe', label: 'PER', group: 'Valoración', fmt: 'x', better: 'low', formula: 'Precio / BPA diluido (TTM)',
     cur: (m) => (isNum(m.pe) && m.pe > 0 ? m.pe : null), hist: (m) => histFrom(m.ratiosHist, 'priceToEarningsRatio').filter((p) => p.v > 0),
-    interp: (v, avg) => v == null ? 'Sin beneficios positivos: el PER no es interpretable.' : `Pagas ${fx(v, 1)} años de beneficio actual.${avg ? ` Su media histórica es ${fx(avg, 1)}×: ${v > avg * 1.15 ? 'cotiza por encima de su media' : v < avg * 0.85 ? 'cotiza por debajo de su media' : 'en línea con su media'}.` : ''}`,
+    interp: (v, avg, m) => v == null ? 'Sin beneficios positivos: el PER no es interpretable.' : `Sobre el BPA del ${m.periodLabel}: pagas ${fx(v, 1)} años de beneficio.${isNum(m.peProvider) && Math.abs(m.peProvider / v - 1) > 0.05 ? ` Con el BPA de los últimos 12 meses (Finnhub) sería ${fx(m.peProvider, 1)}×.` : ''}${avg ? ` Su media histórica es ${fx(avg, 1)}×: ${v > avg * 1.15 ? 'cotiza por encima de su media' : v < avg * 0.85 ? 'cotiza por debajo de su media' : 'en línea con su media'}.` : ''}`,
     alert: (v) => v > 45 && 'PER muy elevado: exige un crecimiento alto y sostenido.' },
   { id: 'fpe', label: 'PER adelantado', group: 'Valoración', fmt: 'x', better: 'low', formula: 'Precio / BPA estimado por analistas para el próximo ejercicio',
     cur: (m) => (isNum(m.forwardEps) && m.forwardEps > 0 ? m.price / m.forwardEps : null), hist: () => [],
@@ -37,10 +37,10 @@ export const RATIOS = [
     cur: (m) => (isNum(m.T.fcf) && m.T.fcf > 0 ? div(m.ev, m.X(m.T.fcf)) : null), hist: (m) => histFrom(m.kmHist, 'evToFreeCashFlow').filter((p) => p.v > 0),
     interp: (v) => v == null ? 'FCF negativo: la empresa consume caja.' : `Tardarías ${fx(v, 0)} años en recuperar el valor de la empresa con su caja libre actual.`, alert: (v) => v > 50 && 'EV/FCF superior a 50.' },
   { id: 'roe', label: 'ROE', group: 'Rentabilidad', fmt: 'pct', better: 'high', formula: 'Beneficio neto / patrimonio neto',
-    cur: (m) => m.kTTM.returnOnEquityTTM ?? m.T.roe ?? m.last.roe, hist: (m) => histDerived(m.years, 'roe'),
+    cur: (m) => m.T.roe ?? m.last.roe, hist: (m) => histDerived(m.years, 'roe'),
     interp: (v, _a, m) => v == null ? '—' : `${fx(v * 100, 1)} %. ${v > 0.15 ? 'Muy rentable para el accionista' : v > 0.08 ? 'Rentabilidad aceptable' : 'Rentabilidad baja'}${isNum(m.T.debtToEquity) && m.T.debtToEquity > 1.5 && v > 0.15 ? ', pero inflado por deuda (D/E > 1,5): mira el ROIC.' : '.'}`, alert: (v) => v < 0 && 'ROE negativo: destruye valor.' },
   { id: 'roa', label: 'ROA', group: 'Rentabilidad', fmt: 'pct', better: 'high', formula: 'Beneficio neto / activos totales',
-    cur: (m) => m.kTTM.returnOnAssetsTTM ?? m.T.roa, hist: (m) => histDerived(m.years, 'roa'),
+    cur: (m) => m.T.roa ?? m.last.roa, hist: (m) => histDerived(m.years, 'roa'),
     interp: (v) => v == null ? '—' : `${fx(v * 100, 1)} % sobre sus activos. En bancos un 1 % ya es bueno; en industria, más del 7 %.`, alert: (v) => v < 0 && 'ROA negativo.' },
   { id: 'roic', label: 'ROIC', group: 'Rentabilidad', fmt: 'pct', better: 'high', formula: 'EBIT·(1−tipo impositivo) / (patrimonio + deuda − caja)',
     cur: (m) => m.T.roic ?? m.last.roic, hist: (m) => histDerived(m.years, 'roic'),
@@ -59,10 +59,10 @@ export const RATIOS = [
     cur: (m) => m.T.netMargin, hist: (m) => histDerived(m.years, 'netMargin'),
     interp: (v) => v == null ? '—' : `De cada 100 de ventas quedan ${fx(v * 100, 1)} de beneficio.`, alert: (v) => v < 0 && 'Pérdidas netas.' },
   { id: 'cr', label: 'Liquidez corriente', group: 'Solvencia', fmt: 'n', better: 'band', formula: 'Activo corriente / pasivo corriente',
-    cur: (m) => m.rTTM.currentRatioTTM ?? m.T.currentRatio ?? m.last.currentRatio, hist: (m) => histDerived(m.years, 'currentRatio'),
-    interp: (v) => v == null ? '—' : v < 1 ? 'Por debajo de 1: depende de generar caja o refinanciar para pagar el corto plazo.' : v > 3 ? 'Muy holgada (puede indicar caja ociosa).' : 'Holgura adecuada para el corto plazo.', alert: (v) => v < 0.8 && 'Liquidez corriente inferior a 0,8.' },
+    cur: (m) => m.T.currentRatio ?? m.last.currentRatio ?? m.rTTM.currentRatioTTM, hist: (m) => histDerived(m.years, 'currentRatio'),
+    interp: (v, _a, m) => v == null ? '—' : v < 1 && isNum(m.T.deferredRevenue) && isNum(m.T.currentLiabilities) && m.T.deferredRevenue / m.T.currentLiabilities > 0.3 ? `Por debajo de 1, pero el ${fx(m.T.deferredRevenue / m.T.currentLiabilities * 100, 0)} % del pasivo corriente son ingresos cobrados por adelantado (suscripciones), que no se pagan en efectivo: típico y sano en software.` : v < 1 ? 'Por debajo de 1: depende de generar caja o refinanciar para pagar el corto plazo.' : v > 3 ? 'Muy holgada (puede indicar caja ociosa).' : 'Holgura adecuada para el corto plazo.', alert: (v) => v < 0.8 && 'Liquidez corriente inferior a 0,8.' },
   { id: 'qr', label: 'Prueba ácida', group: 'Solvencia', fmt: 'n', better: 'band', formula: '(Activo corriente − inventario) / pasivo corriente',
-    cur: (m) => m.rTTM.quickRatioTTM ?? div(isNum(m.T.currentAssets) ? m.T.currentAssets - (m.T.inventory || 0) : null, m.T.currentLiabilities),
+    cur: (m) => div(isNum(m.T.currentAssets) ? m.T.currentAssets - (m.T.inventory || 0) : null, m.T.currentLiabilities) ?? m.rTTM.quickRatioTTM,
     hist: (m) => m.years.map((y) => ({ year: y.year, v: div(isNum(y.currentAssets) ? y.currentAssets - (y.inventory || 0) : null, y.currentLiabilities) })).filter((p) => isNum(p.v)),
     interp: (v) => v == null ? '—' : `${fx(v, 2)}: liquidez sin contar inventarios.`, alert: (v) => v < 0.5 && 'Prueba ácida inferior a 0,5.' },
   { id: 'de', label: 'Deuda / Patrimonio', group: 'Solvencia', fmt: 'n', better: 'low', formula: 'Deuda financiera total / patrimonio neto',

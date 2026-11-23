@@ -1,7 +1,7 @@
 // Construye el modelo normalizado de una empresa a partir de las respuestas de los proveedores.
 // Aquí se resuelven divisas (moneda de cotización vs. moneda de los estados), años fiscales y TTM.
-import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=b26089cc';
-import { wacc as waccCalc, analystGrowth } from './valuation.js?v=b26089cc';
+import { isNum, div, asc, buildAnnual, deriveYear, cagrN, mean, median, stdev, lastAvg, yoy, closeAt, priceChanges, betaFrom, piotroski, altman, adjustSplits } from './finance.js?v=d0e839aa';
+import { wacc as waccCalc, analystGrowth } from './valuation.js?v=d0e839aa';
 
 const val = (r) => (r && r.ok ? r.data : null);
 const prov = (r) => (r && r.ok ? { source: r.source, fetchedAt: r.fetchedAt, cached: r.cached, endpoint: r.endpoint } : { error: r && r.error ? r.error.code : 'missing', message: r && r.error ? r.error.message : '' });
@@ -97,7 +97,10 @@ export function buildModel(raw, fxRate = 1) {
   if (!isNum(scores.piotroskiScore) && years.length >= 2) { const f = piotroski(years[years.length - 1], years[years.length - 2]); if (isNum(f)) { scores = { ...scores, piotroskiScore: f }; derived.push('Piotroski'); } }
   if (!isNum(scores.altmanZScore) && years.length) { const z = altman(years[years.length - 1], isNum(marketCap) ? marketCap / fx : null); if (isNum(z)) { scores = { ...scores, altmanZScore: z }; derived.push('Altman Z'); } }
 
-  const peRatio = isNum(rTTM.priceToEarningsRatioTTM) && fx === 1 ? rTTM.priceToEarningsRatioTTM : div(price, X(T.eps));
+  // PER coherente con el resto del análisis: precio / BPA del mismo periodo que los estados (TTM o último ejercicio).
+  const peRatio = div(price, X(T.eps));
+  const peProvider = isNum(rTTM.priceToEarningsRatioTTM) && fx === 1 ? rTTM.priceToEarningsRatioTTM : null;
+  const periodLabel = ttmIsReal ? 'últimos 12 meses (TTM)' : `último ejercicio cerrado (${last.year || '—'}${last.date ? ', cierre ' + String(last.date).slice(0, 10) : ''})`;
 
   return {
     symbol: profile.symbol, profile, quote, price, tradeCur, repCur, fx, shares, marketCap, ev, netDebt: netDebtT,
@@ -105,7 +108,7 @@ export function buildModel(raw, fxRate = 1) {
     priceTarget: val(raw.priceTarget) || {}, grades: val(raw.gradesConsensus) || {}, fmpDcf: val(raw.dcf) || {},
     change, growth, derived, splitsAdj, divs, dpsSeries, dpsTTM, splits: asc(val(raw.splits) || []), earnings: asc(val(raw.earnings) || []),
     market: { rf10, rfAssumed, rfDate: tr.length ? tr[tr.length - 1].date : null, erp, erpAssumed, erpCountry: rpRow ? rpRow.country : null, beta, betaAssumed, betaCalc: isNum(betaCalc), costDebt, wacc: w },
-    pe: peRatio, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
+    pe: peRatio, peProvider, periodLabel, prov: Object.fromEntries(Object.entries(raw).map(([k, r]) => [k, prov(r)])), X,
     stats: { revVol: stdev(yoy(rev).filter(isNum)), gmStd: stdev(series('grossMargin').slice(-10)), roicAvg5: lastAvg(series('roic'), 5), roicMin5: Math.min(...series('roic').slice(-5).filter(isNum)), gmAvg5: lastAvg(series('grossMargin'), 5), omAvg5: lastAvg(series('operatingMargin'), 5) },
     median, mean,
   };

@@ -5,16 +5,16 @@
 //  - los proveedores con tope diario que ya han gastado ≥70 % de su cuota pasan al final de la cola,
 //    para que la cuota que queda se use solo cuando nadie más tiene el dato.
 // Se devuelve el primer proveedor que responde con datos, junto con su procedencia.
-import { fmp } from './fmp.js?v=b26089cc';
-import { alphavantage } from './alphavantage.js?v=b26089cc';
-import { finnhub } from './finnhub.js?v=b26089cc';
-import { twelvedata } from './twelvedata.js?v=b26089cc';
-import { roic } from './roic.js?v=b26089cc';
-import { sec } from './sec.js?v=b26089cc';
-import { esef } from './esef.js?v=b26089cc';
-import { config } from '../config.js?v=b26089cc';
-import { ApiError, usage, queueDelay } from './http.js?v=b26089cc';
-import { setHint } from './hints.js?v=b26089cc';
+import { fmp } from './fmp.js?v=d0e839aa';
+import { alphavantage } from './alphavantage.js?v=d0e839aa';
+import { finnhub } from './finnhub.js?v=d0e839aa';
+import { twelvedata } from './twelvedata.js?v=d0e839aa';
+import { roic } from './roic.js?v=d0e839aa';
+import { sec } from './sec.js?v=d0e839aa';
+import { esef } from './esef.js?v=d0e839aa';
+import { config } from '../config.js?v=d0e839aa';
+import { ApiError, usage, queueDelay } from './http.js?v=d0e839aa';
+import { setHint } from './hints.js?v=d0e839aa';
 
 const P = { fmp, av: alphavantage, finnhub, td: twelvedata, roic, sec, esef };
 
@@ -106,6 +106,7 @@ const METHODS = ['profile', 'quote', 'priceChange', 'pricesDaily', 'pricesAdjust
 
 export const data = Object.fromEntries(METHODS.map((m) => [m, (...a) => run(m, a)]));
 data.search = search;
+data.profileLite = (sym) => run('profile', [sym]); // sin completar con otras fuentes (competidores, screener)
 
 /** Perfil combinado: se toma el mejor y se completan los campos que falten con las demás fuentes. */
 const PROFILE_FIELDS = ['description', 'beta', 'range', 'sector', 'industry', 'ceo', 'website', 'currency', 'country', 'exchange', 'marketCap', 'sharesOutstanding', 'fullTimeEmployees', 'ipoDate', 'isin', 'cik'];

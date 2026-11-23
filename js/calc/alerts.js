@@ -1,5 +1,5 @@
 // Detección de anomalías sobre la serie anual. Cada alerta es cuantificada y explicada.
-import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=b26089cc';
+import { isNum, div, mean, lastAvg, cagrN } from './finance.js?v=d0e839aa';
 
 const pct = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' %';
 const pp = (v) => (v * 100).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' p.p.';
@@ -49,6 +49,9 @@ export function detectAlerts(m) {
   if (isNum(a.interestCoverage) && a.interestCoverage < 2) add('alta', 'Deuda', 'Cobertura de intereses débil', `El beneficio operativo cubre solo ${fx(a.interestCoverage, 1)} veces los intereses.`);
   if (isNum(a.netDebtToEbitda) && a.netDebtToEbitda > 3.5) add('alta', 'Deuda', 'Apalancamiento elevado', `Deuda neta ${fx(a.netDebtToEbitda, 1)} veces el EBITDA.`);
   if (isNum(a.netIncome) && a.netIncome < 0) add('alta', 'Rentabilidad', 'Pérdidas', `Pérdidas netas de ${fmtB(a.netIncome)} en ${a.year}.`);
+  const closes = (m.priceData || []).slice(-1260).map((p) => p.close).filter(isNum);
+  if (closes.length > 250) { let pk = -Infinity, dd = 0; for (const c of closes) { pk = Math.max(pk, c); dd = Math.min(dd, c / pk - 1); } if (dd < -0.5) out.push({ sev: 'media', area: 'Mercado', title: 'Caída fuerte de la cotización', detail: `La acción llegó a caer un ${pct(-dd)} desde máximos en los últimos 5 años: el mercado ha dudado seriamente del negocio. Averigua por qué antes de entrar.`, year: a.year }); }
+  if (isNum(a.currentRatio) && a.currentRatio < 1 && isNum(a.deferredRevenue) && isNum(a.currentLiabilities) && a.deferredRevenue / a.currentLiabilities > 0.3) { const i = out.findIndex((x) => x.title === 'Riesgo de liquidez'); if (i >= 0) out.splice(i, 1); }
   const sevRank = { alta: 0, media: 1, baja: 2 };
   return out.sort((x, y) => sevRank[x.sev] - sevRank[y.sev]);
 }

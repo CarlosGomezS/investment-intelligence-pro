@@ -1,17 +1,17 @@
 // Comparador de empresas (hasta 5, métricas actuales e históricas) y comparador sectorial (medianas del sector).
-import { data, gather } from '../providers/index.js?v=b26089cc';
-import { fundamentals } from '../ui/charts.js?v=b26089cc';
-import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=b26089cc';
-import { logoHTML } from '../app.js?v=b26089cc';
-import { isNum, buildAnnual, deriveYear, median, cagrN } from '../calc/finance.js?v=b26089cc';
-import { exportCSV } from '../export.js?v=b26089cc';
+import { data, gather } from '../providers/index.js?v=d0e839aa';
+import { fundamentals } from '../ui/charts.js?v=d0e839aa';
+import { esc, card, num, pct, big, mult, unavailable, table } from '../ui/dom.js?v=d0e839aa';
+import { logoHTML } from '../app.js?v=d0e839aa';
+import { isNum, buildAnnual, deriveYear, median, cagrN } from '../calc/finance.js?v=d0e839aa';
+import { exportCSV } from '../export.js?v=d0e839aa';
 
 const METRICS = [['revenue', 'Ingresos', 'big'], ['netIncome', 'Beneficio neto', 'big'], ['fcf', 'FCF', 'big'], ['ebitda', 'EBITDA', 'big'], ['eps', 'BPA', 'n'], ['grossMargin', 'Margen bruto', 'pct'], ['operatingMargin', 'Margen operativo', 'pct'], ['netMargin', 'Margen neto', 'pct'], ['roic', 'ROIC', 'pct'], ['roe', 'ROE', 'pct'], ['debt', 'Deuda total', 'big'], ['cash', 'Caja', 'big'], ['equity', 'Patrimonio', 'big'], ['shares', 'Acciones', 'big']];
 let metric = 'revenue', mode = 'empresas';
 
 async function company(sym) {
   const from = new Date(Date.now() - 5 * 365 * 864e5).toISOString().slice(0, 10);
-  const r = await gather({ p: () => data.profile(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), i: () => data.income(sym, 'annual', 10), b: () => data.balance(sym, 'annual', 10), c: () => data.cashflow(sym, 'annual', 10), px: () => data.pricesDaily(sym, from) });
+  const r = await gather({ p: () => data.profileLite(sym), rt: () => data.ratiosTTM(sym), km: () => data.keyMetricsTTM(sym), i: () => data.income(sym, 'annual', 10), b: () => data.balance(sym, 'annual', 10), c: () => data.cashflow(sym, 'annual', 10), px: () => data.pricesDaily(sym, from) });
   if (!r.p.ok && !r.i.ok) throw Object.assign(r.p.error || new Error('Sin datos'), { sym });
   const years = buildAnnual(r.i.ok ? r.i.data : [], r.b.ok ? r.b.data : [], r.c.ok ? r.c.data : []).map((y) => deriveYear(y));
   return { sym, p: r.p.data || {}, rt: r.rt.data || {}, km: r.km.data || {}, years, px: r.px.ok ? r.px.data : [], prov: r.p };

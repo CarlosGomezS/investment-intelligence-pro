@@ -1,15 +1,15 @@
 // Ficha completa de empresa: carga de datos, cálculo del análisis y navegación por módulos.
-import { data, gather } from '../providers/index.js?v=b26089cc';
-import { buildModel } from '../calc/model.js?v=b26089cc';
-import { evaluateRatios } from '../calc/ratios.js?v=b26089cc';
-import { detectAlerts } from '../calc/alerts.js?v=b26089cc';
-import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=b26089cc';
-import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=b26089cc';
-import { buildReport } from '../calc/report.js?v=b26089cc';
-import { store } from '../store.js?v=b26089cc';
-import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=b26089cc';
-import { logoHTML, countryOf } from '../app.js?v=b26089cc';
-import { isNum } from '../calc/finance.js?v=b26089cc';
+import { data, gather } from '../providers/index.js?v=d0e839aa';
+import { buildModel } from '../calc/model.js?v=d0e839aa';
+import { evaluateRatios } from '../calc/ratios.js?v=d0e839aa';
+import { detectAlerts } from '../calc/alerts.js?v=d0e839aa';
+import { score, DEFAULT_WEIGHTS } from '../calc/scoring.js?v=d0e839aa';
+import { dcfDefaults, runDcf, multiples, dividendModel, composite } from '../calc/intrinsic.js?v=d0e839aa';
+import { buildReport } from '../calc/report.js?v=d0e839aa';
+import { store } from '../store.js?v=d0e839aa';
+import { esc, num, sgnPct, cls, big, datetime, skeleton, unavailable, toast } from '../ui/dom.js?v=d0e839aa';
+import { logoHTML, countryOf } from '../app.js?v=d0e839aa';
+import { isNum } from '../calc/finance.js?v=d0e839aa';
 
 export const TABS = [
   ['resumen', 'Resumen'], ['grafico', 'Cotización'], ['estados', 'Estados financieros'], ['ratios', 'Ratios'], ['crecimiento', 'Crecimiento y calidad'],
@@ -17,10 +17,10 @@ export const TABS = [
   ['noticias', 'Noticias y eventos'], ['analistas', 'Analistas e insiders'], ['riesgos', 'Alertas y riesgos'], ['scoring', 'Scoring'], ['informe', 'Informe final'], ['simulador', 'Simulador'],
 ];
 const TAB_MOD = {
-  resumen: () => import('./tabs/overview.js?v=b26089cc'), grafico: () => import('./tabs/chart.js?v=b26089cc'), estados: () => import('./tabs/statements.js?v=b26089cc'), ratios: () => import('./tabs/ratios.js?v=b26089cc'),
-  crecimiento: () => import('./tabs/growth.js?v=b26089cc'), deuda: () => import('./tabs/debt.js?v=b26089cc'), valoracion: () => import('./tabs/valuation.js?v=b26089cc'), dividendos: () => import('./tabs/dividends.js?v=b26089cc'),
-  competidores: () => import('./tabs/peers.js?v=b26089cc'), moat: () => import('./tabs/moat.js?v=b26089cc'), noticias: () => import('./tabs/news.js?v=b26089cc'), analistas: () => import('./tabs/analysts.js?v=b26089cc'),
-  riesgos: () => import('./tabs/risks.js?v=b26089cc'), scoring: () => import('./tabs/scoring.js?v=b26089cc'), informe: () => import('./tabs/report.js?v=b26089cc'), simulador: () => import('./tabs/simulator.js?v=b26089cc'),
+  resumen: () => import('./tabs/overview.js?v=d0e839aa'), grafico: () => import('./tabs/chart.js?v=d0e839aa'), estados: () => import('./tabs/statements.js?v=d0e839aa'), ratios: () => import('./tabs/ratios.js?v=d0e839aa'),
+  crecimiento: () => import('./tabs/growth.js?v=d0e839aa'), deuda: () => import('./tabs/debt.js?v=d0e839aa'), valoracion: () => import('./tabs/valuation.js?v=d0e839aa'), dividendos: () => import('./tabs/dividends.js?v=d0e839aa'),
+  competidores: () => import('./tabs/peers.js?v=d0e839aa'), moat: () => import('./tabs/moat.js?v=d0e839aa'), noticias: () => import('./tabs/news.js?v=d0e839aa'), analistas: () => import('./tabs/analysts.js?v=d0e839aa'),
+  riesgos: () => import('./tabs/risks.js?v=d0e839aa'), scoring: () => import('./tabs/scoring.js?v=d0e839aa'), informe: () => import('./tabs/report.js?v=d0e839aa'), simulador: () => import('./tabs/simulator.js?v=d0e839aa'),
 };
 
 const cache = new Map(); // símbolo → estado ya calculado durante la sesión
@@ -156,6 +156,12 @@ export async function render(view, [symRaw, tab = 'resumen']) {
         compute(S);
         cache.set(sym, S);
         store.pushHistory({ symbol: sym, name: S.m.profile.companyName, exchange: S.m.profile.exchange });
+        // Competidores en segundo plano: completan la valoración por múltiplos y la comparación sectorial
+        import('./tabs/peers.js?v=d0e839aa').then(({ loadPeers }) => loadPeers(S)).then(() => {
+          compute(S);
+          const t = location.hash.split('/')[3] || 'resumen';
+          if (view.dataset.loaded === sym && ['resumen', 'valoracion', 'informe', 'ratios', 'scoring'].includes(t)) { view.dataset.loaded = ''; render(view, [sym, t]); }
+        }).catch(() => {});
       } catch (e) {
         view.innerHTML = `<div class="chead">${logoHTML(sym, 52)}<div><h1>${esc(sym)}</h1></div></div>${unavailable('No se pudo cargar la empresa', e)}<p class="note">Comprueba el ticker (las bolsas europeas llevan sufijo: SAN.MC, SAP.DE, MC.PA, ASML.AS) o busca por nombre arriba. Para empresas de fuera de EE. UU. añade en Ajustes la clave gratuita de ROIC.AI y el Worker (SEC EDGAR y cuentas europeas ESEF).</p>`;
         return;
@@ -187,13 +193,13 @@ function bindHeader(view, S) {
   view.querySelector('#dlsel').onchange = async (e) => {
     const f = e.target.value; e.target.value = ''; if (!f) return;
     try {
-      const { exportAll } = await import('../exportall.js?v=b26089cc');
+      const { exportAll } = await import('../exportall.js?v=d0e839aa');
       const r = await exportAll(S, f);
       toast(r === 'copied' ? 'Informe copiado: pégalo en notas o WhatsApp' : r === 'shared' ? 'Archivo listo para compartir/guardar' : r === 'downloaded' ? 'Descarga iniciada' : r === 'cancel' ? 'Cancelado' : 'Tu app no permite descargas: usa «Copiar informe»');
     } catch (err) { toast('No se pudo exportar: ' + err.message); }
   };
   view.querySelector('#reloadb').onclick = async () => {
-    const { clearCache } = await import('../providers/http.js?v=b26089cc');
+    const { clearCache } = await import('../providers/http.js?v=d0e839aa');
     await clearCache(); cache.delete(m.symbol); view.dataset.loaded = '';
     const tab = location.hash.split('/')[3] || 'resumen';
     render(view, [m.symbol, tab]);

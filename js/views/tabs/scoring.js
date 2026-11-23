@@ -1,8 +1,8 @@
 // Scoring 0-100: puntuación por categoría y métrica, fórmulas, umbrales, datos faltantes y ponderaciones configurables.
-import { esc, card, scoreColor, toast } from '../../ui/dom.js?v=b26089cc';
-import { DEFAULT_WEIGHTS, CATEGORY_LABELS } from '../../calc/scoring.js?v=b26089cc';
-import { store } from '../../store.js?v=b26089cc';
-import { gauge } from './overview.js?v=b26089cc';
+import { esc, card, scoreColor, toast } from '../../ui/dom.js?v=d0e839aa';
+import { DEFAULT_WEIGHTS, CATEGORY_LABELS } from '../../calc/scoring.js?v=d0e839aa';
+import { store } from '../../store.js?v=d0e839aa';
+import { gauge } from './overview.js?v=d0e839aa';
 
 export function render(el, S, ctx) {
   const { sc } = S, W = { ...(store.weights() || DEFAULT_WEIGHTS) };

@@ -1,6 +1,6 @@
 // Informe final: responde a las 13 preguntas con los datos calculados y emite una conclusión razonada.
-import { isNum } from './finance.js?v=b26089cc';
-import { fmtB } from './alerts.js?v=b26089cc';
+import { isNum } from './finance.js?v=d0e839aa';
+import { fmtB } from './alerts.js?v=d0e839aa';
 
 const P = (v, d = 1) => (isNum(v) ? (v * 100).toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) + ' %' : 'sin dato');
 const N = (v, d = 2) => (isNum(v) ? v.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: d }) : 'sin dato');
@@ -38,7 +38,10 @@ export function buildReport(m, sc, val, alerts) {
   else if (qual >= 60) conclusion = 'Empresa de calidad, pero sobrevalorada';
   else conclusion = 'Empresa mediocre o con riesgos elevados';
   const pros = sc.cats.filter((x) => x.score != null && x.score >= 70).map((x) => `${x.label} (${x.score}/100)`);
-  const cons = sc.cats.filter((x) => x.score != null && x.score < 45).map((x) => `${x.label} (${x.score}/100)`).concat(alerts.filter((a) => a.sev === 'alta').map((a) => a.title));
+  const cons = sc.cats.filter((x) => x.score != null && x.score < 60).map((x) => `${x.label} solo ${x.score}/100`).concat(alerts.filter((a) => a.sev !== 'baja').map((a) => a.title));
+  if (!m.ttmIsReal) cons.push(`Análisis con datos del ${m.periodLabel}, sin los últimos trimestres`);
+  if ((val.mult || []).some((r) => r.exclude)) cons.push('El crecimiento se ha frenado frente a su historia: sus múltiplos pasados ya no sirven de referencia');
+  cons.push('Riesgos cualitativos que los números no ven: competencia, cambio tecnológico (p. ej. IA), regulación y calidad de la dirección. Revísalos en la pestaña Ventajas competitivas y en las noticias');
   return { questions: q, conclusion, pros, cons, total, quality: qual };
 }
 
